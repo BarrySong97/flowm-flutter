@@ -1,0 +1,52 @@
+---
+description: This rule explains the use of flutter_riverpod for state management. It emphasizes Riverpod's reactive and declarative approach. The key directory is lib/state/ for all Riverpod-related logic, including global and feature-specific providers, and notifiers (StateNotifier/Notifier). It provides examples of provider definitions and widget integration (ConsumerWidget, ref.watch()). Best practices include granular providers, immutability, ProviderScope, dependency injection using providers, testing, and using .autoDispose.
+globs: 
+alwaysApply: false
+---
+# Flutter Riverpod Integration Guide
+
+This document outlines how `flutter_riverpod` is used for state management in conjunction with the existing project structure defined in `@flutter-project-structure.mdc`.
+
+## Core Concepts
+
+- Riverpod is the primary state management solution.
+- It promotes a reactive and declarative approach to managing application state.
+- Providers are used to expose and manage state.
+
+## Directory Structure & Usage
+
+### State Management (`lib/state/`)
+
+- The `lib/state/` directory, as mentioned in `@flutter-project-structure.mdc`, is the central location for all Riverpod-related state management logic.
+- **Providers**:
+    - Global providers (e.g., for app theme, user authentication state) can be defined in `lib/state/providers/`.
+    - Feature-specific providers should be co-located with their respective features or grouped under `lib/state/feature_name/`. For example, providers for a `Product` feature might reside in `lib/state/product/product_providers.dart`.
+- **Notifiers/StateNotifiers**:
+    - Complex state logic is encapsulated in `StateNotifier` (or `Notifier` for newer Riverpod versions) classes.
+    - These are typically located alongside their corresponding providers. For instance, `lib/state/product/product_notifier.dart` would contain the notifier for product state.
+
+## Key Files and Examples
+
+- **Provider Definitions**:
+    - `lib/state/auth/auth_providers.dart` - Contains providers related to authentication state (e.g., `currentUserProvider`, `authNotifierProvider`).
+    - `lib/state/auth/auth_notifier.dart` - Implements the `StateNotifier` for managing authentication logic.
+- **Widget Integration**:
+    - Widgets that need to consume state will use `ConsumerWidget`, `ConsumerStatefulWidget`, or hooks like `ref.watch()` and `ref.read()`.
+    - Example: A widget displaying user information would watch the `currentUserProvider`.
+
+## Best Practices
+
+1.  **Granular Providers**: Prefer smaller, focused providers over large, monolithic ones.
+2.  **Immutability**: Ensure state objects are immutable to leverage Riverpod's performance optimizations.
+3.  **Provider Scope**: Use `ProviderScope` at the root of the application (typically in `lib/app.dart` or `lib/main.dart`) to make providers available throughout the widget tree.
+4.  **Dependency Injection**: Use providers to inject dependencies (like services from `lib/services/`) into notifiers or other providers.
+    - Example: `final authServiceProvider = Provider((ref) => AuthService());`
+    - `final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {`
+    - `  final authService = ref.watch(authServiceProvider);`
+    - `  return AuthNotifier(authService);`
+    - `});`
+5.  **Testing**: Riverpod provides excellent support for testing providers and notifiers. Ensure state logic is well-tested.
+6.  **`autoDispose`**: Use `.autoDispose` modifier for providers whose state should be discarded when they are no longer listened to, to prevent memory leaks.
+
+This guide should be used in conjunction with the main `@flutter-project-structure.mdc` to understand the overall architecture.
+

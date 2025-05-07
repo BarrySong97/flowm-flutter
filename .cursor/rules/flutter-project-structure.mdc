@@ -1,0 +1,82 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ Project Name is flowm
+
+# Flutter Project Structure Guide
+
+This document outlines the organization and key components of our Flutter application.
+
+## Core Application Files
+
+- [lib/main.dart](mdc:lib/main.dart) - Application entry point
+- [lib/app.dart](mdc:lib/app.dart) - Root MaterialApp/CupertinoApp component
+
+## Key Directories
+
+### Pages
+Located in `lib/pages/`, contains all screen-level components:
+- [lib/pages/home_page.dart](mdc:lib/pages/home_page.dart) - Home screen implementation
+- Other page components follow similar naming pattern
+
+### Components
+Located in `lib/components/`, contains reusable UI components:
+- Common components in `lib/components/common/`
+- Each component should be self-contained and reusable
+
+### Services
+Located in `lib/services/`, contains business logic and API integration:
+- [lib/services/auth_service.dart](mdc:lib/services/auth_service.dart) - Authentication service
+- [lib/services/product_service.dart](mdc:lib/services/product_service.dart) - Product-related operations
+- [lib/services/api_service.dart](mdc:lib/services/api_service.dart) - API client implementation
+
+### Database
+Located in `lib/db/`, handles local data persistence:
+- [lib/db/database_helper.dart](mdc:lib/db/database_helper.dart) - Database initialization and management
+- DAO (Data Access Objects) in `lib/db/dao/`:
+  - [lib/db/dao/user_dao.dart](mdc:lib/db/dao/user_dao.dart) - User table operations
+  - [lib/db/dao/product_dao.dart](mdc:lib/db/dao/product_dao.dart) - Product table operations
+- Database models in `lib/db/models/`:
+  - [lib/db/models/db_user_model.dart](mdc:lib/db/models/db_user_model.dart) - User table model
+  - [lib/db/models/db_product_model.dart](mdc:lib/db/models/db_product_model.dart) - Product table model
+
+### Models
+Located in `lib/models/`, contains application-level data models:
+- [lib/models/user_model.dart](mdc:lib/models/user_model.dart) - User model for API/UI
+- [lib/models/product_model.dart](mdc:lib/models/product_model.dart) - Product model for API/UI
+
+### State Management
+Located in `lib/state/`, contains state management logic:
+- Uses Provider, Riverpod, BLoC, or GetX for state management
+- Each feature should have its own state management implementation
+
+### Navigation
+Located in `lib/navigation/`:
+- [lib/navigation/app_router.dart](mdc:lib/navigation/app_router.dart) - Route definitions and navigation logic
+
+### Configuration
+Located in `lib/config/`:
+- [lib/config/theme.dart](mdc:lib/config/theme.dart) - App theme and styling
+
+### Additional Directories
+- `lib/l10n/` - Localization files
+- `lib/generated/` - Generated code files
+- `lib/utils/` - Utility functions and constants:
+  - [lib/utils/constants.dart](mdc:lib/utils/constants.dart) - App-wide constants
+
+## Best Practices
+
+1. Keep components small and focused on a single responsibility
+2. Use services for business logic, not in UI components
+3. Separate database models from API/UI models
+4. Follow consistent naming conventions:
+   - Files: snake_case.dart
+   - Classes: PascalCase
+   - Variables and functions: camelCase
+5. Keep state management logic separate from UI components
+6. Use dependency injection for services and repositories
+
+
+

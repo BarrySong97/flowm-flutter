@@ -1,0 +1,180 @@
+---
+description: This rule outlines how to use the go_router package for navigation in the Flutter project. It covers core concepts like GoRouter and GoRoute, explains the directory structure for navigation-related code (primarily lib/navigation/app_router.dart), and how to integrate it with MaterialApp.router in lib/app.dart. It also details navigation methods (go, push, pop), passing arguments (path parameters, query parameters, extra object), and best practices such as centralized configuration, named routes, error handling, and redirects.
+globs: 
+alwaysApply: false
+---
+# Go_Router Navigation Guide
+
+This document outlines the integration and usage of the `go_router` package for navigation, complementing the project structure defined in `@flutter-project-structure.mdc`.
+
+## Core Concepts
+
+- `go_router` is a declarative routing package for Flutter that simplifies navigation logic by using a URL-based API.
+- It maps URL patterns to widget builders, enabling robust navigation and deep linking.
+- Key components include `GoRouter` (the router itself) and `GoRoute` (defines a specific route).
+
+## Directory Structure & Usage (as per `@flutter-project-structure.mdc`)
+
+### Navigation (`lib/navigation/`)
+
+- The `lib/navigation/` directory is the designated location for all navigation-related code.
+- **Router Configuration (`[lib/navigation/app_router.dart](mdc:lib/navigation/app_router.dart)`)**:
+    - This file should contain the main `GoRouter` instance and all route definitions (`GoRoute` objects).
+    - It's the central place for managing paths, route parameters, redirects, and nested routes.
+
+### Application Root (`[lib/app.dart](mdc:lib/app.dart)`)
+
+- The `GoRouter` instance created in `[lib/navigation/app_router.dart](mdc:lib/navigation/app_router.dart)` is typically integrated with the `MaterialApp.router` constructor in `[lib/app.dart](mdc:lib/app.dart)`.
+
+## Key Files and Examples
+
+### 1. Router Configuration (`[lib/navigation/app_router.dart](mdc:lib/navigation/app_router.dart)`)
+
+This file defines the routes for the application.
+
+```dart
+// lib/navigation/app_router.dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+// Import your page/screen widgets here
+// Example: import '../pages/home_page.dart';
+// Example: import '../pages/details_page.dart';
+// Example: import '../pages/login_page.dart';
+
+// Define a global key for the navigator, if needed for advanced scenarios
+// final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+final GoRouter appRouter = GoRouter(
+  // navigatorKey: _rootNavigatorKey, // Optional
+  initialLocation: '/', // The initial route
+  debugLogDiagnostics: true, // Recommended for development
+  routes: <RouteBase>[
+    GoRoute(
+      path: '/',
+      name: 'home', // Named route
+      builder: (BuildContext context, GoRouterState state) {
+        return const Placeholder(); // Replace with your HomePage widget
+        // Example: return const HomePage();
+      },
+      // Example of a sub-route
+      // routes: <RouteBase>[
+      //   GoRoute(
+      //     path: 'details/:itemId', // Path parameter
+      //     name: 'itemDetails',
+      //     builder: (BuildContext context, GoRouterState state) {
+      //       final String itemId = state.pathParameters['itemId']!;
+      //       final String? sort = state.uri.queryParameters['sort']; // Query parameter
+      //       // Example: return ItemDetailsPage(itemId: itemId, sortOrder: sort);
+      //       return Placeholder(child: Text('Details for $itemId, Sort: $sort'));
+      //     },
+      //   ),
+      // ],
+    ),
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (BuildContext context, GoRouterState state) {
+        // Example: return const LoginPage();
+        return const Placeholder(); // Replace with your LoginPage widget
+      },
+    ),
+    // Add more routes here
+  ],
+  errorBuilder: (context, state) {
+    // Example: return ErrorScreen(error: state.error);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error')),
+      body: Center(child: Text('Page not found: ${state.error?.message}')),
+    );
+  },
+  // redirect: (BuildContext context, GoRouterState state) {
+  //   // Example: Implement authentication checks
+  //   // final bool loggedIn = ... check auth state ...;
+  //   // final bool loggingIn = state.matchedLocation == '/login';
+  //   // if (!loggedIn && !loggingIn) return '/login'; // Redirect to login
+  //   // if (loggedIn && loggingIn) return '/'; // Redirect to home if logged in and on login page
+  //   return null; // No redirect
+  // },
+);
+
+// Example: Define page builders for custom transitions (optional)
+// Page<void> _buildPageWithTransition<T>({
+//   required BuildContext context,
+//   required GoRouterState state,
+//   required Widget child,
+// }) {
+//   return MaterialPage<T>(
+//     key: state.pageKey,
+//     child: child,
+//   );
+//   // Or for custom transitions:
+//   // return CustomTransitionPage<T>(
+//   //   key: state.pageKey,
+//   //   child: child,
+//   //   transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+//   //       FadeTransition(opacity: animation, child: child),
+//   // );
+// }
+```
+
+### 2. Application Integration (`[lib/app.dart](mdc:lib/app.dart)`)
+
+This file integrates the `GoRouter` with the main application widget.
+
+```dart
+// lib/app.dart
+import 'package:flutter/material.dart';
+// Import your app_router.dart file
+import 'package:flowm/navigation/app_router.dart'; // Adjust path if necessary
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      routerConfig: appRouter, // Use the routerConfig from your app_router.dart
+      title: 'My Flutter App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        // Define other theme properties
+      ),
+      // Other MaterialApp properties
+    );
+  }
+}
+```
+(If your main app widget is structured differently, adjust the integration accordingly.)
+
+## Navigation Methods
+
+- **Go to a route (replace current stack or navigate within a shell):**
+  `context.go('/path_to_route');`
+  `context.goNamed('routeName', pathParameters: {'id': '123'}, queryParameters: {'search': 'term'});`
+- **Push a route onto the stack:**
+  `context.push('/path_to_route');`
+  `context.pushNamed('routeName', extra: myDataObject);`
+- **Pop the current route:**
+  `context.pop();`
+- **Check if can pop:**
+  `context.canPop();`
+
+## Passing Arguments
+
+1.  **Path Parameters**: Defined in the route path (e.g., `':id'`). Accessed via `state.pathParameters['id']`.
+2.  **Query Parameters**: Appended to the URL (e.g., `?search=term`). Accessed via `state.uri.queryParameters['search']`.
+3.  **Extra Object**: Passed as an `extra` argument to `go()`, `push()`, `goNamed()`, or `pushNamed()`. Accessed via `state.extra`. This is useful for passing complex objects that are not easily serializable in the URL.
+
+## Best Practices
+
+1.  **Centralized Configuration**: Keep all route definitions in `[lib/navigation/app_router.dart](mdc:lib/navigation/app_router.dart)` for clarity and maintainability, as suggested by `@flutter-project-structure.mdc`.
+2.  **Named Routes**: Prefer using named routes (`GoRoute(name: ...)` and `context.goNamed(...)`) for type safety and easier refactoring.
+3.  **Type Safety for Parameters**: When retrieving path parameters, parse them to the correct type (e.g., `int.parse(state.pathParameters['id']!)`).
+4.  **Error Handling**: Implement a comprehensive `errorBuilder` in `GoRouter` to gracefully handle unknown routes or routing errors.
+5.  **Redirects/Route Guards**: Use the `redirect` callback in `GoRouter` for implementing authentication checks, feature flagging, or other conditional navigation logic.
+6.  **Deep Linking**: Design your routes with deep linking in mind if this is a requirement for your application.
+7.  **Shell Routes**: For persistent UI elements like a `BottomNavigationBar`, explore `ShellRoute` to manage nested navigators.
+8.  **State Management**: Ensure your navigation logic integrates well with your chosen state management solution (e.g., Riverpod, BLoC). Route parameters can be used to trigger state updates or fetch data.
+
+This guide, along with `@flutter-project-structure.mdc`, provides a solid foundation for managing navigation in your Flutter application using `go_router`.
+
