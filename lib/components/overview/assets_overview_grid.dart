@@ -83,7 +83,7 @@ class AssetsOverviewGrid extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(6),
           ),
           clipBehavior: Clip.hardEdge,
           child: Column(

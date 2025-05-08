@@ -55,7 +55,7 @@ class AssetsPage extends StatelessWidget {
     ];
     return SingleChildScrollView(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           spacing: 12,
@@ -64,7 +64,7 @@ class AssetsPage extends StatelessWidget {
               padding: EdgeInsets.only(top: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(6),
               ),
               clipBehavior: Clip.hardEdge,
               child: Column(
@@ -111,7 +111,7 @@ class AssetsPage extends StatelessWidget {
               height: 240,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(6),
               ),
               clipBehavior: Clip.hardEdge,
               child: const TreemapWidget(title: 'Social Media Usage Demo'),

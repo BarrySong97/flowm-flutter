@@ -76,7 +76,7 @@ class _AccountItemState extends State<AccountItem> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         child: Padding(
           // Add padding to match ExpansionTile's content
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
           child: accountRow,
         ),
       );

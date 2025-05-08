@@ -51,7 +51,7 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
           child: Container(
         decoration: const BoxDecoration(
-          color: Color.fromARGB(255, 246, 246, 246),
+          color: Color(0xFFF5F6FB),
         ),
         child: Column(
           children: [
