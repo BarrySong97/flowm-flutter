@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 // Data model for an account
 class Account {
@@ -52,16 +53,22 @@ class _AccountItemState extends State<AccountItem> {
           child: ExpansionTile(
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
-            title: accountRow,
+            title: InkWell(
+              onTap: () => _navigateToDetailPage(context, widget.account),
+              child: accountRow,
+            ),
             children: widget.account.children!.map<Widget>((childAccount) {
               return Padding(
                 // Add padding for child items if desired
                 padding: const EdgeInsets.only(
                     left: 16.0, right: 16.0, bottom: 4.0, top: 0),
-                child: _buildAccountRow(
-                  context: context,
-                  account: childAccount,
-                  isParentRow: false,
+                child: InkWell(
+                  onTap: () => _navigateToDetailPage(context, childAccount),
+                  child: _buildAccountRow(
+                    context: context,
+                    account: childAccount,
+                    isParentRow: false,
+                  ),
                 ),
               );
             }).toList(),
@@ -74,13 +81,24 @@ class _AccountItemState extends State<AccountItem> {
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         elevation: 0.0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-        child: Padding(
-          // Add padding to match ExpansionTile's content
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
-          child: accountRow,
+        child: InkWell(
+          onTap: () => _navigateToDetailPage(context, widget.account),
+          child: Padding(
+            // Add padding to match ExpansionTile's content
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+            child: accountRow,
+          ),
         ),
       );
     }
+  }
+
+  void _navigateToDetailPage(BuildContext context, Account account) {
+    context.pushNamed(
+      'accountDetail',
+      extra: {'account': account},
+    );
   }
 
   Widget _buildAccountRow({

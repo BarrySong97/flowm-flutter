@@ -1,3 +1,4 @@
+import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flowm/components/home_page/overview_page.dart';
@@ -19,7 +20,7 @@ class _MainScreenState extends State<MainScreen> {
   static const List<Widget> _widgetOptions = <Widget>[
     HomePage(),
     CalendarPage(),
-    CalendarPage(),
+    AddPage(),
     FlowPage(),
     SettingsPage(),
   ];
