@@ -53,10 +53,7 @@ class _AccountItemState extends State<AccountItem> {
           child: ExpansionTile(
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
-            title: InkWell(
-              onTap: () => _navigateToDetailPage(context, widget.account),
-              child: accountRow,
-            ),
+            title: accountRow,
             children: widget.account.children!.map<Widget>((childAccount) {
               return Padding(
                 // Add padding for child items if desired

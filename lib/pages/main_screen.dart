@@ -1,8 +1,5 @@
-import 'package:flowm/pages/accounts_page.dart';
 import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/home_page.dart';
-import 'package:flowm/pages/postings_page.dart';
-import 'package:flowm/pages/tags_page.dart';
 import 'package:flowm/pages/transactions_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

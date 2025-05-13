@@ -19,44 +19,10 @@ class SeedData {
   /// Create default account hierarchy following Chinese accounting standards
   Future<void> _createDefaultAccounts() async {
     // Root accounts (main categories)
-    final assetId = await _createAccount(
-      null,
-      '资产',
-      '资产',
-      AccountType.ASSET,
-    );
-
-    final liabilityId = await _createAccount(
-      null,
-      '负债',
-      '负债',
-      AccountType.LIABILITY,
-    );
-
-    final equityId = await _createAccount(
-      null,
-      '所有者权益',
-      '所有者权益',
-      AccountType.EQUITY,
-    );
-
-    final incomeId = await _createAccount(
-      null,
-      '收入',
-      '收入',
-      AccountType.INCOME,
-    );
-
-    final expenseId = await _createAccount(
-      null,
-      '支出',
-      '支出',
-      AccountType.EXPENSE,
-    );
 
     // Asset accounts
     final currentAssetsId = await _createAccount(
-      assetId,
+      null,
       '流动资产',
       '资产:流动资产',
       AccountType.ASSET,
@@ -99,7 +65,7 @@ class SeedData {
 
     // Fixed assets
     final fixedAssetsId = await _createAccount(
-      assetId,
+      null,
       '固定资产',
       '资产:固定资产',
       AccountType.ASSET,
@@ -128,7 +94,7 @@ class SeedData {
 
     // Liability accounts
     final shortTermLiabilityId = await _createAccount(
-      liabilityId,
+      null,
       '流动负债',
       '负债:流动负债',
       AccountType.LIABILITY,
@@ -163,7 +129,7 @@ class SeedData {
     );
 
     final longTermLiabilityId = await _createAccount(
-      liabilityId,
+      null,
       '长期负债',
       '负债:长期负债',
       AccountType.LIABILITY,
@@ -185,14 +151,14 @@ class SeedData {
 
     // Equity accounts
     await _createAccount(
-      equityId,
+      null,
       '个人资本',
       '所有者权益:个人资本',
       AccountType.EQUITY,
     );
 
     await _createAccount(
-      equityId,
+      null,
       '期初余额',
       '所有者权益:期初余额',
       AccountType.EQUITY,
@@ -200,42 +166,42 @@ class SeedData {
 
     // Income accounts
     await _createAccount(
-      incomeId,
+      null,
       '工资收入',
       '收入:工资收入',
       AccountType.INCOME,
     );
 
     await _createAccount(
-      incomeId,
+      null,
       '奖金收入',
       '收入:奖金收入',
       AccountType.INCOME,
     );
 
     await _createAccount(
-      incomeId,
+      null,
       '投资收益',
       '收入:投资收益',
       AccountType.INCOME,
     );
 
     await _createAccount(
-      incomeId,
+      null,
       '理财收益',
       '收入:理财收益',
       AccountType.INCOME,
     );
 
     await _createAccount(
-      incomeId,
+      null,
       '兼职收入',
       '收入:兼职收入',
       AccountType.INCOME,
     );
 
     await _createAccount(
-      incomeId,
+      null,
       '其他收入',
       '收入:其他收入',
       AccountType.INCOME,
@@ -243,7 +209,7 @@ class SeedData {
 
     // Expense accounts
     final dailyExpensesId = await _createAccount(
-      expenseId,
+      null,
       '日常支出',
       '支出:日常支出',
       AccountType.EXPENSE,
@@ -278,7 +244,7 @@ class SeedData {
     );
 
     final housingExpensesId = await _createAccount(
-      expenseId,
+      null,
       '住房支出',
       '支出:住房支出',
       AccountType.EXPENSE,
@@ -306,35 +272,35 @@ class SeedData {
     );
 
     await _createAccount(
-      expenseId,
+      null,
       '通讯',
       '支出:通讯',
       AccountType.EXPENSE,
     );
 
     await _createAccount(
-      expenseId,
+      null,
       '医疗',
       '支出:医疗',
       AccountType.EXPENSE,
     );
 
     await _createAccount(
-      expenseId,
+      null,
       '教育',
       '支出:教育',
       AccountType.EXPENSE,
     );
 
     await _createAccount(
-      expenseId,
+      null,
       '保险',
       '支出:保险',
       AccountType.EXPENSE,
     );
 
     await _createAccount(
-      expenseId,
+      null,
       '税费',
       '支出:税费',
       AccountType.EXPENSE,

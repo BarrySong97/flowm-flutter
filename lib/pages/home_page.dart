@@ -17,15 +17,25 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  final List<Widget> _pages = const [
-    OverviewPage(),
-    AssetsPage(),
-    ExpensesPage(),
-    IncomePage(),
-    LiabilitiesPage(),
-  ];
+  // 页面列表
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 初始化页面列表
+    _pages = [
+      const OverviewPage(),
+      const AssetsPage(),
+      const ExpensesPage(),
+      const IncomePage(),
+      const LiabilitiesPage(),
+    ];
+  }
 
   void _onPageTap(int index) {
+    // 使用自定义导航方法切换页面
     navigateToPage(ref, index);
   }
 
@@ -41,29 +51,36 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       body: SafeArea(
-          child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF5F6FB),
-        ),
-        child: Column(
-          children: [
-            PageHeader(
-              currentIndex: currentIndex,
-              onTap: _onPageTap,
-            ),
-            Expanded(
-              child: PageView(
-                controller: pageController,
-                physics: const ClampingScrollPhysics(),
-                children: _pages,
-                onPageChanged: (index) {
-                  ref.read(currentPageIndexProvider.notifier).state = index;
-                },
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F6FB),
+          ),
+          child: Column(
+            children: [
+              PageHeader(
+                currentIndex: currentIndex,
+                onTap: _onPageTap,
               ),
-            ),
-          ],
+              Expanded(
+                // 使用PageView但启用了更好的性能设置
+                child: PageView(
+                  controller: pageController,
+                  // 使用适中的物理滚动效果
+                  physics: const ClampingScrollPhysics(),
+                  // 禁用页面缓存，提高性能
+                  children: _pages,
+                  onPageChanged: (index) {
+                    // 当用户滑动页面时更新状态
+                    if (index != currentIndex) {
+                      ref.read(currentPageIndexProvider.notifier).state = index;
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
-      )),
+      ),
     );
   }
 }

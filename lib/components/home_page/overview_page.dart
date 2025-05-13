@@ -13,7 +13,8 @@ class OverviewPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accountRepository = ref.watch(accountRepositoryProvider);
+    // 使用共享的topAssetAccountsProvider
+    final topAssetsAsync = ref.watch(topAssetAccountsProvider);
 
     return SingleChildScrollView(
       child: Padding(
@@ -33,20 +34,8 @@ class OverviewPage extends ConsumerWidget {
             ),
 
             // Assets Overview
-            FutureBuilder<List<AccountWithBalance>>(
-              // 获取所有资产账户，不限制数量
-              future: accountRepository.getTopAssetAccounts(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('加载失败: ${snapshot.error}'));
-                }
-
-                final allAccounts = snapshot.data ?? [];
-
+            topAssetsAsync.when(
+              data: (allAccounts) {
                 // 计算所有账户的总资产
                 double totalAssets = 0;
                 for (var account in allAccounts) {
@@ -129,6 +118,18 @@ class OverviewPage extends ConsumerWidget {
                   totalLiabilities: formattedLiabilities,
                 );
               },
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (error, stackTrace) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32.0),
+                  child: Text('加载失败: $error'),
+                ),
+              ),
             ),
 
             // Recent Transactions

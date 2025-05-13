@@ -114,7 +114,7 @@ class LiabilitiesPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               clipBehavior: Clip.hardEdge,
-              child: const TreemapWidget(title: 'Social Media Usage Demo'),
+              child: const Text('Social Media Usage Demo'),
             ),
             ListView.builder(
               shrinkWrap: true,

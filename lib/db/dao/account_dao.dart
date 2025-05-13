@@ -41,6 +41,16 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
       (select(accounts)..where((a) => a.parentAccountId.equals(parentId)))
           .get();
 
+  // Get account balance by account ID from postings table
+  Future<double> getAccountBalance(int accountId) async {
+    final result = await customSelect(
+      'SELECT SUM(amount) as balance FROM postings WHERE account_id = ?',
+      variables: [Variable.withInt(accountId)],
+    ).getSingle();
+
+    return result.read<double?>('balance') ?? 0.0;
+  }
+
   // Get all leaf asset accounts by balance in descending order
   Future<List<AccountWithBalance>> getTopAssetAccounts({int? limit}) async {
     // 先获取所有活跃的资产账户
@@ -64,13 +74,8 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
     final List<AccountWithBalance> accountsWithBalance = [];
 
     for (final account in leafAccounts) {
-      // 通过原始SQL查询获取总余额，避免直接引用postings表
-      final result = await customSelect(
-        'SELECT SUM(amount) as total_balance FROM postings WHERE account_id = ?',
-        variables: [Variable.withInt(account.accountId)],
-      ).getSingle();
-
-      final balance = result.read<double?>('total_balance') ?? 0.0;
+      // 使用getAccountBalance方法获取账户余额
+      final balance = await getAccountBalance(account.accountId);
 
       accountsWithBalance.add(
         AccountWithBalance(
