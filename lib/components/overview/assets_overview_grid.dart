@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../state/home/page_controller_provider.dart';
 
 class AssetItem {
   final String symbol;
@@ -14,7 +16,7 @@ class AssetItem {
   });
 }
 
-class AssetsOverviewGrid extends StatelessWidget {
+class AssetsOverviewGrid extends ConsumerWidget {
   final List<AssetItem> assets;
   final String netAssets;
   final String totalAssets;
@@ -53,18 +55,18 @@ class AssetsOverviewGrid extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
-        const Padding(
+        Padding(
             padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
+                const Text(
                   '资产概览',
                   style: TextStyle(
                     fontSize: 16,
@@ -72,9 +74,15 @@ class AssetsOverviewGrid extends StatelessWidget {
                     color: Colors.black54,
                   ),
                 ),
-                Text(
-                  '查看更多',
-                  style: TextStyle(fontSize: 12),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to the AssetsPage (index 1)
+                    navigateToPage(ref, 1);
+                  },
+                  child: const Text(
+                    '查看更多',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ],
             )),

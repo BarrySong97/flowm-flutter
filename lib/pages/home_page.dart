@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../components/home_page/overview_page.dart';
 import '../components/home_page/assets_page.dart';
 import '../components/home_page/expenses_page.dart';
 import '../components/home_page/income_page.dart';
 import '../components/home_page/liabilities_page.dart';
 import '../components/home_page/page_header.dart';
+import '../state/home/page_controller_provider.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  final PageController _pageController = PageController();
-  int _currentIndex = 0;
-
+class _HomePageState extends ConsumerState<HomePage> {
   final List<Widget> _pages = const [
     OverviewPage(),
     AssetsPage(),
@@ -26,22 +25,15 @@ class _HomePageState extends State<HomePage> {
     LiabilitiesPage(),
   ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _onPageTap(int index) {
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    navigateToPage(ref, index);
   }
 
   @override
   Widget build(BuildContext context) {
+    final pageController = ref.watch(pageControllerProvider);
+    final currentIndex = ref.watch(currentPageIndexProvider);
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Color.fromARGB(255, 246, 246, 246),
       statusBarIconBrightness: Brightness.dark,
@@ -56,18 +48,16 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             PageHeader(
-              currentIndex: _currentIndex,
+              currentIndex: currentIndex,
               onTap: _onPageTap,
             ),
             Expanded(
               child: PageView(
-                controller: _pageController,
+                controller: pageController,
                 physics: const ClampingScrollPhysics(),
                 children: _pages,
                 onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
+                  ref.read(currentPageIndexProvider.notifier).state = index;
                 },
               ),
             ),

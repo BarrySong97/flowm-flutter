@@ -1,22 +1,28 @@
+import 'package:flowm/pages/accounts_page.dart';
 import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/home_page.dart';
+import 'package:flowm/pages/postings_page.dart';
+import 'package:flowm/pages/tags_page.dart';
+import 'package:flowm/pages/transactions_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/home_page/overview_page.dart';
 import 'package:flowm/pages/calendar_page.dart';
 import 'package:flowm/pages/flow_page.dart';
 import 'package:flowm/pages/settings_page.dart';
 import 'package:flashy_tab_bar2/flashy_tab_bar2.dart';
 
-class MainScreen extends StatefulWidget {
+// Provider for MainScreen's selected tab index
+final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
+
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
-
+class _MainScreenState extends ConsumerState<MainScreen> {
   static const List<Widget> _widgetOptions = <Widget>[
     HomePage(),
     CalendarPage(),
@@ -26,16 +32,16 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    ref.read(mainScreenIndexProvider.notifier).state = index;
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = ref.watch(mainScreenIndexProvider);
+
     return Scaffold(
       body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
+        child: _widgetOptions.elementAt(selectedIndex),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -47,12 +53,10 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
         child: FlashyTabBar(
-          selectedIndex: _selectedIndex,
+          selectedIndex: selectedIndex,
           showElevation: false,
           height: 55,
-          onItemSelected: (index) => setState(() {
-            _selectedIndex = index;
-          }),
+          onItemSelected: (index) => _onItemTapped(index),
           items: [
             FlashyTabBarItem(
               icon: Icon(

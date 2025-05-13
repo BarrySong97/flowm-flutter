@@ -2,39 +2,18 @@ import 'package:flowm/components/overview/stat_card.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/components/overview/monthly_overview_card.dart';
 import 'package:flowm/components/overview/assets_overview_grid.dart';
+import 'package:flowm/db/dao/account_dao.dart';
+import 'package:flowm/state/account/account_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-class OverviewPage extends StatelessWidget {
+class OverviewPage extends ConsumerWidget {
   const OverviewPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final assetItems = [
-      AssetItem(
-        symbol: 'BTC',
-        amount: '\$1,876,641.68',
-        changePercentage: 2.68,
-        backgroundColor: const Color(0xFFE8F5E9),
-      ),
-      AssetItem(
-        symbol: 'MATIC',
-        amount: '\$42.04',
-        changePercentage: 8.68,
-        backgroundColor: const Color(0xFFE8F5E9),
-      ),
-      AssetItem(
-        symbol: 'DOT',
-        amount: '\$423.05',
-        changePercentage: -1.08,
-        backgroundColor: const Color(0xFFFFEBEE),
-      ),
-      AssetItem(
-        symbol: 'ETH',
-        amount: '\$32,784.0',
-        changePercentage: -0.31,
-        backgroundColor: const Color(0xFFFFEBEE),
-      ),
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountRepository = ref.watch(accountRepositoryProvider);
 
     return SingleChildScrollView(
       child: Padding(
@@ -54,11 +33,102 @@ class OverviewPage extends StatelessWidget {
             ),
 
             // Assets Overview
-            AssetsOverviewGrid(
-              assets: assetItems,
-              netAssets: '¥150,000.00',
-              totalAssets: '¥200,000.00',
-              totalLiabilities: '¥50,000.00',
+            FutureBuilder<List<AccountWithBalance>>(
+              // 获取所有资产账户，不限制数量
+              future: accountRepository.getTopAssetAccounts(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('加载失败: ${snapshot.error}'));
+                }
+
+                final allAccounts = snapshot.data ?? [];
+
+                // 计算所有账户的总资产
+                double totalAssets = 0;
+                for (var account in allAccounts) {
+                  totalAssets += account.balance;
+                }
+
+                // 只取前4个用于显示
+                final topAccounts = allAccounts.take(4).toList();
+
+                // Create AssetItems from top accounts
+                final assetItems = topAccounts.map((accountWithBalance) {
+                  // 格式化余额
+                  final formatter =
+                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formattedBalance =
+                      formatter.format(accountWithBalance.balance);
+
+                  // 这里随机生成涨跌幅，实际应用中可能需要从其他地方获取
+                  final change =
+                      (accountWithBalance.balance > 1000) ? 2.5 : -1.2;
+
+                  return AssetItem(
+                    symbol: accountWithBalance.account.accountName,
+                    amount: formattedBalance,
+                    changePercentage: change,
+                    backgroundColor: change >= 0
+                        ? const Color(0xFFE8F5E9)
+                        : const Color(0xFFFFEBEE),
+                  );
+                }).toList();
+
+                // 如果获取到的账户少于4个，用默认值填充
+                if (assetItems.length < 4) {
+                  final defaultItems = [
+                    AssetItem(
+                      symbol: '现金',
+                      amount: '¥0.00',
+                      changePercentage: 0.0,
+                      backgroundColor: const Color(0xFFE8F5E9),
+                    ),
+                    AssetItem(
+                      symbol: '支付宝',
+                      amount: '¥0.00',
+                      changePercentage: 0.0,
+                      backgroundColor: const Color(0xFFE8F5E9),
+                    ),
+                    AssetItem(
+                      symbol: '微信',
+                      amount: '¥0.00',
+                      changePercentage: 0.0,
+                      backgroundColor: const Color(0xFFE8F5E9),
+                    ),
+                    AssetItem(
+                      symbol: '银行卡',
+                      amount: '¥0.00',
+                      changePercentage: 0.0,
+                      backgroundColor: const Color(0xFFE8F5E9),
+                    ),
+                  ];
+
+                  for (int i = assetItems.length; i < 4; i++) {
+                    if (i < defaultItems.length) {
+                      assetItems.add(defaultItems[i]);
+                    }
+                  }
+                }
+
+                // 格式化总资产
+                final formatter =
+                    NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                final formattedTotalAssets = formatter.format(totalAssets);
+                const formattedLiabilities = '¥0.00'; // 示例，实际应用需要计算
+                final netAssets = totalAssets; // 这里简化处理，实际应用需要计算资产-负债
+                final formattedNetAssets = formatter.format(netAssets);
+
+                return AssetsOverviewGrid(
+                  assets: assetItems,
+                  netAssets: formattedNetAssets,
+                  totalAssets: formattedTotalAssets,
+                  totalLiabilities: formattedLiabilities,
+                );
+              },
             ),
 
             // Recent Transactions
