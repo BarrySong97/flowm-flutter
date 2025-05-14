@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'dart:math'; // Added for Random
 import 'app_database.dart';
 import 'tables/account_table.dart';
 
@@ -13,6 +14,7 @@ class SeedData {
   Future<void> seedDatabase() async {
     await _createDefaultAccounts();
     await _createSampleTransactions();
+    await _generateYearlyTransactions();
     await _createDefaultTags();
   }
 
@@ -111,6 +113,13 @@ class SeedData {
       shortTermLiabilityId,
       '花呗',
       '负债:流动负债:花呗',
+      AccountType.LIABILITY,
+    );
+
+    await _createAccount(
+      shortTermLiabilityId,
+      '白条',
+      '负债:流动负债:白条',
       AccountType.LIABILITY,
     );
 
@@ -708,6 +717,446 @@ class SeedData {
         amount: -8000.0, // -8,000 元从支付宝支付
       ),
     ]);
+  }
+
+  /// Generates a large number of transactions for the previous year.
+  Future<void> _generateYearlyTransactions() async {
+    final random = Random();
+    final now = DateTime.now();
+    // Generate data for the past year, starting from today and going back one year.
+    final endOfPeriod = DateTime(now.year, now.month, now.day);
+    final startOfPeriod = endOfPeriod.subtract(const Duration(days: 365));
+
+    final allAccounts = await db.accountDao.getAllAccounts();
+
+    // Helper to find account by full path
+    Account? findAccount(String path) {
+      try {
+        return allAccounts.firstWhere((a) => a.fullPath == path);
+      } catch (e) {
+        print(
+            'Account with path "$path" not found. It might not have been created yet or the path is incorrect.');
+        return null;
+      }
+    }
+
+    // Define asset, expense, income and liability accounts to be used
+    final assetAccounts = [
+      findAccount('资产:流动资产:现金'),
+      findAccount('资产:流动资产:银行存款'),
+      findAccount('资产:流动资产:支付宝'),
+      findAccount('资产:流动资产:微信支付'),
+    ].where((a) => a != null).cast<Account>().toList();
+
+    final expenseAccounts = [
+      findAccount('支出:日常支出:餐饮'),
+      findAccount('支出:日常支出:购物'),
+      findAccount('支出:日常支出:交通'),
+      findAccount('支出:日常支出:娱乐'),
+      findAccount('支出:住房支出:水电煤'),
+      findAccount('支出:通讯'),
+      findAccount('支出:医疗'),
+      findAccount('支出:教育'),
+    ].where((a) => a != null).cast<Account>().toList();
+
+    final incomeAccounts = [
+      findAccount('收入:工资收入'),
+      findAccount('收入:奖金收入'),
+      findAccount('收入:兼职收入'),
+      findAccount('收入:理财收益'),
+    ].where((a) => a != null).cast<Account>().toList();
+
+    final liabilityAccounts = [
+      findAccount('负债:流动负债:信用卡'),
+      findAccount('负债:流动负债:花呗'),
+      findAccount('负债:流动负债:白条'),
+      findAccount('负债:流动负债:借呗'),
+      findAccount('负债:长期负债:房贷'),
+      findAccount('负债:长期负债:车贷'),
+    ].where((a) => a != null).cast<Account>().toList();
+
+    if (assetAccounts.isEmpty ||
+        expenseAccounts.isEmpty ||
+        incomeAccounts.isEmpty ||
+        liabilityAccounts.isEmpty) {
+      print(
+          'Warning: Not enough asset, expense, income, or liability accounts found for generating yearly transactions. Skipping generation.');
+      return;
+    }
+
+    final creditCardAccount = findAccount('负债:流动负债:信用卡');
+    final huabeiAccount = findAccount('负债:流动负债:花呗');
+    final baitiaoAccount = findAccount('负债:流动负债:白条');
+    final mortgageAccount = findAccount('负债:长期负债:房贷');
+    final carLoanAccount = findAccount('负债:长期负债:车贷');
+    final bankAccount = findAccount('资产:流动资产:银行存款');
+
+    final List<String> commonExpenseDescriptions = [
+      '午餐',
+      '晚餐',
+      '早餐',
+      '买咖啡',
+      '买奶茶',
+      '超市购物',
+      '买菜',
+      '水果零食',
+      '地铁',
+      '公交',
+      '打车',
+      '共享单车',
+      '电影票',
+      '聚餐 KTV',
+      '饮料',
+      '话费充值',
+      '水电煤缴费',
+      '淘宝购物',
+      '京东购物',
+      '拼多多购物',
+      '美团外卖',
+      '饿了么外卖',
+      '日常用品',
+      '服装鞋包',
+      '美容美发',
+      '健身运动',
+      '宠物用品',
+      '医疗挂号',
+      '买药',
+      '书籍学习',
+      '培训课程',
+      '考试报名费',
+      '孩子教育',
+      '交通罚款',
+      '红包支出',
+      '请客吃饭'
+    ];
+
+    final List<String> incomeDescriptions = [
+      '工资',
+      '奖金',
+      '项目提成',
+      '稿费收入',
+      '兼职收入',
+      '理财收益',
+      '股票收益',
+      '基金收益',
+      '二手物品出售',
+      '红包收入'
+    ];
+
+    for (var day = 0;
+        day <= endOfPeriod.difference(startOfPeriod).inDays;
+        day++) {
+      final currentDate = startOfPeriod.add(Duration(days: day));
+
+      // Simulate monthly salary on the 5th or 10th
+      if ((currentDate.day == 5 || currentDate.day == 10) &&
+          incomeAccounts.isNotEmpty &&
+          bankAccount != null) {
+        final salarySourceAccount =
+            incomeAccounts[random.nextInt(incomeAccounts.length)];
+        final salaryAmount =
+            (random.nextDouble() * 8000 + 7000).roundToDouble(); // 7000-15000
+        String description =
+            incomeDescriptions[random.nextInt(incomeDescriptions.length)];
+        if (description == '工资' || description == '奖金') {
+          description = '${currentDate.month}月$description';
+        }
+
+        final salaryTransactionId = await db.transactionDao.insertTransaction(
+          TransactionsCompanion.insert(
+            transactionDate: currentDate,
+            description: Value(description),
+          ),
+        );
+        await db.postingDao.insertPostings([
+          PostingsCompanion.insert(
+            transactionId: salaryTransactionId,
+            accountId: bankAccount.accountId,
+            amount: salaryAmount,
+          ),
+          PostingsCompanion.insert(
+            transactionId: salaryTransactionId,
+            accountId: salarySourceAccount.accountId,
+            amount: -salaryAmount,
+          ),
+        ]);
+      }
+
+      // Simulate monthly mortgage payment on the 15th
+      if (currentDate.day == 15 &&
+          mortgageAccount != null &&
+          bankAccount != null) {
+        final mortgagePaymentAmount =
+            (random.nextDouble() * 3000 + 4000).roundToDouble(); // 4000-7000
+        final transactionId = await db.transactionDao.insertTransaction(
+          TransactionsCompanion.insert(
+            transactionDate: currentDate,
+            description: Value('${currentDate.month}月房贷还款'),
+          ),
+        );
+        await db.postingDao.insertPostings([
+          PostingsCompanion.insert(
+            transactionId: transactionId,
+            accountId: mortgageAccount.accountId,
+            amount: mortgagePaymentAmount, // Debit liability (decrease)
+          ),
+          PostingsCompanion.insert(
+            transactionId: transactionId,
+            accountId: bankAccount.accountId,
+            amount: -mortgagePaymentAmount, // Credit asset (decrease)
+          ),
+        ]);
+      }
+
+      // Simulate monthly car loan payment on the 20th
+      if (currentDate.day == 20 &&
+          carLoanAccount != null &&
+          bankAccount != null) {
+        final carLoanPaymentAmount =
+            (random.nextDouble() * 1000 + 1500).roundToDouble(); // 1500-2500
+        final transactionId = await db.transactionDao.insertTransaction(
+          TransactionsCompanion.insert(
+            transactionDate: currentDate,
+            description: Value('${currentDate.month}月车贷还款'),
+          ),
+        );
+        await db.postingDao.insertPostings([
+          PostingsCompanion.insert(
+            transactionId: transactionId,
+            accountId: carLoanAccount.accountId,
+            amount: carLoanPaymentAmount, // Debit liability (decrease)
+          ),
+          PostingsCompanion.insert(
+            transactionId: transactionId,
+            accountId: bankAccount.accountId,
+            amount: -carLoanPaymentAmount, // Credit asset (decrease)
+          ),
+        ]);
+      }
+
+      // Simulate credit card, Huabei, Baitiao repayments (e.g., on 1st, 10th, 25th)
+      if ((currentDate.day == 1 ||
+              currentDate.day == 10 ||
+              currentDate.day == 25) &&
+          bankAccount != null) {
+        if (creditCardAccount != null && random.nextBool()) {
+          // Repay Credit Card
+          final amount =
+              (random.nextDouble() * 2000 + 500).roundToDouble(); // 500 - 2500
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value('信用卡还款'),
+            ),
+          );
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: creditCardAccount.accountId,
+              amount: amount,
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: bankAccount.accountId,
+              amount: -amount,
+            ),
+          ]);
+        }
+        if (huabeiAccount != null && random.nextBool()) {
+          // Repay Huabei
+          final amount =
+              (random.nextDouble() * 1000 + 200).roundToDouble(); // 200 - 1200
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value('花呗还款'),
+            ),
+          );
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: huabeiAccount.accountId,
+              amount: amount,
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: bankAccount.accountId, // Assume paid from bank
+              amount: -amount,
+            ),
+          ]);
+        }
+        if (baitiaoAccount != null && random.nextBool()) {
+          // Repay Baitiao
+          final amount =
+              (random.nextDouble() * 800 + 100).roundToDouble(); // 100 - 900
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value('白条还款'),
+            ),
+          );
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: baitiaoAccount.accountId,
+              amount: amount,
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: bankAccount.accountId, // Assume paid from bank
+              amount: -amount,
+            ),
+          ]);
+        }
+      }
+
+      // Random number of other transactions for the day (1-5)
+      final numTransactionsToday = random.nextInt(5) + 1;
+
+      for (var i = 0; i < numTransactionsToday; i++) {
+        final transactionType =
+            random.nextDouble(); // Use double for more granular probability
+
+        if (transactionType < 0.75) {
+          // 75% chance of expense
+          if (expenseAccounts.isEmpty || assetAccounts.isEmpty) continue;
+
+          final expenseAccount =
+              expenseAccounts[random.nextInt(expenseAccounts.length)];
+          // Prioritize non-cash payments, more realistic
+          Account paymentAccount;
+          final paymentMethodRoll = random.nextDouble();
+          if (paymentMethodRoll < 0.4 && huabeiAccount != null) {
+            // 40% Huabei
+            paymentAccount = huabeiAccount;
+          } else if (paymentMethodRoll < 0.7 && baitiaoAccount != null) {
+            // 30% Baitiao
+            paymentAccount = baitiaoAccount;
+          } else if (paymentMethodRoll < 0.9 && creditCardAccount != null) {
+            // 20% Credit Card
+            paymentAccount = creditCardAccount;
+          } else {
+            // 10% other asset accounts (Alipay, WeChat, Bank, Cash)
+            paymentAccount =
+                assetAccounts[random.nextInt(assetAccounts.length)];
+          }
+
+          // More realistic amounts based on expense type
+          double amountValue;
+          if (expenseAccount.accountName.contains('餐饮') ||
+              expenseAccount.accountName.contains('交通')) {
+            amountValue =
+                (random.nextDouble() * 100 + 10).roundToDouble(); // 10-110
+          } else if (expenseAccount.accountName.contains('购物') ||
+              expenseAccount.accountName.contains('娱乐')) {
+            amountValue =
+                (random.nextDouble() * 400 + 50).roundToDouble(); // 50-450
+          } else if (expenseAccount.accountName.contains('医疗') ||
+              expenseAccount.accountName.contains('教育')) {
+            amountValue =
+                (random.nextDouble() * 1000 + 100).roundToDouble(); // 100-1100
+          } else {
+            amountValue = (random.nextDouble() * 200 + 20)
+                .roundToDouble(); // 20-220 for others
+          }
+          final amount = amountValue.toStringAsFixed(2);
+
+          final description = commonExpenseDescriptions[
+              random.nextInt(commonExpenseDescriptions.length)];
+
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value(description),
+            ),
+          );
+
+          // If payment is from Huabei/Baitiao/CreditCard, the posting to liability account is negative (increase liability)
+          // If payment is from an asset account, the posting is negative (decrease asset)
+          final paymentAmount =
+              paymentAccount.accountType == AccountType.LIABILITY
+                  ? -double.parse(amount)
+                  : -double.parse(amount);
+
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: expenseAccount.accountId,
+              amount: double.parse(amount), // Debit Expense
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: paymentAccount.accountId,
+              amount: paymentAmount, // Credit Asset or Liability
+            ),
+          ]);
+        } else if (transactionType < 0.9) {
+          // 15% chance of income (less frequent than expenses)
+          if (incomeAccounts.isEmpty || assetAccounts.isEmpty) continue;
+          final incomeSourceAccount =
+              incomeAccounts[random.nextInt(incomeAccounts.length)];
+          final depositAccount = assetAccounts[random
+              .nextInt(assetAccounts.length)]; // Income to any asset account
+          final amount = (random.nextDouble() * 1000 + 100)
+              .toStringAsFixed(2); // 100 - 1100
+          final description =
+              incomeDescriptions[random.nextInt(incomeDescriptions.length)];
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value(description),
+            ),
+          );
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: depositAccount.accountId,
+              amount: double.parse(amount),
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: incomeSourceAccount.accountId,
+              amount: -double.parse(amount),
+            ),
+          ]);
+        } else {
+          // 10% chance of transfer
+          if (assetAccounts.length < 2) continue;
+
+          final fromAccount =
+              assetAccounts[random.nextInt(assetAccounts.length)];
+          Account toAccount;
+          do {
+            toAccount = assetAccounts[random.nextInt(assetAccounts.length)];
+          } while (toAccount.accountId == fromAccount.accountId);
+
+          final amount =
+              (random.nextDouble() * 2000 + 100).toStringAsFixed(2); // 100-2100
+          final description =
+              '转账从 ${fromAccount.accountName} 到 ${toAccount.accountName}';
+
+          final transactionId = await db.transactionDao.insertTransaction(
+            TransactionsCompanion.insert(
+              transactionDate: currentDate,
+              description: Value(description),
+            ),
+          );
+          await db.postingDao.insertPostings([
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: toAccount.accountId,
+              amount: double.parse(amount),
+            ),
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: fromAccount.accountId,
+              amount: -double.parse(amount),
+            ),
+          ]);
+        }
+      }
+    }
+    print('Finished generating yearly transactions for the past year.');
   }
 
   /// Create default tags for transaction categorization

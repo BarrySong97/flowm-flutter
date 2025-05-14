@@ -1,25 +1,132 @@
+import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math';
 import '../components/common/transaction_list_item.dart';
+import '../db/app_database.dart'; // Assuming TransactionWithAmount is from here or a similar model
+import '../state/transaction/transaction_repository.dart';
+import '../db/dao/transaction_dao.dart'
+    show TransactionWithAmount; // Import TransactionWithAmount explicitly
+import 'package:intl/intl.dart'; // For date formatting
 
-class FlowPage extends StatelessWidget {
+class FlowPage extends ConsumerStatefulWidget {
   const FlowPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final transactions = _generateMockTransactions();
+  ConsumerState<FlowPage> createState() => _FlowPageState();
+}
 
+class _FlowPageState extends ConsumerState<FlowPage> {
+  final ScrollController _scrollController = ScrollController();
+  List<TransactionWithAmount> _transactions = [];
+  int _currentPage = 0;
+  bool _isLoading = false;
+  bool _hasMore = true;
+  final int _perPage = 15; // Number of items to fetch per page
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTransactions();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchTransactions({bool isLoadMore = false}) async {
+    if (_isLoading || (!_hasMore && isLoadMore)) return;
+
+    setState(() {
+      _isLoading = true;
+      if (!isLoadMore) {
+        _transactions = []; // Clear list for initial fetch or refresh
+        _currentPage = 0;
+        _hasMore = true;
+      }
+    });
+
+    try {
+      final repository = ref.read(transactionRepositoryProvider);
+      final newTransactionsStream =
+          repository.watchTransactionsWithAmountPaginated(
+        limit: _perPage,
+        offset: _currentPage * _perPage,
+      );
+
+      // Listen to the stream once for the current batch of data
+      final newTransactions = await newTransactionsStream.first;
+
+      setState(() {
+        if (newTransactions.isNotEmpty) {
+          _transactions.addAll(newTransactions);
+          _currentPage++;
+        } else {
+          _hasMore = false;
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        // Handle error, e.g., show a snackbar or a message
+      });
+      print("Error fetching transactions: $e");
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent -
+                200 && // Trigger load more a bit before the end
+        _hasMore &&
+        !_isLoading) {
+      _fetchTransactions(isLoadMore: true);
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    if (date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day) {
+      return 'Today';
+    } else if (date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day) {
+      return 'Yesterday';
+    } else {
+      return DateFormat('MMMM d, EEEE').format(date); // e.g., May 8, Thursday
+    }
+  }
+
+  String _formatTime(DateTime dateTime) {
+    return DateFormat('HH:mm').format(dateTime); // e.g., 11:41
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverAppBar(
             expandedHeight: 200,
             backgroundColor: const Color(0xFF4CAF50),
+            pinned: true, // Keep app bar visible
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                color: const Color(0xFF4CAF50),
+                color: const Color(0xFF4CAF50), // Match app bar color
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,7 +141,9 @@ class FlowPage extends StatelessWidget {
                         IconButton(
                           icon:
                               const Icon(Icons.grid_view, color: Colors.white),
-                          onPressed: () {},
+                          onPressed: () {
+                            // TODO: Implement filter action
+                          },
                         ),
                       ],
                     ),
@@ -43,8 +152,9 @@ class FlowPage extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Text(
-                              '2025年5月',
+                            // TODO: Implement dynamic date selection
+                            Text(
+                              DateFormat('yyyy年M月').format(DateTime.now()),
                               style:
                                   TextStyle(color: Colors.white, fontSize: 14),
                             ),
@@ -52,16 +162,17 @@ class FlowPage extends StatelessWidget {
                                 color: Colors.white),
                           ],
                         ),
+                        // TODO: Calculate and display actual totals
                         RichText(
                           text: const TextSpan(
                             children: [
                               TextSpan(
-                                text: '总支出¥368.83 ',
+                                text: '总支出¥0.00 ', // Placeholder
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 14),
                               ),
                               TextSpan(
-                                text: '总入账¥0.00',
+                                text: '总入账¥0.00', // Placeholder
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 14),
                               ),
@@ -75,65 +186,127 @@ class FlowPage extends StatelessWidget {
               ),
             ),
           ),
-          SliverList.builder(
-            itemCount: transactions.length,
-            itemBuilder: (context, index) {
-              final transaction = transactions[index];
+          if (_isLoading && _transactions.isEmpty)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_transactions.isEmpty && !_isLoading)
+            SliverFillRemaining(
+              child: Center(
+                child: Text(
+                  'No transactions yet.',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+              ),
+            )
+          else
+            SliverList.builder(
+              itemCount: _transactions.length +
+                  (_hasMore ? 1 : 0), // +1 for loading indicator
+              itemBuilder: (context, index) {
+                if (index == _transactions.length) {
+                  return _hasMore
+                      ? const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : const SizedBox.shrink(); // No more items
+                }
 
-              // Add date header
-              if (index == 0 ||
-                  transactions[index].date != transactions[index - 1].date) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            transaction.date,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                final transactionWithAmount = _transactions[index];
+                final transaction = transactionWithAmount.transaction;
+                final uiDate = _formatDate(transaction.transactionDate);
+                final previousUiDate = index > 0
+                    ? _formatDate(
+                        _transactions[index - 1].transaction.transactionDate)
+                    : null;
+
+                // Add date header
+                if (index == 0 || uiDate != previousUiDate) {
+                  // Calculate daily totals accurately using the 'nature' field
+                  final dailyOut = _transactions
+                      .where((twa) =>
+                          _formatDate(twa.transaction.transactionDate) ==
+                              uiDate &&
+                          twa.nature ==
+                              TransactionNature
+                                  .OUTFLOW) // Use nature for outflow
+                      .fold(
+                          0.0,
+                          (sum, twa) =>
+                              sum +
+                              twa.amount
+                                  .abs()); // Use .abs() if amounts are stored signed
+                  final dailyIn = _transactions
+                      .where((twa) =>
+                          _formatDate(twa.transaction.transactionDate) ==
+                              uiDate &&
+                          twa.nature ==
+                              TransactionNature.INFLOW) // Use nature for inflow
+                      .fold(
+                          0.0,
+                          (sum, twa) =>
+                              sum +
+                              twa.amount
+                                  .abs()); // Use .abs() if amounts are stored signed
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              uiDate,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                '出 ${transaction.totalOut}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
+                            Row(
+                              children: [
+                                Text(
+                                  '出 ¥${dailyOut.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '入 ${transaction.totalIn}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
+                                const SizedBox(width: 8),
+                                Text(
+                                  '入 ¥${dailyIn.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    _buildTransactionItem(transaction),
-                  ],
-                );
-              }
-
-              return _buildTransactionItem(transaction);
-            },
-          ),
+                      _buildTransactionItem(transactionWithAmount),
+                    ],
+                  );
+                }
+                return _buildTransactionItem(transactionWithAmount);
+              },
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionItem(MockTransaction transaction) {
+  Widget _buildTransactionItem(TransactionWithAmount transactionWithAmount) {
+    final transaction = transactionWithAmount.transaction;
+    final totalAmount = transactionWithAmount.amount;
+
+    final bool isExpense = totalAmount < 0;
+    final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+    final formattedAmount = formatter.format(totalAmount.abs());
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -141,157 +314,41 @@ class FlowPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: TransactionListItem(
-        title: transaction.title,
-        subtitle: '${transaction.time} · ${transaction.location}',
-        amount: transaction.isExpense
-            ? '-${transaction.amount}'
-            : '+${transaction.amount}',
-        type: transaction.category,
-        statusColor: _getCategoryColor(transaction.category),
-        isExpense: transaction.isExpense,
+        title: transaction.description ?? '无描述',
+        subtitle:
+            '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+        amount: formattedAmount,
+        type: getTransactionFlowType(
+            transactionWithAmount.fromAccount?.accountType ?? AccountType.ASSET,
+            transactionWithAmount.toAccount?.accountType ?? AccountType.ASSET),
+        statusColor: isExpense
+            ? const Color(0xFF007AFF) // Blue for expense
+            : const Color(0xFF34C759), // Green for income
+        isExpense: isExpense,
       ),
     );
   }
 
+  // Keep _getCategoryColor or adapt it as needed
   Color _getCategoryColor(String category) {
-    switch (category) {
-      case '购物':
-        return const Color(0xFF4CAF50);
-      case '服务':
-        return const Color(0xFF2196F3);
-      case '餐饮':
-        return const Color(0xFFFFC107);
-      case '交通':
-        return const Color(0xFFFF5722);
-      default:
-        return const Color(0xFF9E9E9E);
+    // This is a placeholder. You'll need a more robust way to map categories to colors
+    // or have this information in your data models.
+    final lowerCategory = category.toLowerCase();
+    if (lowerCategory.contains('shop') || lowerCategory.contains('购')) {
+      return const Color(0xFF4CAF50);
+    } else if (lowerCategory.contains('service') ||
+        lowerCategory.contains('服务')) {
+      return const Color(0xFF2196F3);
+    } else if (lowerCategory.contains('food') || lowerCategory.contains('餐')) {
+      return const Color(0xFFFFC107);
+    } else if (lowerCategory.contains('transport') ||
+        lowerCategory.contains('交通')) {
+      return const Color(0xFFFF5722);
     }
-  }
-
-  List<MockTransaction> _generateMockTransactions() {
-    final random = Random();
-    final List<MockTransaction> transactions = [];
-
-    final List<String> categories = ['购物', '服务', '餐饮', '交通'];
-    final List<String> locations = [
-      '合力超市',
-      '泽祥超市',
-      '洋祥风尚科技',
-      '美团',
-      '饿了么',
-      '滴滴出行'
-    ];
-    final List<String> titles = ['日用品', '水果', '服务费', '技术支持', '午餐', '晚餐', '打车'];
-
-    // May 8 transactions
-    transactions.add(
-      MockTransaction(
-        title: '购物',
-        category: '购物',
-        amount: '37.20',
-        date: '5月8日 昨天',
-        time: '11:41',
-        location: '合力超市',
-        isExpense: true,
-        totalOut: '37.20',
-        totalIn: '0.00',
-      ),
-    );
-
-    // May 6 transactions
-    transactions.add(
-      MockTransaction(
-        title: '购物',
-        category: '购物',
-        amount: '64.05',
-        date: '5月6日 星期二',
-        time: '11:38',
-        location: '合力超市',
-        isExpense: true,
-        totalOut: '74.17',
-        totalIn: '0.00',
-      ),
-    );
-
-    transactions.add(
-      MockTransaction(
-        title: '服务',
-        category: '服务',
-        amount: '10.12',
-        date: '5月6日 星期二',
-        time: '09:56',
-        location: '洋祥风尚科技',
-        isExpense: true,
-        totalOut: '74.17',
-        totalIn: '0.00',
-      ),
-    );
-
-    // Generate 97 more random transactions
-    final List<String> days = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
-
-    for (int i = 3; i < 100; i++) {
-      final day = random.nextInt(30) + 1;
-      final dayOfWeek = days[random.nextInt(days.length)];
-      final category = categories[random.nextInt(categories.length)];
-      final location = locations[random.nextInt(locations.length)];
-      final title = category == '购物' || category == '餐饮'
-          ? titles[random.nextInt(3)]
-          : titles[3 + random.nextInt(4)];
-      final isExpense = random.nextDouble() < 0.9; // 90% chance of expense
-      final hour = random.nextInt(12) + 8; // 8 AM to 8 PM
-      final minute = random.nextInt(60);
-      final amount = (random.nextDouble() * 100).toStringAsFixed(2);
-      final totalOut = (random.nextDouble() * 200).toStringAsFixed(2);
-      final totalIn = (random.nextDouble() * 50).toStringAsFixed(2);
-
-      transactions.add(
-        MockTransaction(
-          title: title,
-          category: category,
-          amount: amount,
-          date: '5月${day}日 ${dayOfWeek}',
-          time:
-              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-          location: location,
-          isExpense: isExpense,
-          totalOut: totalOut,
-          totalIn: totalIn,
-        ),
-      );
-    }
-
-    // Sort by date (just for demonstration - this is a simple sort)
-    transactions.sort((a, b) {
-      final aDay = int.parse(a.date.split('月')[1].split('日')[0]);
-      final bDay = int.parse(b.date.split('月')[1].split('日')[0]);
-      return bDay.compareTo(aDay); // Descending order
-    });
-
-    return transactions;
+    return const Color(0xFF9E9E9E); // Default
   }
 }
 
-class MockTransaction {
-  final String title;
-  final String category;
-  final String amount;
-  final String date;
-  final String time;
-  final String location;
-  final bool isExpense;
-  final String totalOut;
-  final String totalIn;
-
-  MockTransaction({
-    required this.title,
-    required this.category,
-    required this.amount,
-    required this.date,
-    required this.time,
-    required this.location,
-    required this.isExpense,
-    required this.totalOut,
-    required this.totalIn,
-  });
-}
+// Remove MockTransaction class and _generateMockTransactions method
+// class MockTransaction { ... }
+// List<MockTransaction> _generateMockTransactions() { ... }

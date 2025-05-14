@@ -93,6 +93,25 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
         ? accountsWithBalance.take(limit).toList()
         : accountsWithBalance;
   }
+
+  // Calculate total liabilities
+  Future<double> getTotalLiabilities() async {
+    // Get all active liability accounts
+    final liabilityAccounts = await (select(accounts)
+          ..where((a) => a.accountType.equals(AccountType.LIABILITY.name))
+          ..where((a) => a.isActive.equals(true)))
+        .get();
+
+    double totalLiabilities = 0.0;
+
+    // Calculate balance for each liability account and sum them up
+    for (final account in liabilityAccounts) {
+      final balance = await getAccountBalance(account.accountId);
+      totalLiabilities += balance;
+    }
+
+    return totalLiabilities;
+  }
 }
 
 // Class to hold account with its calculated balance

@@ -119,92 +119,58 @@ class AccountRepository {
   Future<List<AccountWithBalance>> getTopAssetAccounts({int? limit}) =>
       _accountDao.getTopAssetAccounts(limit: limit);
 
-  /// 获取最近一年资产总额变化
-  ///
-  /// 为了保持图表性能，每周采样一次数据，返回过去一年约52个数据点
-  /// 仅查询叶子节点账户（没有子账户的账户）
-  Future<List<AssetHistoryData>> getYearlyAssetHistory() async {
-    try {
-      // 获取当前日期
-      final now = DateTime.now();
-      // 一年前的日期
-      final oneYearAgo = DateTime(now.year - 1, now.month, now.day);
-
-      // 查询结果列表
-      final results = <AssetHistoryData>[];
-
-      // 获取所有活跃的资产账户
-      final assetAccounts = await (_accountDao.select(_accountDao.accounts)
-            ..where((a) => a.accountType.equals(AccountType.ASSET.name))
-            ..where((a) => a.isActive.equals(true)))
-          .get();
-
-      // 获取所有有子账户的账户ID
-      final accountsWithChildren = await _accountDao
-          .customSelect(
-            'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
-          )
-          .get()
-          .then((rows) =>
-              rows.map((row) => row.read<int>('parent_account_id')).toSet());
-
-      // 过滤出叶子节点账户（没有子账户的账户）
-      final leafAccounts = assetAccounts
-          .where((account) => !accountsWithChildren.contains(account.accountId))
-          .toList();
-
-      if (leafAccounts.isEmpty) {
-        return []; // 如果没有叶子账户，返回空列表
-      }
-
-      // 数据采样间隔（每7天一个数据点）
-      const samplingInterval = 7;
-
-      // 当前日期用于迭代
-      var currentDate = oneYearAgo;
-
-      // 遍历从一年前到今天，每7天取一个数据点
-      while (currentDate.isBefore(now) || currentDate.isAtSameMomentAs(now)) {
-        // 计算当天所有叶子账户的总资产
-        double totalAssets = 0;
-
-        // 为每个叶子账户查询指定日期的余额
-        for (final account in leafAccounts) {
-          final balance =
-              await _getAccountBalanceAtDate(account.accountId, currentDate);
-          totalAssets += balance;
-        }
-
-        // 添加到结果列表
-        results.add(AssetHistoryData(
-          date: currentDate,
-          totalAssets: totalAssets,
-        ));
-
-        // 前进到下一个采样点（7天后）
-        currentDate = currentDate.add(Duration(days: samplingInterval));
-      }
-
-      // 确保最后一个数据点是当天
-      if (results.isEmpty || results.last.date != now) {
-        double totalAssetsToday = 0;
-        for (final account in leafAccounts) {
-          final balance =
-              await _getAccountBalanceAtDate(account.accountId, now);
-          totalAssetsToday += balance;
-        }
-
-        results.add(AssetHistoryData(
-          date: now,
-          totalAssets: totalAssetsToday,
-        ));
-      }
-
-      return results;
-    } catch (e) {
-      print('获取资产历史数据时出错: $e');
-      return []; // 发生错误时返回空列表
+  /// 根据时间获取资产历史数据
+  Future<List<AssetHistoryData>> getAssetHistoryByTime(
+      DateTime start, DateTime end) async {
+    final allAssetAccounts =
+        await _accountDao.watchAccountsByType(AccountType.ASSET).first;
+    if (allAssetAccounts.isEmpty) {
+      return [];
     }
+
+    // 获取所有作为父账户的账户ID
+    final parentAccountIds = await _accountDao
+        .customSelect(
+          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
+        )
+        .get()
+        .then((rows) =>
+            rows.map((row) => row.read<int>('parent_account_id')).toSet());
+
+    // 过滤出叶子资产账户
+    final leafAssetAccounts = allAssetAccounts
+        .where((account) => !parentAccountIds.contains(account.accountId))
+        .toList();
+
+    if (leafAssetAccounts.isEmpty) {
+      // 如果没有叶子资产账户（例如，所有资产账户都是其他账户的父账户，或者没有资产账户）
+      // 根据需求，这里可以返回空列表，或者有其他处理逻辑
+      // 当前行为：如果没有叶子资产账户，则返回空历史记录
+      return [];
+    }
+
+    final List<AssetHistoryData> history = [];
+    // Iterate from start date to end date, day by day
+    for (DateTime currentDate = start;
+        currentDate.isBefore(end.add(const Duration(days: 1)));
+        currentDate = currentDate.add(const Duration(days: 1))) {
+      double dailyTotalAssets = 0.0;
+      for (final account in leafAssetAccounts) {
+        // 使用叶子账户进行计算
+        dailyTotalAssets +=
+            await _getAccountBalanceAtDate(account.accountId, currentDate);
+      }
+      history.add(
+          AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
+    }
+    return history;
+  }
+
+  /// 获取年度资产历史数据
+  Future<List<AssetHistoryData>> getYearlyAssetHistory() async {
+    final now = DateTime.now();
+    final oneYearAgo = now.subtract(const Duration(days: 365));
+    return getAssetHistoryByTime(oneYearAgo, now);
   }
 
   /// 获取指定账户在指定日期时的余额
@@ -308,6 +274,141 @@ class AccountRepository {
         .toList();
 
     return AccountWithChildren(account: root, children: children);
+  }
+
+  /// 获取指定时间段内的总支出
+  ///
+  /// 1. 获取所有叶子支出账户
+  /// 2. 计算这些账户在指定时间段内的支出总和
+  Future<double> getExpenseInPeriod(DateTime start, DateTime end) async {
+    // 1. 获取所有账户并筛选出支出账户
+    final allAccounts = await _accountDao.getAllAccounts();
+    final expenseAccounts = allAccounts
+        .where((acc) => acc.accountType == AccountType.EXPENSE)
+        .toList();
+
+    if (expenseAccounts.isEmpty) {
+      return 0.0; // 没有支出账户，总支出为0
+    }
+
+    // 获取所有作为父账户的账户ID
+    final parentAccountIds = await _accountDao
+        .customSelect(
+          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
+        )
+        .get()
+        .then((rows) =>
+            rows.map((row) => row.read<int>('parent_account_id')).toSet());
+
+    // 筛选出叶子支出账户
+    final leafExpenseAccounts = expenseAccounts
+        .where((account) => !parentAccountIds.contains(account.accountId))
+        .toList();
+
+    if (leafExpenseAccounts.isEmpty) {
+      // 如果没有叶子支出账户 (例如，所有支出账户都是父账户，或没有支出账户)
+      return 0.0;
+    }
+
+    double totalExpenses = 0.0;
+
+    for (final account in leafExpenseAccounts) {
+      try {
+        // 构建SQL查询，查询指定日期范围内该账户的所有交易金额总和
+        // 对于支出账户，amount 通常是正数，代表支出金额
+        final result = await _accountDao.customSelect(
+          '''
+          SELECT SUM(p.amount) as period_expense
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id = ? 
+          AND t.transaction_date >= ?
+          AND t.transaction_date <= ?
+          ''',
+          variables: [
+            Variable.withInt(account.accountId),
+            Variable.withDateTime(start),
+            Variable.withDateTime(end),
+          ],
+        ).getSingle();
+
+        totalExpenses += result.read<double?>('period_expense') ?? 0.0;
+      } catch (e) {
+        print('获取账户 ${account.accountId} 在时间段 $start - $end 的支出时出错: $e');
+        //可以选择继续计算其他账户或抛出异常
+      }
+    }
+    return totalExpenses;
+  }
+
+  /// 获取指定时间段内的总收入
+  ///
+  /// 1. 获取所有叶子收入账户
+  /// 2. 计算这些账户在指定时间段内的收入总和
+  Future<double> getIncomeInPeriod(DateTime start, DateTime end) async {
+    // 1. 获取所有账户并筛选出收入账户
+    final allAccounts = await _accountDao.getAllAccounts();
+    final incomeAccounts = allAccounts
+        .where((acc) => acc.accountType == AccountType.INCOME)
+        .toList();
+
+    if (incomeAccounts.isEmpty) {
+      return 0.0; // 没有收入账户，总收入为0
+    }
+
+    // 获取所有作为父账户的账户ID
+    final parentAccountIds = await _accountDao
+        .customSelect(
+          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
+        )
+        .get()
+        .then((rows) =>
+            rows.map((row) => row.read<int>('parent_account_id')).toSet());
+
+    // 筛选出叶子收入账户
+    final leafIncomeAccounts = incomeAccounts
+        .where((account) => !parentAccountIds.contains(account.accountId))
+        .toList();
+
+    if (leafIncomeAccounts.isEmpty) {
+      // 如果没有叶子收入账户
+      return 0.0;
+    }
+
+    double totalIncome = 0.0;
+
+    for (final account in leafIncomeAccounts) {
+      try {
+        // 构建SQL查询，查询指定日期范围内该账户的所有交易金额总和
+        // 对于收入账户，amount 通常是负数 (贷方)
+        final result = await _accountDao.customSelect(
+          """
+          SELECT SUM(p.amount) as period_income
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id = ? 
+          AND t.transaction_date >= ?
+          AND t.transaction_date <= ?
+          """,
+          variables: [
+            Variable.withInt(account.accountId),
+            Variable.withDateTime(start),
+            Variable.withDateTime(end),
+          ],
+        ).getSingle();
+
+        // 收入金额在数据库中为负，所以取反得到正数收入
+        totalIncome -= result.read<double?>('period_income') ?? 0.0;
+      } catch (e) {
+        print('获取账户 ${account.accountId} 在时间段 $start - $end 的收入时出错: $e');
+        //可以选择继续计算其他账户或抛出异常
+      }
+    }
+    return totalIncome;
+  }
+
+  Future<double> getTotalLiabilities() {
+    return _accountDao.getTotalLiabilities();
   }
 }
 

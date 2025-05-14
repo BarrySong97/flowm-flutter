@@ -3,10 +3,56 @@ import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/components/overview/monthly_overview_card.dart';
 import 'package:flowm/components/overview/assets_overview_grid.dart';
 import 'package:flowm/db/dao/account_dao.dart';
+import 'package:flowm/db/dao/transaction_dao.dart';
+import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/transaction/transaction_repository.dart';
+import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
+// Provider to fetch current month's expenses
+final currentMonthExpenseProvider = FutureProvider<double>((ref) async {
+  final now = DateTime.now();
+  final startOfMonth = DateTime(now.year, now.month, 1);
+  final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+  final repository = ref.watch(accountRepositoryProvider);
+  return repository.getExpenseInPeriod(startOfMonth, endOfMonth);
+});
+
+// Provider to fetch current month's income
+final currentMonthIncomeProvider = FutureProvider<double>((ref) async {
+  final now = DateTime.now();
+  final startOfMonth = DateTime(now.year, now.month, 1);
+  final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+  final repository = ref.watch(accountRepositoryProvider);
+  return repository.getIncomeInPeriod(startOfMonth, endOfMonth);
+});
+
+// Provider to fetch total liabilities
+final totalLiabilitiesProvider = FutureProvider<double>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  return repository.getTotalLiabilities();
+});
+
+// Provider for combined monthly overview data (expense, income, balance)
+final monthlyOverviewDataProvider =
+    FutureProvider<({double expense, double income, double balance})>(
+        (ref) async {
+  final expense = await ref.watch(currentMonthExpenseProvider.future);
+  final income = await ref.watch(currentMonthIncomeProvider.future);
+  final balance = income - expense;
+  return (expense: expense, income: income, balance: balance);
+});
+
+// Provider to fetch latest transactions
+final latestTransactionsProvider = StreamProvider((ref) {
+  final transactionRepository = ref.watch(transactionRepositoryProvider);
+  return transactionRepository.watchLatestTransactions(limit: 10);
+});
 
 class OverviewPage extends ConsumerWidget {
   const OverviewPage({super.key});
@@ -15,6 +61,9 @@ class OverviewPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 使用共享的topAssetAccountsProvider
     final topAssetsAsync = ref.watch(topAssetAccountsProvider);
+    final monthlyOverviewDataAsync = ref.watch(monthlyOverviewDataProvider);
+    final latestTransactionsAsync = ref.watch(latestTransactionsProvider);
+    final totalLiabilitiesAsync = ref.watch(totalLiabilitiesProvider);
 
     return SingleChildScrollView(
       child: Padding(
@@ -26,96 +75,138 @@ class OverviewPage extends ConsumerWidget {
           spacing: 16,
           children: [
             // Monthly Overview Card
-            const MonthlyOverviewCard(
-              month: '5月',
-              expense: '¥0.00',
-              income: '¥0.00',
-              balance: '¥0.00',
-            ),
+            monthlyOverviewDataAsync.when(
+                data: (data) {
+                  final formatter =
+                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formattedExpense = formatter.format(data.expense);
+                  final formattedIncome = formatter.format(data.income);
+                  final formattedBalance = formatter.format(data.balance);
+
+                  return MonthlyOverviewCard(
+                    month: '${DateTime.now().month}月', // Display current month
+                    expense: formattedExpense,
+                    income: formattedIncome,
+                    balance: formattedBalance,
+                  );
+                },
+                loading: () => const MonthlyOverviewCard(
+                      month: '--月',
+                      expense: '加载中...',
+                      income: '加载中...',
+                      balance: '加载中...',
+                    ),
+                error: (error, stackTrace) {
+                  print(
+                      'Error in monthlyOverviewDataProvider: $error\n$stackTrace');
+                  return const MonthlyOverviewCard(
+                    month: '--月',
+                    expense: '错误',
+                    income: '错误',
+                    balance: '错误',
+                  );
+                }),
 
             // Assets Overview
             topAssetsAsync.when(
               data: (allAccounts) {
-                // 计算所有账户的总资产
-                double totalAssets = 0;
-                for (var account in allAccounts) {
-                  totalAssets += account.balance;
-                }
-
-                // 只取前4个用于显示
-                final topAccounts = allAccounts.take(4).toList();
-
-                // Create AssetItems from top accounts
-                final assetItems = topAccounts.map((accountWithBalance) {
-                  // 格式化余额
-                  final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
-                  final formattedBalance =
-                      formatter.format(accountWithBalance.balance);
-
-                  // 这里随机生成涨跌幅，实际应用中可能需要从其他地方获取
-                  final change =
-                      (accountWithBalance.balance > 1000) ? 2.5 : -1.2;
-
-                  return AssetItem(
-                    symbol: accountWithBalance.account.accountName,
-                    amount: formattedBalance,
-                    changePercentage: change,
-                    backgroundColor: change >= 0
-                        ? const Color(0xFFE8F5E9)
-                        : const Color(0xFFFFEBEE),
-                  );
-                }).toList();
-
-                // 如果获取到的账户少于4个，用默认值填充
-                if (assetItems.length < 4) {
-                  final defaultItems = [
-                    AssetItem(
-                      symbol: '现金',
-                      amount: '¥0.00',
-                      changePercentage: 0.0,
-                      backgroundColor: const Color(0xFFE8F5E9),
-                    ),
-                    AssetItem(
-                      symbol: '支付宝',
-                      amount: '¥0.00',
-                      changePercentage: 0.0,
-                      backgroundColor: const Color(0xFFE8F5E9),
-                    ),
-                    AssetItem(
-                      symbol: '微信',
-                      amount: '¥0.00',
-                      changePercentage: 0.0,
-                      backgroundColor: const Color(0xFFE8F5E9),
-                    ),
-                    AssetItem(
-                      symbol: '银行卡',
-                      amount: '¥0.00',
-                      changePercentage: 0.0,
-                      backgroundColor: const Color(0xFFE8F5E9),
-                    ),
-                  ];
-
-                  for (int i = assetItems.length; i < 4; i++) {
-                    if (i < defaultItems.length) {
-                      assetItems.add(defaultItems[i]);
+                return totalLiabilitiesAsync.when(
+                  data: (totalLiabilitiesValue) {
+                    // 计算所有账户的总资产
+                    double totalAssets = 0;
+                    for (var account in allAccounts) {
+                      totalAssets += account.balance;
                     }
-                  }
-                }
 
-                // 格式化总资产
-                final formatter =
-                    NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
-                final formattedTotalAssets = formatter.format(totalAssets);
-                const formattedLiabilities = '¥0.00'; // 示例，实际应用需要计算
-                final netAssets = totalAssets; // 这里简化处理，实际应用需要计算资产-负债
-                final formattedNetAssets = formatter.format(netAssets);
+                    // 只取前4个用于显示
+                    final topAccounts = allAccounts.take(4).toList();
 
-                return AssetsOverviewGrid(
-                  assets: assetItems,
-                  netAssets: formattedNetAssets,
-                  totalAssets: formattedTotalAssets,
-                  totalLiabilities: formattedLiabilities,
+                    // Create AssetItems from top accounts
+                    final assetItems = topAccounts.map((accountWithBalance) {
+                      // 格式化余额
+                      final formatter =
+                          NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                      final formattedBalance =
+                          formatter.format(accountWithBalance.balance);
+
+                      // 这里随机生成涨跌幅，实际应用中可能需要从其他地方获取
+                      final change =
+                          (accountWithBalance.balance > 1000) ? 2.5 : -1.2;
+
+                      return AssetItem(
+                        symbol: accountWithBalance.account.accountName,
+                        amount: formattedBalance,
+                        changePercentage: change,
+                        backgroundColor: change >= 0
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFFFEBEE),
+                      );
+                    }).toList();
+
+                    // 如果获取到的账户少于4个，用默认值填充
+                    if (assetItems.length < 4) {
+                      final defaultItems = [
+                        AssetItem(
+                          symbol: '现金',
+                          amount: '¥0.00',
+                          changePercentage: 0.0,
+                          backgroundColor: const Color(0xFFE8F5E9),
+                        ),
+                        AssetItem(
+                          symbol: '支付宝',
+                          amount: '¥0.00',
+                          changePercentage: 0.0,
+                          backgroundColor: const Color(0xFFE8F5E9),
+                        ),
+                        AssetItem(
+                          symbol: '微信',
+                          amount: '¥0.00',
+                          changePercentage: 0.0,
+                          backgroundColor: const Color(0xFFE8F5E9),
+                        ),
+                        AssetItem(
+                          symbol: '银行卡',
+                          amount: '¥0.00',
+                          changePercentage: 0.0,
+                          backgroundColor: const Color(0xFFE8F5E9),
+                        ),
+                      ];
+
+                      for (int i = assetItems.length; i < 4; i++) {
+                        if (i < defaultItems.length) {
+                          assetItems.add(defaultItems[i]);
+                        }
+                      }
+                    }
+
+                    // 格式化总资产、总负债和净资产
+                    final formatter =
+                        NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                    final formattedTotalAssets = formatter.format(totalAssets);
+                    final formattedTotalLiabilities =
+                        formatter.format(totalLiabilitiesValue.abs());
+                    final netAssets = totalAssets + totalLiabilitiesValue;
+                    final formattedNetAssets = formatter.format(netAssets);
+
+                    return AssetsOverviewGrid(
+                      assets: assetItems,
+                      netAssets: formattedNetAssets,
+                      totalAssets: formattedTotalAssets,
+                      totalLiabilities: formattedTotalLiabilities,
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (error, stackTrace) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Text('加载负债失败: $error'),
+                    ),
+                  ),
                 );
               },
               loading: () => const Center(
@@ -127,7 +218,7 @@ class OverviewPage extends ConsumerWidget {
               error: (error, stackTrace) => Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32.0),
-                  child: Text('加载失败: $error'),
+                  child: Text('加载资产失败: $error'),
                 ),
               ),
             ),
@@ -139,7 +230,7 @@ class OverviewPage extends ConsumerWidget {
                 const Padding(
                   padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
                   child: Text(
-                    '今日交易',
+                    '最近交易',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -147,61 +238,180 @@ class OverviewPage extends ConsumerWidget {
                     ),
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  child: Column(
-                    children: [
-                      TransactionListItem(
-                        title: '星巴克',
-                        subtitle: '微信 -> 餐饮',
-                        amount: '¥35.00',
-                        type: '支出',
-                        statusColor: const Color(0xFF34C759),
-                        isExpense: true,
+                latestTransactionsAsync.when(
+                  data: (transactions) {
+                    if (transactions.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                        padding: const EdgeInsets.all(16.0),
+                        child: const Center(
+                          child: Text('暂无交易记录'),
+                        ),
+                      );
+                    }
+
+                    // Group transactions by date
+                    final groupedTransactions =
+                        <DateTime, List<TransactionWithAmount>>{};
+                    for (var transactionWithAmount in transactions) {
+                      final transactionDate = DateTime(
+                        transactionWithAmount.transaction.transactionDate.year,
+                        transactionWithAmount.transaction.transactionDate.month,
+                        transactionWithAmount.transaction.transactionDate.day,
+                      );
+                      if (groupedTransactions.containsKey(transactionDate)) {
+                        groupedTransactions[transactionDate]!
+                            .add(transactionWithAmount);
+                      } else {
+                        groupedTransactions[transactionDate] = [
+                          transactionWithAmount
+                        ];
+                      }
+                    }
+
+                    // Sort dates in descending order
+                    final sortedDates = groupedTransactions.keys.toList()
+                      ..sort((a, b) => b.compareTo(a));
+
+                    return Container(
+                      // transaction list bulder
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        separatorBuilder: (context, index) => const ColoredBox(
+                            color: Colors.transparent,
+                            child: SizedBox(height: 12)),
+                        itemCount: sortedDates.length,
+                        itemBuilder: (context, dateIndex) {
+                          final date = sortedDates[dateIndex];
+                          final transactionsOnDate = groupedTransactions[date]!;
+                          final formattedDate =
+                              DateFormat('MM月dd日 EEEE', 'zh_CN').format(date);
+
+                          // Calculate daily totals using the 'nature' field
+                          double dailyIn = 0.0;
+                          double dailyOut = 0.0;
+
+                          for (var twa in transactionsOnDate) {
+                            if (twa.nature == TransactionNature.INFLOW) {
+                              dailyIn += twa.amount.abs();
+                            } else if (twa.nature ==
+                                TransactionNature.OUTFLOW) {
+                              dailyOut += twa.amount.abs();
+                            }
+                          }
+
+                          final formatter = NumberFormat.currency(
+                              locale: 'zh_CN', symbol: '¥');
+                          final formattedDailyIn = formatter.format(dailyIn);
+                          final formattedDailyOut = formatter.format(dailyOut);
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16.0, vertical: 12.0),
+                                  child: Row(
+                                    // Changed to Row to accommodate totals
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        formattedDate,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      Row(
+                                        // Row for income and expense totals
+                                        children: [
+                                          Text(
+                                            '出 $formattedDailyOut',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '入 $formattedDailyIn',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: transactionsOnDate.length,
+                                  itemBuilder: (context, transactionIndex) {
+                                    final transactionWithAmount =
+                                        transactionsOnDate[transactionIndex];
+                                    final transaction =
+                                        transactionWithAmount.transaction;
+
+                                    // Determine if it's an expense using the 'nature' field
+                                    final bool isExpense =
+                                        transactionWithAmount.nature ==
+                                            TransactionNature.OUTFLOW;
+
+                                    final formatter = NumberFormat.currency(
+                                        locale: 'zh_CN', symbol: '¥');
+                                    // Display the absolute amount, as nature handles inflow/outflow distinction
+                                    final formattedAmount = formatter.format(
+                                        transactionWithAmount.amount.abs());
+
+                                    return TransactionListItem(
+                                      title: transaction.description ?? '无描述',
+                                      subtitle:
+                                          '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                      amount: formattedAmount,
+                                      type: getTransactionFlowType(
+                                          transactionWithAmount
+                                                  .fromAccount?.accountType ??
+                                              AccountType.ASSET,
+                                          transactionWithAmount
+                                                  .toAccount?.accountType ??
+                                              AccountType.ASSET),
+                                      statusColor: isExpense
+                                          ? const Color(
+                                              0xFF007AFF) // Blue for expense
+                                          : const Color(
+                                              0xFF34C759), // Green for income
+                                      isExpense: isExpense,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                      TransactionListItem(
-                        title: '地铁',
-                        subtitle: '支付宝 -> 交通',
-                        amount: '¥4.00',
-                        type: '支出',
-                        statusColor: const Color(0xFF34C759),
-                        isExpense: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24.0),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
-                  child: Text(
-                    '昨日交易',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16.0),
-                  ),
-                  child: Column(
-                    children: [
-                      TransactionListItem(
-                        title: '工资收入',
-                        subtitle: '工商银行 -> 收入',
-                        amount: '¥8,000.00',
-                        type: '收入',
-                        statusColor: const Color(0xFF007AFF),
-                        isExpense: false,
-                      ),
-                    ],
-                  ),
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) {
+                    print('Error loading latest transactions: $error\n$stack');
+                    return const Center(child: Text('加载交易失败'));
+                  },
                 ),
                 const SizedBox(height: 24.0),
                 TextButton(

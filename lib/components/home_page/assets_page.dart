@@ -77,7 +77,27 @@ class AssetsPage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  AssetTrendChart()
+                  // AssetTrendChart()
+                  // Watch the yearly asset trend provider
+                  Consumer(builder: (context, ref, child) {
+                    final assetTrendAsync = ref.watch(yearlyAssetTrendProvider);
+                    return assetTrendAsync.when(
+                      data: (assetData) {
+                        if (assetData.isEmpty) {
+                          return const SizedBox(
+                              height: 200,
+                              child: Center(child: Text('暂无年度资产趋势数据')));
+                        }
+                        return AssetTrendChart(assetData: assetData);
+                      },
+                      loading: () => const SizedBox(
+                          height: 200,
+                          child: Center(child: CircularProgressIndicator())),
+                      error: (error, stack) => SizedBox(
+                          height: 200,
+                          child: Center(child: Text('加载趋势图失败: $error'))),
+                    );
+                  }),
                 ],
               ),
             ),

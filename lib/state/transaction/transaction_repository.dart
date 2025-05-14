@@ -109,4 +109,15 @@ class TransactionRepository {
         : DateTime(now.year + 1, 1, 0, 23, 59, 59);
     return watchTransactionsByDateRange(startOfMonth, endOfMonth);
   }
+
+  /// 获取最新的十条交易
+  Stream<List<TransactionWithAmount>> watchLatestTransactions(
+          {int limit = 10}) =>
+      _transactionDao.watchLatestTransactions(limit: limit);
+
+  /// 获取分页的交易记录 (TransactionWithAmount)
+  Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(
+          {required int limit, required int offset}) =>
+      _transactionDao.watchTransactionsWithAmountPaginated(
+          limit: limit, offset: offset);
 }
