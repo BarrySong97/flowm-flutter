@@ -481,11 +481,11 @@ class AssetHistoryData {
   // 格式化日期显示
   // 对于日期显示，返回如：5/12 或 2023/5/12 格式
   String get formattedDate {
-    final now = DateTime.now();
+    // final now = DateTime.now();
     // 如果是今年的日期，只显示月/日
-    if (date.year == now.year) {
-      return '${date.month}/${date.day}';
-    }
+    // if (date.year == now.year) {
+    //   return '${date.month}/${date.day}';
+    // }
     // 否则显示年/月/日
     return '${date.year}/${date.month}/${date.day}';
   }

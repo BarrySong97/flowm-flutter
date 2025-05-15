@@ -14,7 +14,7 @@ class AssetTrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     // 定义图表主色调
     final Color primaryColor = const Color(0xFF22C5C2);
-
+    print(this.assetData.length);
     return Container(
       padding: EdgeInsets.zero,
       child: SizedBox(
@@ -30,8 +30,9 @@ class AssetTrendChart extends StatelessWidget {
 
           return SfCartesianChart(
             plotAreaBorderWidth: 0,
-            margin: const EdgeInsets.fromLTRB(10, 20, 10, 10),
+            margin: EdgeInsets.zero,
             primaryXAxis: CategoryAxis(
+              isVisible: false,
               majorGridLines: const MajorGridLines(width: 0),
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
               axisLine: const AxisLine(width: 0),
@@ -56,6 +57,7 @@ class AssetTrendChart extends StatelessWidget {
               },
             ),
             primaryYAxis: NumericAxis(
+              isVisible: false,
               // numberFormat handles the formatting of the labels
               numberFormat: NumberFormat.compact(locale: 'zh_CN'),
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
@@ -74,7 +76,7 @@ class AssetTrendChart extends StatelessWidget {
                   : assetData
                           .map((e) => e.totalAssets)
                           .reduce((a, b) => a > b ? a : b) *
-                      1.05,
+                      1.01,
               desiredIntervals:
                   1, // This should result in labels at the effective min and max of the axis.
               // The custom axisLabelFormatter is removed as desiredIntervals: 1 and numberFormat should suffice.
@@ -112,14 +114,15 @@ class AssetTrendChart extends StatelessWidget {
               enable: true,
               activationMode: ActivationMode.singleTap,
               lineType: TrackballLineType.vertical,
+              lineDashArray: <double>[5, 5],
+              lineColor: Colors.black45,
               tooltipDisplayMode: TrackballDisplayMode.nearestPoint,
               builder:
                   (BuildContext context, TrackballDetails trackballDetails) {
                 final dynamic dataPoint = trackballDetails.point;
-
                 if (dataPoint != null && dataPoint.y != null) {
                   final double currentY = dataPoint.y as double;
-
+                  final String formattedDate = dataPoint.x as String;
                   return Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
@@ -133,9 +136,28 @@ class AssetTrendChart extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Text(
-                      formatter.format(currentY),
-                      style: const TextStyle(color: Colors.black, fontSize: 12),
+                    //                     child: Text(
+                    //   '$formattedDate: ${formatter.format(currentY)}',
+                    //   style: const TextStyle(color: Colors.black, fontSize: 12),
+                    // ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      // mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${formatter.format(currentY)}',
+                          style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '$formattedDate',
+                          style: const TextStyle(
+                              color: Colors.black45, fontSize: 12),
+                        ),
+                      ],
                     ),
                   );
                 }

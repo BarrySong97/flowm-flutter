@@ -27,11 +27,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
-      PopoverSelectItem(value: 'year', label: '本年'),
-      PopoverSelectItem(value: '60days', label: '最近60天'),
-      PopoverSelectItem(value: '30days', label: '最近30天'),
       PopoverSelectItem(value: '15days', label: '最近15天'),
-      PopoverSelectItem(value: 'custom', label: '自定义'),
+      PopoverSelectItem(value: '30days', label: '最近30天'),
+      PopoverSelectItem(value: '60days', label: '最近60天'),
+      PopoverSelectItem(value: 'year', label: '本年'),
+      // PopoverSelectItem(value: 'custom', label: '自定义'),
     ];
     return SingleChildScrollView(
       child: Padding(
@@ -71,8 +71,6 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                             // Update the selectedDateRangeProvider when PopoverSelect changes
                             ref.read(selectedDateRangeProvider.notifier).state =
                                 value;
-                            print('Selected value: $value');
-                            // The chart will automatically rebuild as it watches assetTrendProviderByDateRange
                           },
                         ),
                       ],
@@ -87,6 +85,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                         return Text(
                           '¥${totalAssets.toStringAsFixed(2)}',
                           style: const TextStyle(
+                            color: Colors.black,
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
                           ),
