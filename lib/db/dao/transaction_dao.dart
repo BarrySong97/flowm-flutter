@@ -187,6 +187,77 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  // Watch transactions with amount by day
+  Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDay(
+      DateTime day) {
+    final startOfDay = DateTime(day.year, day.month, day.day);
+    final endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59, 999);
+
+    final dayTransactionsQuery = select(transactions)
+      ..where((t) => t.transactionDate.isBetweenValues(startOfDay, endOfDay))
+      ..orderBy([
+        (t) => OrderingTerm(
+            expression: t.transactionDate, mode: OrderingMode.desc),
+        (t) =>
+            OrderingTerm(expression: t.transactionId, mode: OrderingMode.desc),
+      ]);
+
+    return dayTransactionsQuery.watch().asyncMap((dailyTransactionsList) async {
+      if (dailyTransactionsList.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+
+      final resultList = <TransactionWithAmount>[];
+
+      for (final transaction in dailyTransactionsList) {
+        final postingsQuery = select(db.postings).join([
+          innerJoin(db.accounts,
+              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ])
+          ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+        final postingsWithAccounts = await postingsQuery.get();
+
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+
+        if (postingsWithAccounts.isNotEmpty) {
+          final firstPosting =
+              postingsWithAccounts.first.readTable(db.postings);
+          // The amount in TransactionWithAmount is typically the "principal" amount of the transaction, often positive.
+          // The nature (income/expense/transfer) defines its effect.
+          transactionAmount = firstPosting.amount.abs();
+        }
+
+        for (final rowData in postingsWithAccounts) {
+          final posting = rowData.readTable(db.postings);
+          final account = rowData.readTable(db.accounts);
+          // This logic assumes a simple two-posting transaction (debit/credit)
+          // For more complex splits, this might need adjustment or rely on how 'nature' is determined
+          if (posting.amount < 0) {
+            fromAccountObj = account;
+          } else if (posting.amount > 0) {
+            toAccountObj = account;
+          }
+        }
+
+        // Determine transaction nature
+        final nature = getTransactionNature(
+            fromAccountObj?.accountType, toAccountObj?.accountType);
+
+        resultList.add(TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
+          nature: nature,
+        ));
+      }
+      return resultList;
+    });
+  }
+
   // Insert transaction
   Future<int> insertTransaction(TransactionsCompanion transaction) =>
       into(transactions).insert(transaction);

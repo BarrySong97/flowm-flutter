@@ -1,3 +1,4 @@
+import 'package:flowm/components/common/popover_select.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/area_chart.dart';
@@ -7,16 +8,31 @@ import 'package:flowm/components/account/account_item.dart'; // Import AccountIt
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/db/dao/account_dao.dart';
 
-class AssetsPage extends ConsumerWidget {
+class AssetsPage extends ConsumerStatefulWidget {
   const AssetsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AssetsPage> createState() => _AssetsPageState();
+}
+
+class _AssetsPageState extends ConsumerState<AssetsPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // Important for AutomaticKeepAliveClientMixin
     // 使用topAssetAccountsProvider代替直接调用repository
     final topAssetsAsync = ref.watch(topAssetAccountsProvider);
     // 使用uiAccountsProvider获取UI格式的账户数据
     final uiAccountsAsync = ref.watch(uiAccountsProvider);
 
+    final List<PopoverSelectItem> dateRangeOptions = [
+      PopoverSelectItem(value: 'month', label: '本月'),
+      PopoverSelectItem(value: 'year', label: '本年'),
+      PopoverSelectItem(value: '60days', label: '最近60天'),
+      PopoverSelectItem(value: '30days', label: '最近30天'),
+      PopoverSelectItem(value: '15days', label: '最近15天'),
+      PopoverSelectItem(value: 'custom', label: '自定义'),
+    ];
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
@@ -39,11 +55,27 @@ class AssetsPage extends ConsumerWidget {
                 children: [
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      '总资产',
-                      style: const TextStyle(
-                        fontSize: 14,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '总资产',
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                        ),
+                        PopoverSelect(
+                          items: dateRangeOptions,
+                          defaultValue: 'month', // Default to 'month'
+                          onChanged: (value) {
+                            // Update the selectedDateRangeProvider when PopoverSelect changes
+                            ref.read(selectedDateRangeProvider.notifier).state =
+                                value;
+                            print('Selected value: $value');
+                            // The chart will automatically rebuild as it watches assetTrendProviderByDateRange
+                          },
+                        ),
+                      ],
                     ),
                   ),
                   Padding(
@@ -78,15 +110,19 @@ class AssetsPage extends ConsumerWidget {
                     ),
                   ),
                   // AssetTrendChart()
-                  // Watch the yearly asset trend provider
+                  // Watch the asset trend provider by date range
                   Consumer(builder: (context, ref, child) {
-                    final assetTrendAsync = ref.watch(yearlyAssetTrendProvider);
+                    // Watch the new provider
+                    final assetTrendAsync =
+                        ref.watch(assetTrendProviderByDateRange);
                     return assetTrendAsync.when(
                       data: (assetData) {
                         if (assetData.isEmpty) {
                           return const SizedBox(
                               height: 200,
-                              child: Center(child: Text('暂无年度资产趋势数据')));
+                              child: Center(
+                                  child:
+                                      Text('暂无该时间段资产趋势数据'))); // Updated message
                         }
                         return AssetTrendChart(assetData: assetData);
                       },
@@ -197,4 +233,7 @@ class AssetsPage extends ConsumerWidget {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

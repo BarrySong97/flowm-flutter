@@ -120,4 +120,8 @@ class TransactionRepository {
           {required int limit, required int offset}) =>
       _transactionDao.watchTransactionsWithAmountPaginated(
           limit: limit, offset: offset);
+
+  /// 获取某一天交易
+  Stream<List<TransactionWithAmount>> watchTransactionsByDay(DateTime day) =>
+      _transactionDao.watchTransactionsWithAmountByDay(day);
 }

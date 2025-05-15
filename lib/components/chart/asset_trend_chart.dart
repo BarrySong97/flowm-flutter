@@ -37,6 +37,7 @@ class AssetTrendChart extends StatelessWidget {
               axisLine: const AxisLine(width: 0),
               majorTickLines: const MajorTickLines(size: 0),
               labelPlacement: LabelPlacement.onTicks,
+              edgeLabelPlacement: EdgeLabelPlacement.shift,
               axisLabelFormatter: (AxisLabelRenderDetails args) {
                 // args.value is the index for CategoryAxis
                 final int currentIndex = args.value.toInt();
@@ -55,11 +56,28 @@ class AssetTrendChart extends StatelessWidget {
               },
             ),
             primaryYAxis: NumericAxis(
-              labelFormat: '{value}',
+              // numberFormat handles the formatting of the labels
               numberFormat: NumberFormat.compact(locale: 'zh_CN'),
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
               axisLine: const AxisLine(width: 0),
               majorTickLines: const MajorTickLines(size: 0),
+              // Set min/max based on data to guide the axis range.
+              // assetData.isEmpty check is important to avoid error on reduce.
+              minimum: assetData.isEmpty
+                  ? null
+                  : assetData
+                          .map((e) => e.totalAssets)
+                          .reduce((a, b) => a < b ? a : b) *
+                      0.95,
+              maximum: assetData.isEmpty
+                  ? null
+                  : assetData
+                          .map((e) => e.totalAssets)
+                          .reduce((a, b) => a > b ? a : b) *
+                      1.05,
+              desiredIntervals:
+                  1, // This should result in labels at the effective min and max of the axis.
+              // The custom axisLabelFormatter is removed as desiredIntervals: 1 and numberFormat should suffice.
             ),
             series: <CartesianSeries>[
               // 折线图+面积图组合展示
@@ -86,14 +104,8 @@ class AssetTrendChart extends StatelessWidget {
                 yValueMapper: (data, _) => data.totalAssets,
                 color: primaryColor,
                 width: 2,
-                markerSettings: MarkerSettings(
-                  isVisible: assetData.length <= 20, // 只有在数据点较少时才显示标记
-                  color: primaryColor,
-                  borderColor: Colors.white,
-                  borderWidth: 2,
-                  height: 6,
-                  width: 6,
-                ),
+                markerSettings:
+                    const MarkerSettings(isVisible: false), // Hide markers
               ),
             ],
             trackballBehavior: TrackballBehavior(

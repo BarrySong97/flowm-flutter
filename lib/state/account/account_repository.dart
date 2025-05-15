@@ -7,6 +7,10 @@ import '../../db/tables/account_table.dart';
 import '../../components/account/account_item.dart' as account_ui;
 import '../database/database_provider.dart';
 
+// StateProvider for the selected date range string
+final selectedDateRangeProvider =
+    StateProvider<String>((ref) => 'month'); // Default to 'month'
+
 /// 账户仓库提供者，用于封装账户相关的数据库操作
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
@@ -34,6 +38,44 @@ final yearlyAssetTrendProvider =
   final repository = ref.watch(accountRepositoryProvider);
   return repository.getYearlyAssetHistory();
 });
+
+// Renamed and modified provider that fetches asset trend data based on selectedDateRangeProvider
+final assetTrendProviderByDateRange =
+    FutureProvider<List<AssetHistoryData>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedRange = ref.watch(selectedDateRangeProvider);
+
+  DateTime endDate = DateTime.now();
+  DateTime startDate;
+
+  switch (selectedRange) {
+    case 'year':
+      startDate = DateTime(endDate.year, 1, 1);
+      break;
+    case '60days':
+      startDate =
+          endDate.subtract(const Duration(days: 59)); // 59 + today = 60 days
+      break;
+    case '30days':
+      startDate = endDate.subtract(const Duration(days: 29));
+      break;
+    case '15days':
+      startDate = endDate.subtract(const Duration(days: 14));
+      break;
+    case 'month':
+    default: // Default to 'month'
+      startDate = DateTime(endDate.year, endDate.month, 1);
+      break;
+  }
+  // For 'custom', you might need another provider to hold custom start/end dates
+  // or expand this logic. For now, it defaults to 'month'.
+  // Ensure startDate is not after endDate, which can happen for "month" at the start of a new month if not handled.
+  // However, our logic for 'month' (DateTime(endDate.year, endDate.month, 1)) is fine.
+
+  return repository.getAssetHistoryByTimeRange(startDate, endDate);
+});
+
+/// 指定时间段内的资产历史数据提供者，用于绘制资产变化曲线图
 
 /// 账户仓库类
 ///
@@ -171,6 +213,12 @@ class AccountRepository {
     final now = DateTime.now();
     final oneYearAgo = now.subtract(const Duration(days: 365));
     return getAssetHistoryByTime(oneYearAgo, now);
+  }
+
+  /// 获取指定时间段内的资产历史数据
+  Future<List<AssetHistoryData>> getAssetHistoryByTimeRange(
+      DateTime start, DateTime end) async {
+    return getAssetHistoryByTime(start, end);
   }
 
   /// 获取指定账户在指定日期时的余额
