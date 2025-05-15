@@ -9,6 +9,7 @@ class Account {
       icon; // Icon for the account (e.g., for child items like "保险")
   final List<Account>? children; // Sub-accounts
   final String currencySymbol; // e.g., "¥", "$", ""
+  final double? percentage; // Percentage of this account among its siblings
 
   Account({
     required this.name,
@@ -16,6 +17,7 @@ class Account {
     this.icon,
     this.children,
     this.currencySymbol = '', // Default to no symbol, explicitly set if needed
+    this.percentage,
   });
 }
 
@@ -37,10 +39,35 @@ class _AccountItemState extends State<AccountItem> {
     bool hasChildren =
         widget.account.children != null && widget.account.children!.isNotEmpty;
 
+    // Calculate percentages for children if they exist
+    List<Account>? childrenWithPercentage;
+    if (hasChildren) {
+      double totalChildrenAmount = widget.account.children!.fold(
+          0.0,
+          (sum, item) =>
+              sum +
+              item.amount.abs()); // Use absolute amount for total calculation
+      childrenWithPercentage = widget.account.children!.map((child) {
+        double childPercentage = totalChildrenAmount == 0
+            ? 0.0
+            : (child.amount.abs() / totalChildrenAmount) * 100;
+        return Account(
+          name: child.name,
+          amount: child.amount,
+          icon: child.icon,
+          children:
+              child.children, // Children of children are not processed here
+          currencySymbol: child.currencySymbol,
+          percentage: childPercentage,
+        );
+      }).toList();
+    }
+
     Widget accountRow = _buildAccountRow(
       context: context,
       account: widget.account,
       isParentRow: true, // Still useful for styling/amount display logic
+      percentage: widget.account.percentage,
     );
 
     if (hasChildren) {
@@ -54,7 +81,7 @@ class _AccountItemState extends State<AccountItem> {
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
             title: accountRow,
-            children: widget.account.children!.map<Widget>((childAccount) {
+            children: childrenWithPercentage!.map<Widget>((childAccount) {
               return Padding(
                 // Add padding for child items if desired
                 padding: const EdgeInsets.only(
@@ -65,6 +92,7 @@ class _AccountItemState extends State<AccountItem> {
                     context: context,
                     account: childAccount,
                     isParentRow: false,
+                    percentage: childAccount.percentage,
                   ),
                 ),
               );
@@ -102,6 +130,7 @@ class _AccountItemState extends State<AccountItem> {
     required BuildContext context,
     required Account account,
     required bool isParentRow,
+    double? percentage,
   }) {
     final double fontSize = 15.0;
     final TextStyle nameStyle = TextStyle(
@@ -138,10 +167,28 @@ class _AccountItemState extends State<AccountItem> {
                   const SizedBox(width: 12),
                 ],
                 Flexible(
-                  child: Text(
-                    account.name,
-                    style: nameStyle,
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          account.name,
+                          style: nameStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (percentage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Text(
+                            '(${percentage.toStringAsFixed(1)}%)',
+                            style: TextStyle(
+                              fontSize: fontSize - 2,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],

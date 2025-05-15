@@ -7,6 +7,7 @@ import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/db/dao/account_dao.dart';
+import 'package:collection/collection.dart';
 
 class AssetsPage extends ConsumerStatefulWidget {
   const AssetsPage({super.key});
@@ -17,6 +18,8 @@ class AssetsPage extends ConsumerStatefulWidget {
 
 class _AssetsPageState extends ConsumerState<AssetsPage>
     with AutomaticKeepAliveClientMixin {
+  String? _drilledDownAccountName; // State for current drill-down level
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
@@ -155,36 +158,147 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
             // 资产分布图表
             Container(
-              height: 240,
+              height: _drilledDownAccountName == null
+                  ? 240
+                  : 280, // Adjust height if back button is shown
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(6),
               ),
               clipBehavior: Clip.hardEdge,
-              child: topAssetsAsync.when(
-                data: (accounts) {
-                  if (accounts.isEmpty) {
+              child: uiAccountsAsync.when(
+                data: (allAccounts) {
+                  // Renamed to allAccounts for clarity
+                  if (allAccounts.isEmpty) {
                     return Center(child: Text('暂无资产数据'));
                   }
 
-                  // 将账户数据转换为Treemap数据，过滤掉负值和零值账户
-                  final treeMapData = accounts
-                      .where((item) => item.balance > 0) // 只保留正余额账户(大于0)
-                      .map((item) => TreemapData(
-                            name: item.account.accountName,
-                            value: item.balance,
-                          ))
-                      .toList();
+                  List<dynamic>
+                      displayedAccounts; // Assuming 'dynamic' for now, replace with your Account model type
+                  String currentTreemapTitle = '资产分布';
+                  bool isDrilledDown = _drilledDownAccountName != null;
 
-                  // 检查是否有数据
-                  if (treeMapData.isEmpty) {
-                    return Center(child: Text('暂无可显示的资产数据'));
+                  if (!isDrilledDown) {
+                    displayedAccounts = allAccounts;
+                  } else {
+                    final parentAccount = allAccounts.firstWhereOrNull(
+                        (acc) => acc.name == _drilledDownAccountName);
+
+                    if (parentAccount != null &&
+                        parentAccount.children != null &&
+                        parentAccount.children!.isNotEmpty) {
+                      displayedAccounts = parentAccount.children!;
+                      currentTreemapTitle = '资产分布 > $_drilledDownAccountName';
+                    } else {
+                      // Fallback: If parent not found or has no children, show top level and reset drill-down
+                      displayedAccounts = allAccounts;
+                      _drilledDownAccountName = null;
+                      isDrilledDown = false; // Update status
+                      // Optionally, show a message or log this case
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() {
+                            _drilledDownAccountName = null;
+                          });
+                        }
+                      });
+                    }
                   }
 
-                  return TreemapWidget(
-                    title: '资产分布',
-                    dataItems: treeMapData,
-                    tooltipValueSuffix: ' ¥',
+                  // Calculate total value for the current level for percentage calculation
+                  final double totalValueAtThisLevel = displayedAccounts
+                      .where((account) => account.amount > 0)
+                      .fold(0.0, (sum, account) => sum + account.amount);
+
+                  final treeMapData = displayedAccounts
+                      .where((account) => account.amount > 0)
+                      .map((account) {
+                    double? percentage;
+                    if (totalValueAtThisLevel > 0) {
+                      percentage =
+                          (account.amount / totalValueAtThisLevel) * 100;
+                    }
+                    return TreemapData(
+                      name: account.name,
+                      value: account.amount,
+                      canDrillDown: account.children != null &&
+                          account.children!.isNotEmpty,
+                      percentageOfLevel: percentage,
+                    );
+                  }).toList();
+
+                  if (treeMapData.isEmpty) {
+                    return Center(
+                        child:
+                            Text(isDrilledDown ? '此分类下无子账户数据' : '暂无可显示的资产数据'));
+                  }
+
+                  return Column(
+                    // Wrap Treemap with a Column to add a back button
+                    children: [
+                      if (isDrilledDown)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              top: 8.0, left: 8.0, right: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton.icon(
+                                icon: Icon(Icons.arrow_back_ios, size: 16),
+                                label: Text('返回上一级'),
+                                onPressed: () {
+                                  setState(() {
+                                    _drilledDownAccountName = null;
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor:
+                                      Theme.of(context).primaryColor,
+                                ),
+                              ),
+                              // Spacer(),
+                              // Text(currentTreemapTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder:
+                              (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                                opacity: animation, child: child);
+                          },
+                          child: TreemapWidget(
+                            key: ValueKey(
+                                _drilledDownAccountName ?? '__treemap_root__'),
+                            title: currentTreemapTitle,
+                            dataItems: treeMapData,
+                            tooltipValueSuffix: ' ¥',
+                            drilledDownAccountName: _drilledDownAccountName,
+                            onDrillDownSelected: (accountName) {
+                              // Check if the selected account (from currently displayedAccounts) has children
+                              final selectedAccount =
+                                  displayedAccounts.firstWhereOrNull(
+                                      (acc) => acc.name == accountName);
+
+                              if (selectedAccount != null &&
+                                  selectedAccount.children != null &&
+                                  selectedAccount.children!.isNotEmpty) {
+                                setState(() {
+                                  _drilledDownAccountName = accountName;
+                                });
+                              } else {
+                                // Optional: Log or show a message if trying to drill into an account without children.
+                                // This case should ideally be prevented by canDrillDown being false.
+                                print(
+                                    'Cannot drill down: ${accountName} has no children or was not found in the current view.');
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
                 loading: () => Center(child: CircularProgressIndicator()),
@@ -205,12 +319,36 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     ),
                   );
                 }
+
+                // Calculate total amount for top-level accounts for percentage calculation
+                final double totalTopLevelAmount = accounts.fold(
+                    0.0, (sum, account) => sum + account.amount.abs());
+
+                final List<Account> accountsWithPercentage =
+                    accounts.map((account) {
+                  double percentage = totalTopLevelAmount == 0
+                      ? 0.0
+                      : (account.amount.abs() / totalTopLevelAmount) * 100;
+                  return Account(
+                    name: account.name,
+                    amount: account.amount,
+                    icon: account.icon,
+                    children: account
+                        .children, // Children percentages are handled within AccountItem
+                    currencySymbol: account.currencySymbol,
+                    percentage:
+                        percentage, // Assign calculated top-level percentage
+                  );
+                }).toList();
+
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: accounts.length,
+                  itemCount: accountsWithPercentage.length, // Use the new list
                   itemBuilder: (context, index) {
-                    return AccountItem(account: accounts[index]);
+                    return AccountItem(
+                        account: accountsWithPercentage[
+                            index]); // Pass account with percentage
                   },
                 );
               },

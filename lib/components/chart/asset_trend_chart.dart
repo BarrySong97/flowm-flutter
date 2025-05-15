@@ -19,7 +19,7 @@ class AssetTrendChart extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: SizedBox(
         width: double.infinity,
-        height: 200, // 固定高度，可根据需要调整
+        height: 140, // 固定高度，可根据需要调整
         child: () {
           if (assetData.isEmpty) {
             return const Center(child: Text('暂无资产趋势数据'));
