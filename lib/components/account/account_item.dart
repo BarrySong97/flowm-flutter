@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flowm/components/account/account_row.dart'; // Import the new AccountRow
 
 // Data model for an account
 class Account {
@@ -63,11 +64,12 @@ class _AccountItemState extends State<AccountItem> {
       }).toList();
     }
 
-    Widget accountRow = _buildAccountRow(
-      context: context,
+    // Parent row: show currency symbol only if it has NO children.
+    // If it HAS children, its amount is a sum, so don't show symbol.
+    Widget accountRowWidget = AccountRow(
       account: widget.account,
-      isParentRow: true, // Still useful for styling/amount display logic
       percentage: widget.account.percentage,
+      showCurrencySymbolInAmount: !hasChildren, // Logic for parent row
     );
 
     if (hasChildren) {
@@ -80,7 +82,7 @@ class _AccountItemState extends State<AccountItem> {
           child: ExpansionTile(
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
-            title: accountRow,
+            title: accountRowWidget, // Use the new AccountRow widget
             children: childrenWithPercentage!.map<Widget>((childAccount) {
               return Padding(
                 // Add padding for child items if desired
@@ -88,11 +90,12 @@ class _AccountItemState extends State<AccountItem> {
                     left: 16.0, right: 16.0, bottom: 4.0, top: 0),
                 child: InkWell(
                   onTap: () => _navigateToDetailPage(context, childAccount),
-                  child: _buildAccountRow(
-                    context: context,
+                  // Child row: always show currency symbol.
+                  child: AccountRow(
                     account: childAccount,
-                    isParentRow: false,
                     percentage: childAccount.percentage,
+                    showCurrencySymbolInAmount:
+                        true, // Children always show currency
                   ),
                 ),
               );
@@ -112,7 +115,7 @@ class _AccountItemState extends State<AccountItem> {
             // Add padding to match ExpansionTile's content
             padding:
                 const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
-            child: accountRow,
+            child: accountRowWidget, // Use the new AccountRow widget
           ),
         ),
       );
@@ -120,90 +123,25 @@ class _AccountItemState extends State<AccountItem> {
   }
 
   void _navigateToDetailPage(BuildContext context, Account account) {
-    context.pushNamed(
-      'accountDetail',
-      extra: {'account': account},
-    );
-  }
+    // Determine if the account has children to decide the navigation target
+    bool hasChildren = account.children != null && account.children!.isNotEmpty;
 
-  Widget _buildAccountRow({
-    required BuildContext context,
-    required Account account,
-    required bool isParentRow,
-    double? percentage,
-  }) {
-    final double fontSize = 15.0;
-    final TextStyle nameStyle = TextStyle(
-        fontSize: fontSize, fontWeight: FontWeight.bold, color: Colors.black87);
-    final TextStyle amountStyle = TextStyle(
-        fontSize: fontSize,
-        fontWeight: FontWeight.normal,
-        color: Colors.black87);
-
-    String displayedAmount;
-    bool actualHasChildren =
-        account.children != null && account.children!.isNotEmpty;
-
-    if (isParentRow && actualHasChildren) {
-      // Parent account with children (e.g., "投资理财"): amount without currency symbol
-      displayedAmount = account.amount.toStringAsFixed(2);
+    if (hasChildren) {
+      // If account has children, it might be a summary/category type account.
+      // Navigating to 'topAssetsAccountDetail' might be more appropriate if it's designed for such accounts.
+      // Or, if 'accountDetail' is generic enough, it can be used.
+      // For now, sticking to 'accountDetail' as per original _navigateToDetailPage,
+      // but this could be a point of refinement based on page capabilities.
+      context.pushNamed(
+        'topAssetsAccountDetail', // Or consider if 'accountDetail' is always the target for any item tapped in a list
+        extra: {'account': account},
+      );
     } else {
-      // Single account or a child account (e.g., "保险"): amount with currency symbol
-      displayedAmount =
-          '${account.currencySymbol}${account.amount.toStringAsFixed(2)}';
+      context.pushNamed(
+        'accountDetail',
+        extra: {'account': account},
+      );
     }
-
-    return Padding(
-      // Ensure consistent padding for the row content
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                if (account.icon != null) ...[
-                  Icon(account.icon, color: Colors.blueAccent, size: 22),
-                  const SizedBox(width: 12),
-                ],
-                Flexible(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          account.name,
-                          style: nameStyle,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (percentage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: Text(
-                            '(${percentage.toStringAsFixed(1)}%)',
-                            style: TextStyle(
-                              fontSize: fontSize - 2,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              Text(displayedAmount, style: amountStyle),
-              if (!isParentRow || (isParentRow && !actualHasChildren))
-                const SizedBox(width: 24), // Keep space for alignment if needed
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }
 

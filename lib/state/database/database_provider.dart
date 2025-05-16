@@ -5,6 +5,7 @@ import '../../db/dao/transaction_dao.dart';
 import '../../db/dao/posting_dao.dart';
 import '../../db/dao/tag_dao.dart';
 import '../../db/dao/transaction_tag_dao.dart';
+import '../../db/dao/ledger_dao.dart';
 
 /// 全局数据库实例提供者
 ///
@@ -50,4 +51,10 @@ final tagDaoProvider = Provider<TagDao>((ref) {
 final transactionTagDaoProvider = Provider<TransactionTagDao>((ref) {
   final database = ref.watch(databaseProvider);
   return database.transactionTagDao;
+});
+
+/// 账本DAO提供者
+final ledgerDaoProvider = Provider<LedgerDao>((ref) {
+  final database = ref.watch(databaseProvider);
+  return database.ledgerDao;
 });

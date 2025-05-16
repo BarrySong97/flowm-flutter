@@ -110,10 +110,39 @@ class TransactionRepository {
     return watchTransactionsByDateRange(startOfMonth, endOfMonth);
   }
 
-  /// 获取最新的十条交易
+  /// 获取最新的交易
   Stream<List<TransactionWithAmount>> watchLatestTransactions(
-          {int limit = 10}) =>
-      _transactionDao.watchLatestTransactions(limit: limit);
+      {int? ledgerId, int limit = 10}) {
+    if (ledgerId != null) {
+      // 获取与指定账本相关的最新交易
+      return _getLatestTransactionsByLedger(ledgerId, limit);
+    } else {
+      // 原来的实现，不考虑ledgerId
+      return _transactionDao.watchLatestTransactions(limit: limit);
+    }
+  }
+
+  /// 获取指定账本的最新交易
+  Stream<List<TransactionWithAmount>> _getLatestTransactionsByLedger(
+      int ledgerId, int limit) {
+    // 首先获取与该账本相关的账户ID
+    return _transactionDao.db.accountDao
+        .watchAccountsByLedgerId(ledgerId)
+        .asyncMap((accounts) async {
+      if (accounts.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+
+      // 获取这些账户相关的accountIds
+      final accountIds = accounts.map((account) => account.accountId).toSet();
+
+      // 通过accountIds查找相关的交易
+      return await _transactionDao
+          .watchLatestTransactionsByAccountIds(
+              accountIds: accountIds, limit: limit)
+          .first;
+    });
+  }
 
   /// 获取分页的交易记录 (TransactionWithAmount)
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(

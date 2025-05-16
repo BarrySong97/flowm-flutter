@@ -1,11 +1,12 @@
 import 'package:drift/drift.dart';
+import 'package:flowm/db/tables/ledger_table.dart';
 import '../app_database.dart';
 import '../tables/account_table.dart';
 import '../tables/posting_table.dart';
 
 part 'account_dao.g.dart';
 
-@DriftAccessor(tables: [Accounts])
+@DriftAccessor(tables: [Accounts, Ledgers])
 class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
   AccountDao(AppDatabase db) : super(db);
 
@@ -16,6 +17,14 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
   Future<Account?> getAccountById(int id) =>
       (select(accounts)..where((a) => a.accountId.equals(id)))
           .getSingleOrNull();
+
+  // Get accounts by ledger ID
+  Future<List<Account>> getAccountsByLedgerId(int ledgerId) =>
+      (select(accounts)..where((a) => a.ledgerId.equals(ledgerId))).get();
+
+  // Watch accounts by ledger ID (reactive stream)
+  Stream<List<Account>> watchAccountsByLedgerId(int ledgerId) =>
+      (select(accounts)..where((a) => a.ledgerId.equals(ledgerId))).watch();
 
   // Watch all accounts (reactive stream)
   Stream<List<Account>> watchAllAccounts() => select(accounts).watch();

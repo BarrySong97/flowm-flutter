@@ -1,7 +1,9 @@
 import 'package:drift/drift.dart';
+import 'ledger_table.dart'; // Added import for Ledgers table
 
 class Accounts extends Table {
   IntColumn get accountId => integer().autoIncrement()();
+  IntColumn get ledgerId => integer().references(Ledgers, #ledgerId)();
   IntColumn get parentAccountId =>
       integer().nullable().references(Accounts, #accountId)();
   TextColumn get accountName => text()();

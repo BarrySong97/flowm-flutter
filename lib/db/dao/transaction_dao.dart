@@ -258,6 +258,92 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  // Watch latest transactions filtered by account IDs
+  Stream<List<TransactionWithAmount>> watchLatestTransactionsByAccountIds(
+      {required Set<int> accountIds, int limit = 10}) {
+    // 如果没有账户ID，直接返回空列表
+    if (accountIds.isEmpty) {
+      return Stream.value([]);
+    }
+
+    // 首先找出与指定账户相关的交易ID
+    return customSelect(
+      '''
+      SELECT DISTINCT t.transaction_id 
+      FROM transactions t
+      JOIN postings p ON t.transaction_id = p.transaction_id
+      WHERE p.account_id IN (${List.filled(accountIds.length, '?').join(',')})
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      LIMIT ?
+      ''',
+      variables: [
+        ...accountIds.map((id) => Variable.withInt(id)),
+        Variable.withInt(limit),
+      ],
+    ).watch().asyncMap((rows) async {
+      if (rows.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+
+      // 提取交易ID
+      final transactionIds =
+          rows.map((row) => row.read<int>('transaction_id')).toList();
+
+      // 创建结果列表
+      final resultList = <TransactionWithAmount>[];
+
+      // 获取每个交易的详细信息
+      for (final transactionId in transactionIds) {
+        // 获取交易记录
+        final transaction = await (select(transactions)
+              ..where((t) => t.transactionId.equals(transactionId)))
+            .getSingle();
+
+        // 获取与该交易相关的postings和账户信息
+        final postingsQuery = select(db.postings).join([
+          innerJoin(db.accounts,
+              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ])
+          ..where(db.postings.transactionId.equals(transactionId));
+
+        final postingsWithAccounts = await postingsQuery.get();
+
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+
+        if (postingsWithAccounts.isNotEmpty) {
+          final firstPosting =
+              postingsWithAccounts.first.readTable(db.postings);
+          transactionAmount = firstPosting.amount.abs();
+        }
+
+        for (final rowData in postingsWithAccounts) {
+          final posting = rowData.readTable(db.postings);
+          final account = rowData.readTable(db.accounts);
+          if (posting.amount < 0) {
+            fromAccountObj = account;
+          } else if (posting.amount > 0) {
+            toAccountObj = account;
+          }
+        }
+
+        // 确定交易性质
+        final nature = getTransactionNature(
+            fromAccountObj?.accountType, toAccountObj?.accountType);
+
+        resultList.add(TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
+          nature: nature,
+        ));
+      }
+      return resultList;
+    });
+  }
+
   // Insert transaction
   Future<int> insertTransaction(TransactionsCompanion transaction) =>
       into(transactions).insert(transaction);

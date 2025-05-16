@@ -8,6 +8,7 @@ import 'package:flowm/components/account/account_item.dart'; // Import AccountIt
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/db/dao/account_dao.dart';
 import 'package:collection/collection.dart';
+import 'package:go_router/go_router.dart'; // 引入 GoRouter
 
 class AssetsPage extends ConsumerStatefulWidget {
   const AssetsPage({super.key});
@@ -293,6 +294,37 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                                 // This case should ideally be prevented by canDrillDown being false.
                                 print(
                                     'Cannot drill down: ${accountName} has no children or was not found in the current view.');
+                              }
+                            },
+                            onDoubleClick: (accountName) {
+                              // 新增 onDoubleClick 回调
+                              final selectedAccountToNavigate =
+                                  displayedAccounts.firstWhereOrNull(
+                                      (acc) => acc.name == accountName);
+                              if (selectedAccountToNavigate != null) {
+                                print(
+                                    '双击 ${accountName} 于 AssetsPage, 准备导航到详情页');
+                                bool hasChildren =
+                                    selectedAccountToNavigate.children !=
+                                            null &&
+                                        selectedAccountToNavigate
+                                            .children!.isNotEmpty;
+                                if (hasChildren) {
+                                  GoRouter.of(context).pushNamed(
+                                      'topAssetsAccountDetail',
+                                      extra: {
+                                        'account': selectedAccountToNavigate
+                                      });
+                                } else {
+                                  GoRouter.of(context).pushNamed(
+                                      'assetsLiabilityDetail', // Navigate to accountDetail if no children
+                                      extra: {
+                                        'account': selectedAccountToNavigate
+                                      });
+                                }
+                              } else {
+                                print(
+                                    '双击 ${accountName} 于 AssetsPage, 但未找到对应账户数据');
                               }
                             },
                           ),

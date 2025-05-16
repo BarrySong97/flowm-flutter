@@ -581,6 +581,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.6.1"
+  sankey_flutter:
+    dependency: "direct main"
+    description:
+      name: sankey_flutter
+      sha256: "9275f56057195782139474328a476690fe3bf0f4b38e7603be65ed4b72a729dc"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.0.1"
   shelf:
     dependency: transitive
     description:

@@ -6,6 +6,7 @@ import '../../db/dao/account_dao.dart';
 import '../../db/tables/account_table.dart';
 import '../../components/account/account_item.dart' as account_ui;
 import '../database/database_provider.dart';
+import '../ledger/ledger_repository.dart';
 
 // StateProvider for the selected date range string
 final selectedDateRangeProvider =
@@ -22,7 +23,17 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
 final topAssetAccountsProvider =
     FutureProvider<List<AccountWithBalance>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getTopAssetAccounts();
+
+  // 先尝试获取当前选中的账本
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  if (selectedLedger != null) {
+    // 如果有选中的账本，根据账本获取资产账户
+    return repository.getTopAssetAccountsByLedger(
+        ledgerId: selectedLedger.ledgerId);
+  } else {
+    // 如果没有选中的账本，使用原来的方法获取所有资产账户
+    return repository.getTopAssetAccounts();
+  }
 });
 
 /// 提供UI账户列表，与AccountItem组件兼容
@@ -253,6 +264,7 @@ class AccountRepository {
     required String name,
     required String fullPath,
     required AccountType type,
+    required int ledgerId,
     int? parentId,
     bool isActive = true,
   }) {
@@ -260,6 +272,7 @@ class AccountRepository {
       accountName: name,
       fullPath: fullPath,
       accountType: type,
+      ledgerId: ledgerId,
       parentAccountId:
           parentId == null ? const Value.absent() : Value(parentId),
       isActive: Value(isActive),
@@ -324,139 +337,191 @@ class AccountRepository {
     return AccountWithChildren(account: root, children: children);
   }
 
-  /// 获取指定时间段内的总支出
-  ///
-  /// 1. 获取所有叶子支出账户
-  /// 2. 计算这些账户在指定时间段内的支出总和
-  Future<double> getExpenseInPeriod(DateTime start, DateTime end) async {
-    // 1. 获取所有账户并筛选出支出账户
-    final allAccounts = await _accountDao.getAllAccounts();
-    final expenseAccounts = allAccounts
-        .where((acc) => acc.accountType == AccountType.EXPENSE)
-        .toList();
+  /// 获取指定时间段内的支出总额
+  Future<double> getExpenseInPeriod(
+      int ledgerId, DateTime start, DateTime end) async {
+    try {
+      // 获取所有与该账本相关的资产账户
+      final assetAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final assetAccountsList = assetAccounts
+          .where((account) => account.accountType == AccountType.ASSET)
+          .toList();
 
-    if (expenseAccounts.isEmpty) {
-      return 0.0; // 没有支出账户，总支出为0
-    }
+      if (assetAccountsList.isEmpty) return 0.0;
 
-    // 获取所有作为父账户的账户ID
-    final parentAccountIds = await _accountDao
-        .customSelect(
-          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
-        )
-        .get()
-        .then((rows) =>
-            rows.map((row) => row.read<int>('parent_account_id')).toSet());
-
-    // 筛选出叶子支出账户
-    final leafExpenseAccounts = expenseAccounts
-        .where((account) => !parentAccountIds.contains(account.accountId))
-        .toList();
-
-    if (leafExpenseAccounts.isEmpty) {
-      // 如果没有叶子支出账户 (例如，所有支出账户都是父账户，或没有支出账户)
+      // 计算资产账户在此期间的支出（负值交易）
+      double totalExpense = 0.0;
+      for (final account in assetAccountsList) {
+        final accountExpense =
+            await _getAccountExpenseInPeriod(account.accountId, start, end);
+        totalExpense += accountExpense;
+      }
+      return totalExpense;
+    } catch (e) {
+      print('获取支出时出错: $e');
       return 0.0;
     }
-
-    double totalExpenses = 0.0;
-
-    for (final account in leafExpenseAccounts) {
-      try {
-        // 构建SQL查询，查询指定日期范围内该账户的所有交易金额总和
-        // 对于支出账户，amount 通常是正数，代表支出金额
-        final result = await _accountDao.customSelect(
-          '''
-          SELECT SUM(p.amount) as period_expense
-          FROM postings p
-          JOIN transactions t ON p.transaction_id = t.transaction_id
-          WHERE p.account_id = ? 
-          AND t.transaction_date >= ?
-          AND t.transaction_date <= ?
-          ''',
-          variables: [
-            Variable.withInt(account.accountId),
-            Variable.withDateTime(start),
-            Variable.withDateTime(end),
-          ],
-        ).getSingle();
-
-        totalExpenses += result.read<double?>('period_expense') ?? 0.0;
-      } catch (e) {
-        print('获取账户 ${account.accountId} 在时间段 $start - $end 的支出时出错: $e');
-        //可以选择继续计算其他账户或抛出异常
-      }
-    }
-    return totalExpenses;
   }
 
-  /// 获取指定时间段内的总收入
-  ///
-  /// 1. 获取所有叶子收入账户
-  /// 2. 计算这些账户在指定时间段内的收入总和
-  Future<double> getIncomeInPeriod(DateTime start, DateTime end) async {
-    // 1. 获取所有账户并筛选出收入账户
-    final allAccounts = await _accountDao.getAllAccounts();
-    final incomeAccounts = allAccounts
-        .where((acc) => acc.accountType == AccountType.INCOME)
-        .toList();
+  /// 获取指定时间段内的收入总额
+  Future<double> getIncomeInPeriod(
+      int ledgerId, DateTime start, DateTime end) async {
+    try {
+      // 获取所有与该账本相关的资产账户
+      final assetAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final assetAccountsList = assetAccounts
+          .where((account) => account.accountType == AccountType.ASSET)
+          .toList();
 
-    if (incomeAccounts.isEmpty) {
-      return 0.0; // 没有收入账户，总收入为0
-    }
+      if (assetAccountsList.isEmpty) return 0.0;
 
-    // 获取所有作为父账户的账户ID
-    final parentAccountIds = await _accountDao
-        .customSelect(
-          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
-        )
-        .get()
-        .then((rows) =>
-            rows.map((row) => row.read<int>('parent_account_id')).toSet());
-
-    // 筛选出叶子收入账户
-    final leafIncomeAccounts = incomeAccounts
-        .where((account) => !parentAccountIds.contains(account.accountId))
-        .toList();
-
-    if (leafIncomeAccounts.isEmpty) {
-      // 如果没有叶子收入账户
+      // 计算资产账户在此期间的收入（正值交易）
+      double totalIncome = 0.0;
+      for (final account in assetAccountsList) {
+        final accountIncome =
+            await _getAccountIncomeInPeriod(account.accountId, start, end);
+        totalIncome += accountIncome;
+      }
+      return totalIncome;
+    } catch (e) {
+      print('获取收入时出错: $e');
       return 0.0;
     }
-
-    double totalIncome = 0.0;
-
-    for (final account in leafIncomeAccounts) {
-      try {
-        // 构建SQL查询，查询指定日期范围内该账户的所有交易金额总和
-        // 对于收入账户，amount 通常是负数 (贷方)
-        final result = await _accountDao.customSelect(
-          """
-          SELECT SUM(p.amount) as period_income
-          FROM postings p
-          JOIN transactions t ON p.transaction_id = t.transaction_id
-          WHERE p.account_id = ? 
-          AND t.transaction_date >= ?
-          AND t.transaction_date <= ?
-          """,
-          variables: [
-            Variable.withInt(account.accountId),
-            Variable.withDateTime(start),
-            Variable.withDateTime(end),
-          ],
-        ).getSingle();
-
-        // 收入金额在数据库中为负，所以取反得到正数收入
-        totalIncome -= result.read<double?>('period_income') ?? 0.0;
-      } catch (e) {
-        print('获取账户 ${account.accountId} 在时间段 $start - $end 的收入时出错: $e');
-        //可以选择继续计算其他账户或抛出异常
-      }
-    }
-    return totalIncome;
   }
 
+  /// 获取账户指定时间段内的支出
+  Future<double> _getAccountExpenseInPeriod(
+      int accountId, DateTime start, DateTime end) async {
+    try {
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT SUM(p.amount) as expense
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id = ? 
+        AND t.transaction_date BETWEEN ? AND ?
+        AND p.amount < 0
+        ''',
+        variables: [
+          Variable.withInt(accountId),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).getSingle();
+
+      return (result.read<double?>('expense') ?? 0.0).abs(); // 转为正值
+    } catch (e) {
+      print('获取账户支出时出错: $e');
+      return 0.0;
+    }
+  }
+
+  /// 获取账户指定时间段内的收入
+  Future<double> _getAccountIncomeInPeriod(
+      int accountId, DateTime start, DateTime end) async {
+    try {
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT SUM(p.amount) as income
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id = ? 
+        AND t.transaction_date BETWEEN ? AND ?
+        AND p.amount > 0
+        ''',
+        variables: [
+          Variable.withInt(accountId),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).getSingle();
+
+      return result.read<double?>('income') ?? 0.0;
+    } catch (e) {
+      print('获取账户收入时出错: $e');
+      return 0.0;
+    }
+  }
+
+  /// 获取总负债（原始版本，不需要ledgerId）
   Future<double> getTotalLiabilities() {
     return _accountDao.getTotalLiabilities();
+  }
+
+  /// 获取总负债（考虑特定账本）
+  Future<double> getTotalLiabilitiesByLedger(int ledgerId) async {
+    try {
+      // 获取所有与该账本相关的负债账户
+      final liabilityAccounts =
+          await _accountDao.getAccountsByLedgerId(ledgerId);
+      final liabilityAccountsList = liabilityAccounts
+          .where((account) => account.accountType == AccountType.LIABILITY)
+          .toList();
+
+      if (liabilityAccountsList.isEmpty) return 0.0;
+
+      double totalLiabilities = 0.0;
+      for (final account in liabilityAccountsList) {
+        final balance = await _accountDao.getAccountBalance(account.accountId);
+        totalLiabilities += balance;
+      }
+
+      return totalLiabilities;
+    } catch (e) {
+      print('获取总负债时出错: $e');
+      return 0.0;
+    }
+  }
+
+  /// 获取顶级资产账户（考虑特定账本）
+  Future<List<AccountWithBalance>> getTopAssetAccountsByLedger(
+      {int? limit, required int ledgerId}) async {
+    try {
+      // 获取所有与该账本相关的活跃资产账户
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final assetAccounts = allAccounts
+          .where((account) =>
+              account.accountType == AccountType.ASSET && account.isActive)
+          .toList();
+
+      // 获取所有具有子账户的账户ID
+      final parentIdsResult = await _accountDao.customSelect(
+        'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL AND ledger_id = ?',
+        variables: [Variable.withInt(ledgerId)],
+      ).get();
+
+      final accountsWithChildren = parentIdsResult
+          .map((row) => row.read<int>('parent_account_id'))
+          .toSet();
+
+      // 过滤掉有子账户的账户，只保留叶子节点账户
+      final leafAccounts = assetAccounts
+          .where((account) => !accountsWithChildren.contains(account.accountId))
+          .toList();
+
+      // 计算每个账户的余额
+      final List<AccountWithBalance> accountsWithBalance = [];
+      for (final account in leafAccounts) {
+        final balance = await _accountDao.getAccountBalance(account.accountId);
+        accountsWithBalance.add(
+          AccountWithBalance(
+            account: account,
+            balance: balance,
+          ),
+        );
+      }
+
+      // 按余额降序排序
+      accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
+
+      // 如果指定了limit，则返回前limit个
+      return limit != null
+          ? accountsWithBalance.take(limit).toList()
+          : accountsWithBalance;
+    } catch (e) {
+      print('获取顶级资产账户时出错: $e');
+      return [];
+    }
   }
 }
 

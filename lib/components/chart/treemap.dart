@@ -27,6 +27,7 @@ class TreemapWidget extends StatefulWidget {
   final String? tooltipValueSuffix;
   final String? drilledDownAccountName;
   final Function(String accountName)? onDrillDownSelected;
+  final Function(String accountName)? onDoubleClick;
 
   const TreemapWidget({
     super.key,
@@ -35,6 +36,7 @@ class TreemapWidget extends StatefulWidget {
     required this.dataItems,
     this.tooltipValueSuffix,
     this.onDrillDownSelected,
+    this.onDoubleClick,
   });
 
   @override
@@ -146,7 +148,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
                           padding: const EdgeInsets.symmetric(
                               vertical: 8.0, horizontal: 4.0),
                           child: const Text(
-                            '[长按下钻查看 ]',
+                            '[长按下钻查看 | 双击进入详情]',
                             style: TextStyle(color: Colors.blue, fontSize: 12),
                           ),
                         ),
@@ -226,6 +228,12 @@ class _TreemapWidgetState extends State<TreemapWidget> {
                   widget.onDrillDownSelected?.call(dataItem.name);
                 } else {
                   print('长按标签: ${dataItem.name} (不可下钻)');
+                }
+              },
+              onDoubleTap: () {
+                print('双击标签: ${dataItem.name}');
+                if (widget.onDoubleClick != null) {
+                  widget.onDoubleClick!(dataItem.name);
                 }
               },
               behavior: HitTestBehavior.opaque,

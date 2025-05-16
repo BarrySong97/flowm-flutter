@@ -7,6 +7,7 @@ import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,28 +15,39 @@ import 'package:intl/intl.dart';
 
 // Provider to fetch current month's expenses
 final currentMonthExpenseProvider = FutureProvider<double>((ref) async {
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  if (selectedLedger == null) return 0.0;
+
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
   final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getExpenseInPeriod(startOfMonth, endOfMonth);
+  return repository.getExpenseInPeriod(
+      selectedLedger.ledgerId, startOfMonth, endOfMonth);
 });
 
 // Provider to fetch current month's income
 final currentMonthIncomeProvider = FutureProvider<double>((ref) async {
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  if (selectedLedger == null) return 0.0;
+
   final now = DateTime.now();
   final startOfMonth = DateTime(now.year, now.month, 1);
   final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getIncomeInPeriod(startOfMonth, endOfMonth);
+  return repository.getIncomeInPeriod(
+      selectedLedger.ledgerId, startOfMonth, endOfMonth);
 });
 
 // Provider to fetch total liabilities
 final totalLiabilitiesProvider = FutureProvider<double>((ref) async {
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  if (selectedLedger == null) return 0.0;
+
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getTotalLiabilities();
+  return repository.getTotalLiabilitiesByLedger(selectedLedger.ledgerId);
 });
 
 // Provider for combined monthly overview data (expense, income, balance)
@@ -50,8 +62,29 @@ final monthlyOverviewDataProvider =
 
 // Provider to fetch latest transactions
 final latestTransactionsProvider = StreamProvider((ref) {
-  final transactionRepository = ref.watch(transactionRepositoryProvider);
-  return transactionRepository.watchLatestTransactions(limit: 10);
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) return Stream.value(<TransactionWithAmount>[]);
+
+      final transactionRepository = ref.watch(transactionRepositoryProvider);
+      return transactionRepository.watchLatestTransactions(
+          ledgerId: ledger.ledgerId, limit: 10);
+    },
+    loading: () => Stream.value(<TransactionWithAmount>[]),
+    error: (_, __) => Stream.value(<TransactionWithAmount>[]),
+  );
+});
+
+// 为当前页面提供账户资产信息
+final topAssetAccountsProvider =
+    FutureProvider<List<AccountWithBalance>>((ref) async {
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  if (selectedLedger == null) return [];
+
+  final repository = ref.watch(accountRepositoryProvider);
+  return repository.getTopAssetAccountsByLedger(
+      ledgerId: selectedLedger.ledgerId);
 });
 
 class OverviewPage extends ConsumerWidget {

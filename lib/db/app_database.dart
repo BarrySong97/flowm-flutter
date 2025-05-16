@@ -6,10 +6,12 @@ import 'package:path/path.dart' as p;
 
 // Table imports
 import 'tables/account_table.dart';
+import 'tables/account_config_table.dart';
 import 'tables/transaction_table.dart';
 import 'tables/posting_table.dart';
 import 'tables/tag_table.dart';
 import 'tables/transaction_tag_table.dart';
+import 'tables/ledger_table.dart';
 
 // DAO imports
 import 'dao/account_dao.dart';
@@ -17,6 +19,8 @@ import 'dao/transaction_dao.dart';
 import 'dao/posting_dao.dart';
 import 'dao/tag_dao.dart';
 import 'dao/transaction_tag_dao.dart';
+import 'dao/account_config_dao.dart';
+import 'dao/ledger_dao.dart';
 
 import 'seed_data.dart';
 
@@ -25,10 +29,12 @@ part 'app_database.g.dart';
 @DriftDatabase(
   tables: [
     Accounts,
+    AccountConfigs,
     Transactions,
     Postings,
     Tags,
     TransactionTags,
+    Ledgers,
   ],
   daos: [
     AccountDao,
@@ -36,6 +42,8 @@ part 'app_database.g.dart';
     PostingDao,
     TagDao,
     TransactionTagDao,
+    AccountConfigDao,
+    LedgerDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {

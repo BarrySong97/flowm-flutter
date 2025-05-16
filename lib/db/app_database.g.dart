@@ -3,6 +3,316 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class $LedgersTable extends Ledgers with TableInfo<$LedgersTable, Ledger> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LedgersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
+  @override
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 255),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _isSelectedMeta =
+      const VerificationMeta('isSelected');
+  @override
+  late final GeneratedColumn<bool> isSelected = GeneratedColumn<bool>(
+      'is_selected', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_selected" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [ledgerId, name, description, createdAt, isSelected];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'ledgers';
+  @override
+  VerificationContext validateIntegrity(Insertable<Ledger> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('is_selected')) {
+      context.handle(
+          _isSelectedMeta,
+          isSelected.isAcceptableOrUnknown(
+              data['is_selected']!, _isSelectedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ledgerId};
+  @override
+  Ledger map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Ledger(
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      isSelected: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_selected'])!,
+    );
+  }
+
+  @override
+  $LedgersTable createAlias(String alias) {
+    return $LedgersTable(attachedDatabase, alias);
+  }
+}
+
+class Ledger extends DataClass implements Insertable<Ledger> {
+  final int ledgerId;
+  final String name;
+  final String? description;
+  final DateTime createdAt;
+  final bool isSelected;
+  const Ledger(
+      {required this.ledgerId,
+      required this.name,
+      this.description,
+      required this.createdAt,
+      required this.isSelected});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['ledger_id'] = Variable<int>(ledgerId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['is_selected'] = Variable<bool>(isSelected);
+    return map;
+  }
+
+  LedgersCompanion toCompanion(bool nullToAbsent) {
+    return LedgersCompanion(
+      ledgerId: Value(ledgerId),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      createdAt: Value(createdAt),
+      isSelected: Value(isSelected),
+    );
+  }
+
+  factory Ledger.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Ledger(
+      ledgerId: serializer.fromJson<int>(json['ledgerId']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      isSelected: serializer.fromJson<bool>(json['isSelected']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ledgerId': serializer.toJson<int>(ledgerId),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'isSelected': serializer.toJson<bool>(isSelected),
+    };
+  }
+
+  Ledger copyWith(
+          {int? ledgerId,
+          String? name,
+          Value<String?> description = const Value.absent(),
+          DateTime? createdAt,
+          bool? isSelected}) =>
+      Ledger(
+        ledgerId: ledgerId ?? this.ledgerId,
+        name: name ?? this.name,
+        description: description.present ? description.value : this.description,
+        createdAt: createdAt ?? this.createdAt,
+        isSelected: isSelected ?? this.isSelected,
+      );
+  Ledger copyWithCompanion(LedgersCompanion data) {
+    return Ledger(
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
+      name: data.name.present ? data.name.value : this.name,
+      description:
+          data.description.present ? data.description.value : this.description,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      isSelected:
+          data.isSelected.present ? data.isSelected.value : this.isSelected,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Ledger(')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('isSelected: $isSelected')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(ledgerId, name, description, createdAt, isSelected);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Ledger &&
+          other.ledgerId == this.ledgerId &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.createdAt == this.createdAt &&
+          other.isSelected == this.isSelected);
+}
+
+class LedgersCompanion extends UpdateCompanion<Ledger> {
+  final Value<int> ledgerId;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<DateTime> createdAt;
+  final Value<bool> isSelected;
+  const LedgersCompanion({
+    this.ledgerId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.isSelected = const Value.absent(),
+  });
+  LedgersCompanion.insert({
+    this.ledgerId = const Value.absent(),
+    required String name,
+    this.description = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.isSelected = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<Ledger> custom({
+    Expression<int>? ledgerId,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<DateTime>? createdAt,
+    Expression<bool>? isSelected,
+  }) {
+    return RawValuesInsertable({
+      if (ledgerId != null) 'ledger_id': ledgerId,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (createdAt != null) 'created_at': createdAt,
+      if (isSelected != null) 'is_selected': isSelected,
+    });
+  }
+
+  LedgersCompanion copyWith(
+      {Value<int>? ledgerId,
+      Value<String>? name,
+      Value<String?>? description,
+      Value<DateTime>? createdAt,
+      Value<bool>? isSelected}) {
+    return LedgersCompanion(
+      ledgerId: ledgerId ?? this.ledgerId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      isSelected: isSelected ?? this.isSelected,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (isSelected.present) {
+      map['is_selected'] = Variable<bool>(isSelected.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LedgersCompanion(')
+          ..write('ledgerId: $ledgerId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('isSelected: $isSelected')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -18,6 +328,15 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _ledgerIdMeta =
+      const VerificationMeta('ledgerId');
+  @override
+  late final GeneratedColumn<int> ledgerId = GeneratedColumn<int>(
+      'ledger_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES ledgers (ledger_id)'));
   static const VerificationMeta _parentAccountIdMeta =
       const VerificationMeta('parentAccountId');
   @override
@@ -65,6 +384,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
   @override
   List<GeneratedColumn> get $columns => [
         accountId,
+        ledgerId,
         parentAccountId,
         accountName,
         fullPath,
@@ -85,6 +405,12 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     if (data.containsKey('account_id')) {
       context.handle(_accountIdMeta,
           accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    }
+    if (data.containsKey('ledger_id')) {
+      context.handle(_ledgerIdMeta,
+          ledgerId.isAcceptableOrUnknown(data['ledger_id']!, _ledgerIdMeta));
+    } else if (isInserting) {
+      context.missing(_ledgerIdMeta);
     }
     if (data.containsKey('parent_account_id')) {
       context.handle(
@@ -125,6 +451,8 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     return Account(
       accountId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}account_id'])!,
+      ledgerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ledger_id'])!,
       parentAccountId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}parent_account_id']),
       accountName: attachedDatabase.typeMapping
@@ -152,6 +480,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
 
 class Account extends DataClass implements Insertable<Account> {
   final int accountId;
+  final int ledgerId;
   final int? parentAccountId;
   final String accountName;
   final String fullPath;
@@ -160,6 +489,7 @@ class Account extends DataClass implements Insertable<Account> {
   final DateTime createdAt;
   const Account(
       {required this.accountId,
+      required this.ledgerId,
       this.parentAccountId,
       required this.accountName,
       required this.fullPath,
@@ -170,6 +500,7 @@ class Account extends DataClass implements Insertable<Account> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['account_id'] = Variable<int>(accountId);
+    map['ledger_id'] = Variable<int>(ledgerId);
     if (!nullToAbsent || parentAccountId != null) {
       map['parent_account_id'] = Variable<int>(parentAccountId);
     }
@@ -187,6 +518,7 @@ class Account extends DataClass implements Insertable<Account> {
   AccountsCompanion toCompanion(bool nullToAbsent) {
     return AccountsCompanion(
       accountId: Value(accountId),
+      ledgerId: Value(ledgerId),
       parentAccountId: parentAccountId == null && nullToAbsent
           ? const Value.absent()
           : Value(parentAccountId),
@@ -203,6 +535,7 @@ class Account extends DataClass implements Insertable<Account> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Account(
       accountId: serializer.fromJson<int>(json['accountId']),
+      ledgerId: serializer.fromJson<int>(json['ledgerId']),
       parentAccountId: serializer.fromJson<int?>(json['parentAccountId']),
       accountName: serializer.fromJson<String>(json['accountName']),
       fullPath: serializer.fromJson<String>(json['fullPath']),
@@ -217,6 +550,7 @@ class Account extends DataClass implements Insertable<Account> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'accountId': serializer.toJson<int>(accountId),
+      'ledgerId': serializer.toJson<int>(ledgerId),
       'parentAccountId': serializer.toJson<int?>(parentAccountId),
       'accountName': serializer.toJson<String>(accountName),
       'fullPath': serializer.toJson<String>(fullPath),
@@ -229,6 +563,7 @@ class Account extends DataClass implements Insertable<Account> {
 
   Account copyWith(
           {int? accountId,
+          int? ledgerId,
           Value<int?> parentAccountId = const Value.absent(),
           String? accountName,
           String? fullPath,
@@ -237,6 +572,7 @@ class Account extends DataClass implements Insertable<Account> {
           DateTime? createdAt}) =>
       Account(
         accountId: accountId ?? this.accountId,
+        ledgerId: ledgerId ?? this.ledgerId,
         parentAccountId: parentAccountId.present
             ? parentAccountId.value
             : this.parentAccountId,
@@ -249,6 +585,7 @@ class Account extends DataClass implements Insertable<Account> {
   Account copyWithCompanion(AccountsCompanion data) {
     return Account(
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      ledgerId: data.ledgerId.present ? data.ledgerId.value : this.ledgerId,
       parentAccountId: data.parentAccountId.present
           ? data.parentAccountId.value
           : this.parentAccountId,
@@ -266,6 +603,7 @@ class Account extends DataClass implements Insertable<Account> {
   String toString() {
     return (StringBuffer('Account(')
           ..write('accountId: $accountId, ')
+          ..write('ledgerId: $ledgerId, ')
           ..write('parentAccountId: $parentAccountId, ')
           ..write('accountName: $accountName, ')
           ..write('fullPath: $fullPath, ')
@@ -277,13 +615,14 @@ class Account extends DataClass implements Insertable<Account> {
   }
 
   @override
-  int get hashCode => Object.hash(accountId, parentAccountId, accountName,
-      fullPath, accountType, isActive, createdAt);
+  int get hashCode => Object.hash(accountId, ledgerId, parentAccountId,
+      accountName, fullPath, accountType, isActive, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Account &&
           other.accountId == this.accountId &&
+          other.ledgerId == this.ledgerId &&
           other.parentAccountId == this.parentAccountId &&
           other.accountName == this.accountName &&
           other.fullPath == this.fullPath &&
@@ -294,6 +633,7 @@ class Account extends DataClass implements Insertable<Account> {
 
 class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<int> accountId;
+  final Value<int> ledgerId;
   final Value<int?> parentAccountId;
   final Value<String> accountName;
   final Value<String> fullPath;
@@ -302,6 +642,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<DateTime> createdAt;
   const AccountsCompanion({
     this.accountId = const Value.absent(),
+    this.ledgerId = const Value.absent(),
     this.parentAccountId = const Value.absent(),
     this.accountName = const Value.absent(),
     this.fullPath = const Value.absent(),
@@ -311,17 +652,20 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   });
   AccountsCompanion.insert({
     this.accountId = const Value.absent(),
+    required int ledgerId,
     this.parentAccountId = const Value.absent(),
     required String accountName,
     required String fullPath,
     required AccountType accountType,
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
-  })  : accountName = Value(accountName),
+  })  : ledgerId = Value(ledgerId),
+        accountName = Value(accountName),
         fullPath = Value(fullPath),
         accountType = Value(accountType);
   static Insertable<Account> custom({
     Expression<int>? accountId,
+    Expression<int>? ledgerId,
     Expression<int>? parentAccountId,
     Expression<String>? accountName,
     Expression<String>? fullPath,
@@ -331,6 +675,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   }) {
     return RawValuesInsertable({
       if (accountId != null) 'account_id': accountId,
+      if (ledgerId != null) 'ledger_id': ledgerId,
       if (parentAccountId != null) 'parent_account_id': parentAccountId,
       if (accountName != null) 'account_name': accountName,
       if (fullPath != null) 'full_path': fullPath,
@@ -342,6 +687,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
 
   AccountsCompanion copyWith(
       {Value<int>? accountId,
+      Value<int>? ledgerId,
       Value<int?>? parentAccountId,
       Value<String>? accountName,
       Value<String>? fullPath,
@@ -350,6 +696,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       Value<DateTime>? createdAt}) {
     return AccountsCompanion(
       accountId: accountId ?? this.accountId,
+      ledgerId: ledgerId ?? this.ledgerId,
       parentAccountId: parentAccountId ?? this.parentAccountId,
       accountName: accountName ?? this.accountName,
       fullPath: fullPath ?? this.fullPath,
@@ -364,6 +711,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     final map = <String, Expression>{};
     if (accountId.present) {
       map['account_id'] = Variable<int>(accountId.value);
+    }
+    if (ledgerId.present) {
+      map['ledger_id'] = Variable<int>(ledgerId.value);
     }
     if (parentAccountId.present) {
       map['parent_account_id'] = Variable<int>(parentAccountId.value);
@@ -391,12 +741,291 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   String toString() {
     return (StringBuffer('AccountsCompanion(')
           ..write('accountId: $accountId, ')
+          ..write('ledgerId: $ledgerId, ')
           ..write('parentAccountId: $parentAccountId, ')
           ..write('accountName: $accountName, ')
           ..write('fullPath: $fullPath, ')
           ..write('accountType: $accountType, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AccountConfigsTable extends AccountConfigs
+    with TableInfo<$AccountConfigsTable, AccountConfig> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AccountConfigsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _accountIdMeta =
+      const VerificationMeta('accountId');
+  @override
+  late final GeneratedColumn<int> accountId = GeneratedColumn<int>(
+      'account_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES accounts (account_id)'));
+  static const VerificationMeta _configDetailsMeta =
+      const VerificationMeta('configDetails');
+  @override
+  late final GeneratedColumn<String> configDetails = GeneratedColumn<String>(
+      'config_details', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [accountId, configDetails, createdAt, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'account_configs';
+  @override
+  VerificationContext validateIntegrity(Insertable<AccountConfig> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('account_id')) {
+      context.handle(_accountIdMeta,
+          accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta));
+    }
+    if (data.containsKey('config_details')) {
+      context.handle(
+          _configDetailsMeta,
+          configDetails.isAcceptableOrUnknown(
+              data['config_details']!, _configDetailsMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {accountId};
+  @override
+  AccountConfig map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AccountConfig(
+      accountId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}account_id'])!,
+      configDetails: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}config_details']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $AccountConfigsTable createAlias(String alias) {
+    return $AccountConfigsTable(attachedDatabase, alias);
+  }
+}
+
+class AccountConfig extends DataClass implements Insertable<AccountConfig> {
+  /// The ID of the account this configuration belongs to.
+  /// This is also the primary key for this table and a foreign key to [Accounts.accountId].
+  final int accountId;
+
+  /// Example configuration data column.
+  /// You can replace this with actual configuration fields.
+  final String? configDetails;
+
+  /// Timestamp of when the configuration was created.
+  final DateTime createdAt;
+
+  /// Timestamp of when the configuration was last updated.
+  final DateTime updatedAt;
+  const AccountConfig(
+      {required this.accountId,
+      this.configDetails,
+      required this.createdAt,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['account_id'] = Variable<int>(accountId);
+    if (!nullToAbsent || configDetails != null) {
+      map['config_details'] = Variable<String>(configDetails);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AccountConfigsCompanion toCompanion(bool nullToAbsent) {
+    return AccountConfigsCompanion(
+      accountId: Value(accountId),
+      configDetails: configDetails == null && nullToAbsent
+          ? const Value.absent()
+          : Value(configDetails),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AccountConfig.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AccountConfig(
+      accountId: serializer.fromJson<int>(json['accountId']),
+      configDetails: serializer.fromJson<String?>(json['configDetails']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'accountId': serializer.toJson<int>(accountId),
+      'configDetails': serializer.toJson<String?>(configDetails),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AccountConfig copyWith(
+          {int? accountId,
+          Value<String?> configDetails = const Value.absent(),
+          DateTime? createdAt,
+          DateTime? updatedAt}) =>
+      AccountConfig(
+        accountId: accountId ?? this.accountId,
+        configDetails:
+            configDetails.present ? configDetails.value : this.configDetails,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  AccountConfig copyWithCompanion(AccountConfigsCompanion data) {
+    return AccountConfig(
+      accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      configDetails: data.configDetails.present
+          ? data.configDetails.value
+          : this.configDetails,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AccountConfig(')
+          ..write('accountId: $accountId, ')
+          ..write('configDetails: $configDetails, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(accountId, configDetails, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AccountConfig &&
+          other.accountId == this.accountId &&
+          other.configDetails == this.configDetails &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AccountConfigsCompanion extends UpdateCompanion<AccountConfig> {
+  final Value<int> accountId;
+  final Value<String?> configDetails;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const AccountConfigsCompanion({
+    this.accountId = const Value.absent(),
+    this.configDetails = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  AccountConfigsCompanion.insert({
+    this.accountId = const Value.absent(),
+    this.configDetails = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  static Insertable<AccountConfig> custom({
+    Expression<int>? accountId,
+    Expression<String>? configDetails,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (accountId != null) 'account_id': accountId,
+      if (configDetails != null) 'config_details': configDetails,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  AccountConfigsCompanion copyWith(
+      {Value<int>? accountId,
+      Value<String?>? configDetails,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt}) {
+    return AccountConfigsCompanion(
+      accountId: accountId ?? this.accountId,
+      configDetails: configDetails ?? this.configDetails,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (accountId.present) {
+      map['account_id'] = Variable<int>(accountId.value);
+    }
+    if (configDetails.present) {
+      map['config_details'] = Variable<String>(configDetails.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AccountConfigsCompanion(')
+          ..write('accountId: $accountId, ')
+          ..write('configDetails: $configDetails, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -1583,7 +2212,9 @@ class TransactionTagsCompanion extends UpdateCompanion<TransactionTag> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $LedgersTable ledgers = $LedgersTable(this);
   late final $AccountsTable accounts = $AccountsTable(this);
+  late final $AccountConfigsTable accountConfigs = $AccountConfigsTable(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $PostingsTable postings = $PostingsTable(this);
   late final $TagsTable tags = $TagsTable(this);
@@ -1596,16 +2227,271 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final TagDao tagDao = TagDao(this as AppDatabase);
   late final TransactionTagDao transactionTagDao =
       TransactionTagDao(this as AppDatabase);
+  late final AccountConfigDao accountConfigDao =
+      AccountConfigDao(this as AppDatabase);
+  late final LedgerDao ledgerDao = LedgerDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [accounts, transactions, postings, tags, transactionTags];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        ledgers,
+        accounts,
+        accountConfigs,
+        transactions,
+        postings,
+        tags,
+        transactionTags
+      ];
 }
 
+typedef $$LedgersTableCreateCompanionBuilder = LedgersCompanion Function({
+  Value<int> ledgerId,
+  required String name,
+  Value<String?> description,
+  Value<DateTime> createdAt,
+  Value<bool> isSelected,
+});
+typedef $$LedgersTableUpdateCompanionBuilder = LedgersCompanion Function({
+  Value<int> ledgerId,
+  Value<String> name,
+  Value<String?> description,
+  Value<DateTime> createdAt,
+  Value<bool> isSelected,
+});
+
+final class $$LedgersTableReferences
+    extends BaseReferences<_$AppDatabase, $LedgersTable, Ledger> {
+  $$LedgersTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$AccountsTable, List<Account>> _accountsRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.accounts,
+          aliasName:
+              $_aliasNameGenerator(db.ledgers.ledgerId, db.accounts.ledgerId));
+
+  $$AccountsTableProcessedTableManager get accountsRefs {
+    final manager = $$AccountsTableTableManager($_db, $_db.accounts).filter(
+        (f) => f.ledgerId.ledgerId.sqlEquals($_itemColumn<int>('ledger_id')!));
+
+    final cache = $_typedResult.readTableOrNull(_accountsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$LedgersTableFilterComposer
+    extends Composer<_$AppDatabase, $LedgersTable> {
+  $$LedgersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isSelected => $composableBuilder(
+      column: $table.isSelected, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> accountsRefs(
+      Expression<bool> Function($$AccountsTableFilterComposer f) f) {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.ledgerId,
+        referencedTable: $db.accounts,
+        getReferencedColumn: (t) => t.ledgerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountsTableFilterComposer(
+              $db: $db,
+              $table: $db.accounts,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$LedgersTableOrderingComposer
+    extends Composer<_$AppDatabase, $LedgersTable> {
+  $$LedgersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get ledgerId => $composableBuilder(
+      column: $table.ledgerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isSelected => $composableBuilder(
+      column: $table.isSelected, builder: (column) => ColumnOrderings(column));
+}
+
+class $$LedgersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LedgersTable> {
+  $$LedgersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get ledgerId =>
+      $composableBuilder(column: $table.ledgerId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSelected => $composableBuilder(
+      column: $table.isSelected, builder: (column) => column);
+
+  Expression<T> accountsRefs<T extends Object>(
+      Expression<T> Function($$AccountsTableAnnotationComposer a) f) {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.ledgerId,
+        referencedTable: $db.accounts,
+        getReferencedColumn: (t) => t.ledgerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.accounts,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$LedgersTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $LedgersTable,
+    Ledger,
+    $$LedgersTableFilterComposer,
+    $$LedgersTableOrderingComposer,
+    $$LedgersTableAnnotationComposer,
+    $$LedgersTableCreateCompanionBuilder,
+    $$LedgersTableUpdateCompanionBuilder,
+    (Ledger, $$LedgersTableReferences),
+    Ledger,
+    PrefetchHooks Function({bool accountsRefs})> {
+  $$LedgersTableTableManager(_$AppDatabase db, $LedgersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LedgersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LedgersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LedgersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> ledgerId = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<bool> isSelected = const Value.absent(),
+          }) =>
+              LedgersCompanion(
+            ledgerId: ledgerId,
+            name: name,
+            description: description,
+            createdAt: createdAt,
+            isSelected: isSelected,
+          ),
+          createCompanionCallback: ({
+            Value<int> ledgerId = const Value.absent(),
+            required String name,
+            Value<String?> description = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<bool> isSelected = const Value.absent(),
+          }) =>
+              LedgersCompanion.insert(
+            ledgerId: ledgerId,
+            name: name,
+            description: description,
+            createdAt: createdAt,
+            isSelected: isSelected,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) =>
+                  (e.readTable(table), $$LedgersTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: ({accountsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (accountsRefs) db.accounts],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (accountsRefs)
+                    await $_getPrefetchedData<Ledger, $LedgersTable, Account>(
+                        currentTable: table,
+                        referencedTable:
+                            $$LedgersTableReferences._accountsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$LedgersTableReferences(db, table, p0)
+                                .accountsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.ledgerId == item.ledgerId),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$LedgersTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $LedgersTable,
+    Ledger,
+    $$LedgersTableFilterComposer,
+    $$LedgersTableOrderingComposer,
+    $$LedgersTableAnnotationComposer,
+    $$LedgersTableCreateCompanionBuilder,
+    $$LedgersTableUpdateCompanionBuilder,
+    (Ledger, $$LedgersTableReferences),
+    Ledger,
+    PrefetchHooks Function({bool accountsRefs})>;
 typedef $$AccountsTableCreateCompanionBuilder = AccountsCompanion Function({
   Value<int> accountId,
+  required int ledgerId,
   Value<int?> parentAccountId,
   required String accountName,
   required String fullPath,
@@ -1615,6 +2501,7 @@ typedef $$AccountsTableCreateCompanionBuilder = AccountsCompanion Function({
 });
 typedef $$AccountsTableUpdateCompanionBuilder = AccountsCompanion Function({
   Value<int> accountId,
+  Value<int> ledgerId,
   Value<int?> parentAccountId,
   Value<String> accountName,
   Value<String> fullPath,
@@ -1626,6 +2513,21 @@ typedef $$AccountsTableUpdateCompanionBuilder = AccountsCompanion Function({
 final class $$AccountsTableReferences
     extends BaseReferences<_$AppDatabase, $AccountsTable, Account> {
   $$AccountsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $LedgersTable _ledgerIdTable(_$AppDatabase db) =>
+      db.ledgers.createAlias(
+          $_aliasNameGenerator(db.accounts.ledgerId, db.ledgers.ledgerId));
+
+  $$LedgersTableProcessedTableManager get ledgerId {
+    final $_column = $_itemColumn<int>('ledger_id')!;
+
+    final manager = $$LedgersTableTableManager($_db, $_db.ledgers)
+        .filter((f) => f.ledgerId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_ledgerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
 
   static $AccountsTable _parentAccountIdTable(_$AppDatabase db) =>
       db.accounts.createAlias($_aliasNameGenerator(
@@ -1640,6 +2542,22 @@ final class $$AccountsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$AccountConfigsTable, List<AccountConfig>>
+      _accountConfigsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.accountConfigs,
+              aliasName: $_aliasNameGenerator(
+                  db.accounts.accountId, db.accountConfigs.accountId));
+
+  $$AccountConfigsTableProcessedTableManager get accountConfigsRefs {
+    final manager = $$AccountConfigsTableTableManager($_db, $_db.accountConfigs)
+        .filter((f) =>
+            f.accountId.accountId.sqlEquals($_itemColumn<int>('account_id')!));
+
+    final cache = $_typedResult.readTableOrNull(_accountConfigsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
   }
 
   static MultiTypedResultKey<$PostingsTable, List<Posting>> _postingsRefsTable(
@@ -1688,6 +2606,26 @@ class $$AccountsTableFilterComposer
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
+  $$LedgersTableFilterComposer get ledgerId {
+    final $$LedgersTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.ledgerId,
+        referencedTable: $db.ledgers,
+        getReferencedColumn: (t) => t.ledgerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$LedgersTableFilterComposer(
+              $db: $db,
+              $table: $db.ledgers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   $$AccountsTableFilterComposer get parentAccountId {
     final $$AccountsTableFilterComposer composer = $composerBuilder(
         composer: this,
@@ -1706,6 +2644,27 @@ class $$AccountsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> accountConfigsRefs(
+      Expression<bool> Function($$AccountConfigsTableFilterComposer f) f) {
+    final $$AccountConfigsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.accountId,
+        referencedTable: $db.accountConfigs,
+        getReferencedColumn: (t) => t.accountId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountConfigsTableFilterComposer(
+              $db: $db,
+              $table: $db.accountConfigs,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 
   Expression<bool> postingsRefs(
@@ -1757,6 +2716,26 @@ class $$AccountsTableOrderingComposer
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  $$LedgersTableOrderingComposer get ledgerId {
+    final $$LedgersTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.ledgerId,
+        referencedTable: $db.ledgers,
+        getReferencedColumn: (t) => t.ledgerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$LedgersTableOrderingComposer(
+              $db: $db,
+              $table: $db.ledgers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   $$AccountsTableOrderingComposer get parentAccountId {
     final $$AccountsTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -1806,6 +2785,26 @@ class $$AccountsTableAnnotationComposer
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
+  $$LedgersTableAnnotationComposer get ledgerId {
+    final $$LedgersTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.ledgerId,
+        referencedTable: $db.ledgers,
+        getReferencedColumn: (t) => t.ledgerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$LedgersTableAnnotationComposer(
+              $db: $db,
+              $table: $db.ledgers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   $$AccountsTableAnnotationComposer get parentAccountId {
     final $$AccountsTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -1824,6 +2823,27 @@ class $$AccountsTableAnnotationComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<T> accountConfigsRefs<T extends Object>(
+      Expression<T> Function($$AccountConfigsTableAnnotationComposer a) f) {
+    final $$AccountConfigsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.accountId,
+        referencedTable: $db.accountConfigs,
+        getReferencedColumn: (t) => t.accountId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountConfigsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.accountConfigs,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 
   Expression<T> postingsRefs<T extends Object>(
@@ -1859,7 +2879,11 @@ class $$AccountsTableTableManager extends RootTableManager<
     $$AccountsTableUpdateCompanionBuilder,
     (Account, $$AccountsTableReferences),
     Account,
-    PrefetchHooks Function({bool parentAccountId, bool postingsRefs})> {
+    PrefetchHooks Function(
+        {bool ledgerId,
+        bool parentAccountId,
+        bool accountConfigsRefs,
+        bool postingsRefs})> {
   $$AccountsTableTableManager(_$AppDatabase db, $AccountsTable table)
       : super(TableManagerState(
           db: db,
@@ -1872,6 +2896,7 @@ class $$AccountsTableTableManager extends RootTableManager<
               $$AccountsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> accountId = const Value.absent(),
+            Value<int> ledgerId = const Value.absent(),
             Value<int?> parentAccountId = const Value.absent(),
             Value<String> accountName = const Value.absent(),
             Value<String> fullPath = const Value.absent(),
@@ -1881,6 +2906,7 @@ class $$AccountsTableTableManager extends RootTableManager<
           }) =>
               AccountsCompanion(
             accountId: accountId,
+            ledgerId: ledgerId,
             parentAccountId: parentAccountId,
             accountName: accountName,
             fullPath: fullPath,
@@ -1890,6 +2916,7 @@ class $$AccountsTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> accountId = const Value.absent(),
+            required int ledgerId,
             Value<int?> parentAccountId = const Value.absent(),
             required String accountName,
             required String fullPath,
@@ -1899,6 +2926,7 @@ class $$AccountsTableTableManager extends RootTableManager<
           }) =>
               AccountsCompanion.insert(
             accountId: accountId,
+            ledgerId: ledgerId,
             parentAccountId: parentAccountId,
             accountName: accountName,
             fullPath: fullPath,
@@ -1911,10 +2939,16 @@ class $$AccountsTableTableManager extends RootTableManager<
                   (e.readTable(table), $$AccountsTableReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: (
-              {parentAccountId = false, postingsRefs = false}) {
+              {ledgerId = false,
+              parentAccountId = false,
+              accountConfigsRefs = false,
+              postingsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (postingsRefs) db.postings],
+              explicitlyWatchedTables: [
+                if (accountConfigsRefs) db.accountConfigs,
+                if (postingsRefs) db.postings
+              ],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -1928,6 +2962,16 @@ class $$AccountsTableTableManager extends RootTableManager<
                       dynamic,
                       dynamic,
                       dynamic>>(state) {
+                if (ledgerId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.ledgerId,
+                    referencedTable:
+                        $$AccountsTableReferences._ledgerIdTable(db),
+                    referencedColumn:
+                        $$AccountsTableReferences._ledgerIdTable(db).ledgerId,
+                  ) as T;
+                }
                 if (parentAccountId) {
                   state = state.withJoin(
                     currentTable: table,
@@ -1944,6 +2988,19 @@ class $$AccountsTableTableManager extends RootTableManager<
               },
               getPrefetchedDataCallback: (items) async {
                 return [
+                  if (accountConfigsRefs)
+                    await $_getPrefetchedData<Account, $AccountsTable,
+                            AccountConfig>(
+                        currentTable: table,
+                        referencedTable: $$AccountsTableReferences
+                            ._accountConfigsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$AccountsTableReferences(db, table, p0)
+                                .accountConfigsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.accountId == item.accountId),
+                        typedResults: items),
                   if (postingsRefs)
                     await $_getPrefetchedData<Account, $AccountsTable, Posting>(
                         currentTable: table,
@@ -1974,7 +3031,269 @@ typedef $$AccountsTableProcessedTableManager = ProcessedTableManager<
     $$AccountsTableUpdateCompanionBuilder,
     (Account, $$AccountsTableReferences),
     Account,
-    PrefetchHooks Function({bool parentAccountId, bool postingsRefs})>;
+    PrefetchHooks Function(
+        {bool ledgerId,
+        bool parentAccountId,
+        bool accountConfigsRefs,
+        bool postingsRefs})>;
+typedef $$AccountConfigsTableCreateCompanionBuilder = AccountConfigsCompanion
+    Function({
+  Value<int> accountId,
+  Value<String?> configDetails,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+});
+typedef $$AccountConfigsTableUpdateCompanionBuilder = AccountConfigsCompanion
+    Function({
+  Value<int> accountId,
+  Value<String?> configDetails,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+});
+
+final class $$AccountConfigsTableReferences
+    extends BaseReferences<_$AppDatabase, $AccountConfigsTable, AccountConfig> {
+  $$AccountConfigsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $AccountsTable _accountIdTable(_$AppDatabase db) =>
+      db.accounts.createAlias($_aliasNameGenerator(
+          db.accountConfigs.accountId, db.accounts.accountId));
+
+  $$AccountsTableProcessedTableManager get accountId {
+    final $_column = $_itemColumn<int>('account_id')!;
+
+    final manager = $$AccountsTableTableManager($_db, $_db.accounts)
+        .filter((f) => f.accountId.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_accountIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$AccountConfigsTableFilterComposer
+    extends Composer<_$AppDatabase, $AccountConfigsTable> {
+  $$AccountConfigsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get configDetails => $composableBuilder(
+      column: $table.configDetails, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  $$AccountsTableFilterComposer get accountId {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.accountId,
+        referencedTable: $db.accounts,
+        getReferencedColumn: (t) => t.accountId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountsTableFilterComposer(
+              $db: $db,
+              $table: $db.accounts,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$AccountConfigsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AccountConfigsTable> {
+  $$AccountConfigsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get configDetails => $composableBuilder(
+      column: $table.configDetails,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  $$AccountsTableOrderingComposer get accountId {
+    final $$AccountsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.accountId,
+        referencedTable: $db.accounts,
+        getReferencedColumn: (t) => t.accountId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountsTableOrderingComposer(
+              $db: $db,
+              $table: $db.accounts,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$AccountConfigsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AccountConfigsTable> {
+  $$AccountConfigsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get configDetails => $composableBuilder(
+      column: $table.configDetails, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$AccountsTableAnnotationComposer get accountId {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.accountId,
+        referencedTable: $db.accounts,
+        getReferencedColumn: (t) => t.accountId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AccountsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.accounts,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$AccountConfigsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $AccountConfigsTable,
+    AccountConfig,
+    $$AccountConfigsTableFilterComposer,
+    $$AccountConfigsTableOrderingComposer,
+    $$AccountConfigsTableAnnotationComposer,
+    $$AccountConfigsTableCreateCompanionBuilder,
+    $$AccountConfigsTableUpdateCompanionBuilder,
+    (AccountConfig, $$AccountConfigsTableReferences),
+    AccountConfig,
+    PrefetchHooks Function({bool accountId})> {
+  $$AccountConfigsTableTableManager(
+      _$AppDatabase db, $AccountConfigsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AccountConfigsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AccountConfigsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AccountConfigsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> accountId = const Value.absent(),
+            Value<String?> configDetails = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+          }) =>
+              AccountConfigsCompanion(
+            accountId: accountId,
+            configDetails: configDetails,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> accountId = const Value.absent(),
+            Value<String?> configDetails = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+          }) =>
+              AccountConfigsCompanion.insert(
+            accountId: accountId,
+            configDetails: configDetails,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$AccountConfigsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({accountId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (accountId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.accountId,
+                    referencedTable:
+                        $$AccountConfigsTableReferences._accountIdTable(db),
+                    referencedColumn: $$AccountConfigsTableReferences
+                        ._accountIdTable(db)
+                        .accountId,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$AccountConfigsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $AccountConfigsTable,
+    AccountConfig,
+    $$AccountConfigsTableFilterComposer,
+    $$AccountConfigsTableOrderingComposer,
+    $$AccountConfigsTableAnnotationComposer,
+    $$AccountConfigsTableCreateCompanionBuilder,
+    $$AccountConfigsTableUpdateCompanionBuilder,
+    (AccountConfig, $$AccountConfigsTableReferences),
+    AccountConfig,
+    PrefetchHooks Function({bool accountId})>;
 typedef $$TransactionsTableCreateCompanionBuilder = TransactionsCompanion
     Function({
   Value<int> transactionId,
@@ -3221,8 +4540,12 @@ typedef $$TransactionTagsTableProcessedTableManager = ProcessedTableManager<
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$LedgersTableTableManager get ledgers =>
+      $$LedgersTableTableManager(_db, _db.ledgers);
   $$AccountsTableTableManager get accounts =>
       $$AccountsTableTableManager(_db, _db.accounts);
+  $$AccountConfigsTableTableManager get accountConfigs =>
+      $$AccountConfigsTableTableManager(_db, _db.accountConfigs);
   $$TransactionsTableTableManager get transactions =>
       $$TransactionsTableTableManager(_db, _db.transactions);
   $$PostingsTableTableManager get postings =>

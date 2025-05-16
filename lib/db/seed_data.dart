@@ -12,18 +12,47 @@ class SeedData {
 
   /// Initialize the database with seed data
   Future<void> seedDatabase() async {
-    await _createDefaultAccounts();
-    await _createSampleTransactions();
+    final ledgerIds = await _createDefaultLedgers();
+    await _createDefaultAccounts(ledgerIds[0]);
+    await _createDefaultAccounts(ledgerIds[1]);
+    await _createSampleTransactions(ledgerIds[0]);
+    await _createSampleTransactions(ledgerIds[1]);
     await _generateYearlyTransactions();
     await _createDefaultTags();
   }
 
+  /// Create default ledgers
+  Future<List<int>> _createDefaultLedgers() async {
+    // 创建个人账本
+    final personalLedgerId = await db.ledgerDao.insertLedger(
+      LedgersCompanion.insert(
+        name: '个人账本',
+        isSelected: const Value(true),
+        description: const Value('个人日常收支记录'),
+      ),
+    );
+
+    // 创建家庭账本
+    final familyLedgerId = await db.ledgerDao.insertLedger(
+      LedgersCompanion.insert(
+        name: '家庭账本',
+        description: const Value('家庭共同财务记录'),
+      ),
+    );
+
+    print(
+        'Created default ledgers with IDs: $personalLedgerId, $familyLedgerId');
+    return [personalLedgerId, familyLedgerId];
+  }
+
   /// Create default account hierarchy following Chinese accounting standards
-  Future<void> _createDefaultAccounts() async {
-    // Root accounts (main categories)
+  Future<void> _createDefaultAccounts(int ledgerId) async {
+    // 使用第一个账本ID（个人账本）创建账户
+    final personalLedgerId = ledgerId;
 
     // Asset accounts
     final currentAssetsId = await _createAccount(
+      personalLedgerId,
       null,
       '流动资产',
       '资产:流动资产',
@@ -31,6 +60,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       currentAssetsId,
       '现金',
       '资产:流动资产:现金',
@@ -38,6 +68,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       currentAssetsId,
       '银行存款',
       '资产:流动资产:银行存款',
@@ -45,6 +76,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       currentAssetsId,
       '支付宝',
       '资产:流动资产:支付宝',
@@ -52,6 +84,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       currentAssetsId,
       '微信支付',
       '资产:流动资产:微信支付',
@@ -59,6 +92,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       currentAssetsId,
       '应收账款',
       '资产:流动资产:应收账款',
@@ -67,6 +101,7 @@ class SeedData {
 
     // Fixed assets
     final fixedAssetsId = await _createAccount(
+      personalLedgerId,
       null,
       '固定资产',
       '资产:固定资产',
@@ -74,6 +109,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       fixedAssetsId,
       '房产',
       '资产:固定资产:房产',
@@ -81,6 +117,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       fixedAssetsId,
       '车辆',
       '资产:固定资产:车辆',
@@ -88,6 +125,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       fixedAssetsId,
       '电子设备',
       '资产:固定资产:电子设备',
@@ -96,6 +134,7 @@ class SeedData {
 
     // Liability accounts
     final shortTermLiabilityId = await _createAccount(
+      personalLedgerId,
       null,
       '流动负债',
       '负债:流动负债',
@@ -103,6 +142,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       shortTermLiabilityId,
       '信用卡',
       '负债:流动负债:信用卡',
@@ -110,6 +150,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       shortTermLiabilityId,
       '花呗',
       '负债:流动负债:花呗',
@@ -117,6 +158,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       shortTermLiabilityId,
       '白条',
       '负债:流动负债:白条',
@@ -124,6 +166,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       shortTermLiabilityId,
       '借呗',
       '负债:流动负债:借呗',
@@ -131,6 +174,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       shortTermLiabilityId,
       '应付账款',
       '负债:流动负债:应付账款',
@@ -138,6 +182,7 @@ class SeedData {
     );
 
     final longTermLiabilityId = await _createAccount(
+      personalLedgerId,
       null,
       '长期负债',
       '负债:长期负债',
@@ -145,6 +190,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       longTermLiabilityId,
       '房贷',
       '负债:长期负债:房贷',
@@ -152,6 +198,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       longTermLiabilityId,
       '车贷',
       '负债:长期负债:车贷',
@@ -160,6 +207,7 @@ class SeedData {
 
     // Equity accounts
     await _createAccount(
+      personalLedgerId,
       null,
       '个人资本',
       '所有者权益:个人资本',
@@ -167,6 +215,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '期初余额',
       '所有者权益:期初余额',
@@ -175,6 +224,7 @@ class SeedData {
 
     // Income accounts
     await _createAccount(
+      personalLedgerId,
       null,
       '工资收入',
       '收入:工资收入',
@@ -182,6 +232,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '奖金收入',
       '收入:奖金收入',
@@ -189,6 +240,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '投资收益',
       '收入:投资收益',
@@ -196,6 +248,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '理财收益',
       '收入:理财收益',
@@ -203,6 +256,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '兼职收入',
       '收入:兼职收入',
@@ -210,6 +264,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '其他收入',
       '收入:其他收入',
@@ -218,6 +273,7 @@ class SeedData {
 
     // Expense accounts
     final dailyExpensesId = await _createAccount(
+      personalLedgerId,
       null,
       '日常支出',
       '支出:日常支出',
@@ -225,6 +281,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       dailyExpensesId,
       '餐饮',
       '支出:日常支出:餐饮',
@@ -232,6 +289,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       dailyExpensesId,
       '购物',
       '支出:日常支出:购物',
@@ -239,6 +297,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       dailyExpensesId,
       '交通',
       '支出:日常支出:交通',
@@ -246,6 +305,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       dailyExpensesId,
       '娱乐',
       '支出:日常支出:娱乐',
@@ -253,6 +313,7 @@ class SeedData {
     );
 
     final housingExpensesId = await _createAccount(
+      personalLedgerId,
       null,
       '住房支出',
       '支出:住房支出',
@@ -260,6 +321,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       housingExpensesId,
       '房租',
       '支出:住房支出:房租',
@@ -267,6 +329,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       housingExpensesId,
       '物业费',
       '支出:住房支出:物业费',
@@ -274,6 +337,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       housingExpensesId,
       '水电煤',
       '支出:住房支出:水电煤',
@@ -281,6 +345,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '通讯',
       '支出:通讯',
@@ -288,6 +353,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '医疗',
       '支出:医疗',
@@ -295,6 +361,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '教育',
       '支出:教育',
@@ -302,6 +369,7 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '保险',
       '支出:保险',
@@ -309,17 +377,20 @@ class SeedData {
     );
 
     await _createAccount(
+      personalLedgerId,
       null,
       '税费',
       '支出:税费',
       AccountType.EXPENSE,
     );
+
+    // 如果有第二个账本（家庭账本），为其创建基本账户结构
   }
 
   /// Create sample transactions with postings that balance (debits = credits)
-  Future<void> _createSampleTransactions() async {
+  Future<void> _createSampleTransactions(int ledgerId) async {
     // Get account IDs for sample transactions
-    final accounts = await db.accountDao.getAllAccounts();
+    final accounts = await db.accountDao.getAccountsByLedgerId(ledgerId);
 
     // Find accounts by their full paths
     final bankAccount =
@@ -1199,6 +1270,7 @@ class SeedData {
 
   /// Helper method to create accounts
   Future<int> _createAccount(
+    int ledgerId,
     int? parentId,
     String name,
     String fullPath,
@@ -1206,6 +1278,7 @@ class SeedData {
   ) async {
     return await db.accountDao.insertAccount(
       AccountsCompanion.insert(
+        ledgerId: ledgerId,
         parentAccountId:
             parentId != null ? Value(parentId) : const Value.absent(),
         accountName: name,
