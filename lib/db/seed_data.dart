@@ -17,7 +17,8 @@ class SeedData {
     await _createDefaultAccounts(ledgerIds[1]);
     await _createSampleTransactions(ledgerIds[0]);
     await _createSampleTransactions(ledgerIds[1]);
-    await _generateYearlyTransactions();
+    await _generateYearlyTransactions(ledgerIds[0]);
+    await _generateYearlyTransactions(ledgerIds[1]);
     await _createDefaultTags();
   }
 
@@ -791,14 +792,14 @@ class SeedData {
   }
 
   /// Generates a large number of transactions for the previous year.
-  Future<void> _generateYearlyTransactions() async {
+  Future<void> _generateYearlyTransactions(int ledgerId) async {
     final random = Random();
     final now = DateTime.now();
     // Generate data for the past year, starting from today and going back one year.
     final endOfPeriod = DateTime(now.year, now.month, now.day);
     final startOfPeriod = endOfPeriod.subtract(const Duration(days: 365));
 
-    final allAccounts = await db.accountDao.getAllAccounts();
+    final allAccounts = await db.accountDao.getAccountsByLedgerId(ledgerId);
 
     // Helper to find account by full path
     Account? findAccount(String path) {

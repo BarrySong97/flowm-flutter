@@ -397,7 +397,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
           t.*,
           p.amount,
           a.account_id,
-          a.name as account_name,
+          a.account_name,
           a.account_type,
           ROW_NUMBER() OVER (PARTITION BY t.transaction_id ORDER BY 
             CASE WHEN p.amount < 0 THEN 1 ELSE 2 END) as row_num

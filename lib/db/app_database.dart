@@ -71,6 +71,7 @@ class AppDatabase extends _$AppDatabase {
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
+    print('dbFolder: ${dbFolder.path}');
     final file = File(p.join(dbFolder.path, 'flowm_database.sqlite'));
     return NativeDatabase(file);
   });
