@@ -4,6 +4,7 @@ import 'package:flowm/components/account/account_row.dart'; // Import the new Ac
 
 // Data model for an account
 class Account {
+  final int id;
   final String name;
   final double amount;
   final IconData?
@@ -13,6 +14,7 @@ class Account {
   final double? percentage; // Percentage of this account among its siblings
 
   Account({
+    required this.id,
     required this.name,
     required this.amount,
     this.icon,
@@ -53,6 +55,7 @@ class _AccountItemState extends State<AccountItem> {
             ? 0.0
             : (child.amount.abs() / totalChildrenAmount) * 100;
         return Account(
+          id: child.id,
           name: child.name,
           amount: child.amount,
           icon: child.icon,

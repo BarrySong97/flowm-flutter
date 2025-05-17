@@ -50,9 +50,17 @@ class $LedgersTable extends Ledgers with TableInfo<$LedgersTable, Ledger> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_selected" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _currencySymbolMeta =
+      const VerificationMeta('currencySymbol');
+  @override
+  late final GeneratedColumn<String> currencySymbol = GeneratedColumn<String>(
+      'currency_symbol', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('¥'));
   @override
   List<GeneratedColumn> get $columns =>
-      [ledgerId, name, description, createdAt, isSelected];
+      [ledgerId, name, description, createdAt, isSelected, currencySymbol];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -89,6 +97,12 @@ class $LedgersTable extends Ledgers with TableInfo<$LedgersTable, Ledger> {
           isSelected.isAcceptableOrUnknown(
               data['is_selected']!, _isSelectedMeta));
     }
+    if (data.containsKey('currency_symbol')) {
+      context.handle(
+          _currencySymbolMeta,
+          currencySymbol.isAcceptableOrUnknown(
+              data['currency_symbol']!, _currencySymbolMeta));
+    }
     return context;
   }
 
@@ -108,6 +122,8 @@ class $LedgersTable extends Ledgers with TableInfo<$LedgersTable, Ledger> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       isSelected: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_selected'])!,
+      currencySymbol: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}currency_symbol'])!,
     );
   }
 
@@ -123,12 +139,14 @@ class Ledger extends DataClass implements Insertable<Ledger> {
   final String? description;
   final DateTime createdAt;
   final bool isSelected;
+  final String currencySymbol;
   const Ledger(
       {required this.ledgerId,
       required this.name,
       this.description,
       required this.createdAt,
-      required this.isSelected});
+      required this.isSelected,
+      required this.currencySymbol});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -139,6 +157,7 @@ class Ledger extends DataClass implements Insertable<Ledger> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['is_selected'] = Variable<bool>(isSelected);
+    map['currency_symbol'] = Variable<String>(currencySymbol);
     return map;
   }
 
@@ -151,6 +170,7 @@ class Ledger extends DataClass implements Insertable<Ledger> {
           : Value(description),
       createdAt: Value(createdAt),
       isSelected: Value(isSelected),
+      currencySymbol: Value(currencySymbol),
     );
   }
 
@@ -163,6 +183,7 @@ class Ledger extends DataClass implements Insertable<Ledger> {
       description: serializer.fromJson<String?>(json['description']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       isSelected: serializer.fromJson<bool>(json['isSelected']),
+      currencySymbol: serializer.fromJson<String>(json['currencySymbol']),
     );
   }
   @override
@@ -174,6 +195,7 @@ class Ledger extends DataClass implements Insertable<Ledger> {
       'description': serializer.toJson<String?>(description),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'isSelected': serializer.toJson<bool>(isSelected),
+      'currencySymbol': serializer.toJson<String>(currencySymbol),
     };
   }
 
@@ -182,13 +204,15 @@ class Ledger extends DataClass implements Insertable<Ledger> {
           String? name,
           Value<String?> description = const Value.absent(),
           DateTime? createdAt,
-          bool? isSelected}) =>
+          bool? isSelected,
+          String? currencySymbol}) =>
       Ledger(
         ledgerId: ledgerId ?? this.ledgerId,
         name: name ?? this.name,
         description: description.present ? description.value : this.description,
         createdAt: createdAt ?? this.createdAt,
         isSelected: isSelected ?? this.isSelected,
+        currencySymbol: currencySymbol ?? this.currencySymbol,
       );
   Ledger copyWithCompanion(LedgersCompanion data) {
     return Ledger(
@@ -199,6 +223,9 @@ class Ledger extends DataClass implements Insertable<Ledger> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       isSelected:
           data.isSelected.present ? data.isSelected.value : this.isSelected,
+      currencySymbol: data.currencySymbol.present
+          ? data.currencySymbol.value
+          : this.currencySymbol,
     );
   }
 
@@ -209,14 +236,15 @@ class Ledger extends DataClass implements Insertable<Ledger> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('createdAt: $createdAt, ')
-          ..write('isSelected: $isSelected')
+          ..write('isSelected: $isSelected, ')
+          ..write('currencySymbol: $currencySymbol')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(ledgerId, name, description, createdAt, isSelected);
+  int get hashCode => Object.hash(
+      ledgerId, name, description, createdAt, isSelected, currencySymbol);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -225,7 +253,8 @@ class Ledger extends DataClass implements Insertable<Ledger> {
           other.name == this.name &&
           other.description == this.description &&
           other.createdAt == this.createdAt &&
-          other.isSelected == this.isSelected);
+          other.isSelected == this.isSelected &&
+          other.currencySymbol == this.currencySymbol);
 }
 
 class LedgersCompanion extends UpdateCompanion<Ledger> {
@@ -234,12 +263,14 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
   final Value<String?> description;
   final Value<DateTime> createdAt;
   final Value<bool> isSelected;
+  final Value<String> currencySymbol;
   const LedgersCompanion({
     this.ledgerId = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isSelected = const Value.absent(),
+    this.currencySymbol = const Value.absent(),
   });
   LedgersCompanion.insert({
     this.ledgerId = const Value.absent(),
@@ -247,6 +278,7 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
     this.description = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.isSelected = const Value.absent(),
+    this.currencySymbol = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Ledger> custom({
     Expression<int>? ledgerId,
@@ -254,6 +286,7 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
     Expression<String>? description,
     Expression<DateTime>? createdAt,
     Expression<bool>? isSelected,
+    Expression<String>? currencySymbol,
   }) {
     return RawValuesInsertable({
       if (ledgerId != null) 'ledger_id': ledgerId,
@@ -261,6 +294,7 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
       if (description != null) 'description': description,
       if (createdAt != null) 'created_at': createdAt,
       if (isSelected != null) 'is_selected': isSelected,
+      if (currencySymbol != null) 'currency_symbol': currencySymbol,
     });
   }
 
@@ -269,13 +303,15 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
       Value<String>? name,
       Value<String?>? description,
       Value<DateTime>? createdAt,
-      Value<bool>? isSelected}) {
+      Value<bool>? isSelected,
+      Value<String>? currencySymbol}) {
     return LedgersCompanion(
       ledgerId: ledgerId ?? this.ledgerId,
       name: name ?? this.name,
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       isSelected: isSelected ?? this.isSelected,
+      currencySymbol: currencySymbol ?? this.currencySymbol,
     );
   }
 
@@ -297,6 +333,9 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
     if (isSelected.present) {
       map['is_selected'] = Variable<bool>(isSelected.value);
     }
+    if (currencySymbol.present) {
+      map['currency_symbol'] = Variable<String>(currencySymbol.value);
+    }
     return map;
   }
 
@@ -307,7 +346,8 @@ class LedgersCompanion extends UpdateCompanion<Ledger> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('createdAt: $createdAt, ')
-          ..write('isSelected: $isSelected')
+          ..write('isSelected: $isSelected, ')
+          ..write('currencySymbol: $currencySymbol')
           ..write(')'))
         .toString();
   }
@@ -2251,6 +2291,7 @@ typedef $$LedgersTableCreateCompanionBuilder = LedgersCompanion Function({
   Value<String?> description,
   Value<DateTime> createdAt,
   Value<bool> isSelected,
+  Value<String> currencySymbol,
 });
 typedef $$LedgersTableUpdateCompanionBuilder = LedgersCompanion Function({
   Value<int> ledgerId,
@@ -2258,6 +2299,7 @@ typedef $$LedgersTableUpdateCompanionBuilder = LedgersCompanion Function({
   Value<String?> description,
   Value<DateTime> createdAt,
   Value<bool> isSelected,
+  Value<String> currencySymbol,
 });
 
 final class $$LedgersTableReferences
@@ -2304,6 +2346,10 @@ class $$LedgersTableFilterComposer
   ColumnFilters<bool> get isSelected => $composableBuilder(
       column: $table.isSelected, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get currencySymbol => $composableBuilder(
+      column: $table.currencySymbol,
+      builder: (column) => ColumnFilters(column));
+
   Expression<bool> accountsRefs(
       Expression<bool> Function($$AccountsTableFilterComposer f) f) {
     final $$AccountsTableFilterComposer composer = $composerBuilder(
@@ -2349,6 +2395,10 @@ class $$LedgersTableOrderingComposer
 
   ColumnOrderings<bool> get isSelected => $composableBuilder(
       column: $table.isSelected, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get currencySymbol => $composableBuilder(
+      column: $table.currencySymbol,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$LedgersTableAnnotationComposer
@@ -2374,6 +2424,9 @@ class $$LedgersTableAnnotationComposer
 
   GeneratedColumn<bool> get isSelected => $composableBuilder(
       column: $table.isSelected, builder: (column) => column);
+
+  GeneratedColumn<String> get currencySymbol => $composableBuilder(
+      column: $table.currencySymbol, builder: (column) => column);
 
   Expression<T> accountsRefs<T extends Object>(
       Expression<T> Function($$AccountsTableAnnotationComposer a) f) {
@@ -2425,6 +2478,7 @@ class $$LedgersTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<bool> isSelected = const Value.absent(),
+            Value<String> currencySymbol = const Value.absent(),
           }) =>
               LedgersCompanion(
             ledgerId: ledgerId,
@@ -2432,6 +2486,7 @@ class $$LedgersTableTableManager extends RootTableManager<
             description: description,
             createdAt: createdAt,
             isSelected: isSelected,
+            currencySymbol: currencySymbol,
           ),
           createCompanionCallback: ({
             Value<int> ledgerId = const Value.absent(),
@@ -2439,6 +2494,7 @@ class $$LedgersTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<bool> isSelected = const Value.absent(),
+            Value<String> currencySymbol = const Value.absent(),
           }) =>
               LedgersCompanion.insert(
             ledgerId: ledgerId,
@@ -2446,6 +2502,7 @@ class $$LedgersTableTableManager extends RootTableManager<
             description: description,
             createdAt: createdAt,
             isSelected: isSelected,
+            currencySymbol: currencySymbol,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>

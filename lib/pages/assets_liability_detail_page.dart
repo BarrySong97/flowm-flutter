@@ -63,7 +63,7 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: 280,
+              expandedHeight: 200,
               floating: false,
               pinned: true,
               backgroundColor: Colors.transparent,
@@ -105,7 +105,7 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
                                       Text(
                                         widget.account.name,
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 20,
                                           color: Colors.white70,
                                         ),
                                       ),
@@ -128,13 +128,6 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
                                 const SizedBox(height: 20),
 
                                 // Additional info row
-                                Row(
-                                  spacing: 12,
-                                  children: [
-                                    _buildDetailItem('title', 'xxxxxx'),
-                                    _buildDetailItem('title', 'xxxxxx'),
-                                  ],
-                                ),
                               ],
                             ),
                           ),
@@ -179,10 +172,11 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
         },
         body: Container(
           padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Color(0xFFF5F6FB),
+          ),
           child: Column(
-            children: [
-              SankeyChart(),
-            ],
+            children: [],
           ),
         ),
       ),

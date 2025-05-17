@@ -1,12 +1,10 @@
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/chart/area_chart.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
 import 'package:flowm/state/account/account_repository.dart';
-import 'package:flowm/db/dao/account_dao.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
 
@@ -117,7 +115,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   Consumer(builder: (context, ref, child) {
                     // Watch the new provider
                     final assetTrendAsync =
-                        ref.watch(assetTrendProviderByDateRange);
+                        ref.watch(assetTrendProviderByDateRange(null));
                     return assetTrendAsync.when(
                       data: (assetData) {
                         if (assetData.isEmpty) {
@@ -364,6 +362,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                       ? 0.0
                       : (account.amount.abs() / totalTopLevelAmount) * 100;
                   return Account(
+                    id: account.id,
                     name: account.name,
                     amount: account.amount,
                     icon: account.icon,

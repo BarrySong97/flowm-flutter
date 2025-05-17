@@ -48,14 +48,25 @@ final uiAccountsProvider =
 final yearlyAssetTrendProvider =
     FutureProvider<List<AssetHistoryData>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getYearlyAssetHistory();
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  return repository.getYearlyAssetHistory(ledgerId: selectedLedger.ledgerId);
 });
 
 // Renamed and modified provider that fetches asset trend data based on selectedDateRangeProvider
 final assetTrendProviderByDateRange =
-    FutureProvider<List<AssetHistoryData>>((ref) async {
+    FutureProvider.family<List<AssetHistoryData>, int?>((ref, accountId) async {
   final repository = ref.watch(accountRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+
+  if (selectedLedger == null) {
+    return [];
+  }
 
   DateTime endDate = DateTime.now();
   DateTime startDate;
@@ -79,12 +90,13 @@ final assetTrendProviderByDateRange =
       startDate = DateTime(endDate.year, endDate.month, 1);
       break;
   }
-  // For 'custom', you might need another provider to hold custom start/end dates
-  // or expand this logic. For now, it defaults to 'month'.
-  // Ensure startDate is not after endDate, which can happen for "month" at the start of a new month if not handled.
-  // However, our logic for 'month' (DateTime(endDate.year, endDate.month, 1)) is fine.
 
-  return repository.getAssetHistoryByTimeRange(startDate, endDate);
+  return repository.getAssetHistoryByTimeRange(
+    startDate,
+    endDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: accountId,
+  );
 });
 
 /// 指定时间段内的资产历史数据提供者，用于绘制资产变化曲线图
@@ -152,6 +164,7 @@ class AccountRepository {
 
       // 创建UI需要的Account对象
       results.add(account_ui.Account(
+        id: acc.account.accountId,
         name: acc.account.accountName,
         amount: balance,
         children: children,
@@ -173,64 +186,104 @@ class AccountRepository {
   Future<List<AccountWithBalance>> getTopAssetAccounts({int? limit}) =>
       _accountDao.getTopAssetAccounts(limit: limit);
 
+  /// 获取指定时间段内的资产历史数据
+  Future<List<AssetHistoryData>> getAssetHistoryByTimeRange(
+      DateTime start, DateTime end,
+      {required int ledgerId, int? accountId}) async {
+    return getAssetHistoryByTime(start, end,
+        ledgerId: ledgerId, accountId: accountId);
+  }
+
   /// 根据时间获取资产历史数据
   Future<List<AssetHistoryData>> getAssetHistoryByTime(
-      DateTime start, DateTime end) async {
-    final allAssetAccounts =
-        await _accountDao.watchAccountsByType(AccountType.ASSET).first;
-    if (allAssetAccounts.isEmpty) {
-      return [];
-    }
+      DateTime start, DateTime end,
+      {required int ledgerId, int? accountId}) async {
+    try {
+      List<Account> leafAssetAccounts;
 
-    // 获取所有作为父账户的账户ID
-    final parentAccountIds = await _accountDao
-        .customSelect(
-          'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL',
-        )
-        .get()
-        .then((rows) =>
-            rows.map((row) => row.read<int>('parent_account_id')).toSet());
+      if (accountId != null) {
+        // 如果指定了accountId，获取该账户下的所有叶子节点
+        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+        final accountTree = _buildAccountTree(
+            allAccounts.firstWhere((acc) => acc.accountId == accountId),
+            allAccounts);
 
-    // 过滤出叶子资产账户
-    final leafAssetAccounts = allAssetAccounts
-        .where((account) => !parentAccountIds.contains(account.accountId))
-        .toList();
+        // 获取所有叶子节点
+        leafAssetAccounts = _getLeafAccounts(accountTree);
 
-    if (leafAssetAccounts.isEmpty) {
-      // 如果没有叶子资产账户（例如，所有资产账户都是其他账户的父账户，或者没有资产账户）
-      // 根据需求，这里可以返回空列表，或者有其他处理逻辑
-      // 当前行为：如果没有叶子资产账户，则返回空历史记录
-      return [];
-    }
+        // 验证账户是否属于指定的ledger
+        if (leafAssetAccounts.any((acc) => acc.ledgerId != ledgerId)) {
+          return [];
+        }
+      } else {
+        // 获取所有资产账户
+        final allAssetAccounts =
+            await _accountDao.getAccountsByLedgerId(ledgerId);
+        if (allAssetAccounts.isEmpty) {
+          return [];
+        }
 
-    final List<AssetHistoryData> history = [];
-    // Iterate from start date to end date, day by day
-    for (DateTime currentDate = start;
-        currentDate.isBefore(end.add(const Duration(days: 1)));
-        currentDate = currentDate.add(const Duration(days: 1))) {
-      double dailyTotalAssets = 0.0;
-      for (final account in leafAssetAccounts) {
-        // 使用叶子账户进行计算
-        dailyTotalAssets +=
-            await _getAccountBalanceAtDate(account.accountId, currentDate);
+        // 获取所有作为父账户的账户ID
+        final parentAccountIds = await _accountDao
+            .customSelect(
+              'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL AND ledger_id = ?',
+              variables: [Variable.withInt(ledgerId)],
+            )
+            .get()
+            .then((rows) =>
+                rows.map((row) => row.read<int>('parent_account_id')).toSet());
+
+        // 过滤出叶子资产账户
+        leafAssetAccounts = allAssetAccounts
+            .where((account) =>
+                account.accountType == AccountType.ASSET &&
+                !parentAccountIds.contains(account.accountId))
+            .toList();
       }
-      history.add(
-          AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
+
+      if (leafAssetAccounts.isEmpty) {
+        return [];
+      }
+
+      final List<AssetHistoryData> history = [];
+      // Iterate from start date to end date, day by day
+      for (DateTime currentDate = start;
+          currentDate.isBefore(end.add(const Duration(days: 1)));
+          currentDate = currentDate.add(const Duration(days: 1))) {
+        double dailyTotalAssets = 0.0;
+        for (final account in leafAssetAccounts) {
+          dailyTotalAssets +=
+              await _getAccountBalanceAtDate(account.accountId, currentDate);
+        }
+        history.add(
+            AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
+      }
+      return history;
+    } catch (e) {
+      print('获取资产历史数据时出错: $e');
+      return [];
     }
-    return history;
+  }
+
+  // 递归获取所有叶子账户
+  List<Account> _getLeafAccounts(AccountWithChildren accountTree) {
+    if (accountTree.children.isEmpty) {
+      return [accountTree.account];
+    }
+
+    List<Account> leafAccounts = [];
+    for (var child in accountTree.children) {
+      leafAccounts.addAll(_getLeafAccounts(child));
+    }
+    return leafAccounts;
   }
 
   /// 获取年度资产历史数据
-  Future<List<AssetHistoryData>> getYearlyAssetHistory() async {
+  Future<List<AssetHistoryData>> getYearlyAssetHistory(
+      {required int ledgerId}) async {
     final now = DateTime.now();
     final oneYearAgo = now.subtract(const Duration(days: 365));
-    return getAssetHistoryByTime(oneYearAgo, now);
-  }
-
-  /// 获取指定时间段内的资产历史数据
-  Future<List<AssetHistoryData>> getAssetHistoryByTimeRange(
-      DateTime start, DateTime end) async {
-    return getAssetHistoryByTime(start, end);
+    return getAssetHistoryByTime(oneYearAgo, now, ledgerId: ledgerId);
   }
 
   /// 获取指定账户在指定日期时的余额

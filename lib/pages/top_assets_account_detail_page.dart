@@ -62,6 +62,7 @@ class _TopAssetsAccountDetailPageState
                   ? 0.0
                   : (account.amount.abs() / totalTopLevelAmount) * 100;
               return Account(
+                id: account.id,
                 name: account.name,
                 amount: account.amount,
                 icon: account.icon,
@@ -74,6 +75,23 @@ class _TopAssetsAccountDetailPageState
             }).toList() ??
             [];
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Color(0xFFF5F6FB),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, size: 22, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          widget.account.name,
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        centerTitle: true,
+      ),
       backgroundColor: Color(0xFFF5F6FB),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -137,9 +155,10 @@ class _TopAssetsAccountDetailPageState
                       // AssetTrendChart()
                       // Watch the asset trend provider by date range
                       Consumer(builder: (context, ref, child) {
-                        // Watch the new provider
-                        final assetTrendAsync =
-                            ref.watch(assetTrendProviderByDateRange);
+                        // Watch the new provider with null for now
+                        // TODO: Add accountId to Account model and use it here
+                        final assetTrendAsync = ref.watch(
+                            assetTrendProviderByDateRange(widget.account.id));
                         return assetTrendAsync.when(
                           data: (assetData) {
                             if (assetData.isEmpty) {

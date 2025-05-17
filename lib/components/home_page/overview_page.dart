@@ -162,17 +162,17 @@ class OverviewPage extends ConsumerWidget {
                       final formattedBalance =
                           formatter.format(accountWithBalance.balance);
 
-                      // 这里随机生成涨跌幅，实际应用中可能需要从其他地方获取
-                      final change =
-                          (accountWithBalance.balance > 1000) ? 2.5 : -1.2;
+                      // 计算该账户余额占总资产的百分比
+                      final percentValue = totalAssets > 0
+                          ? (accountWithBalance.balance / totalAssets * 100)
+                          : 0.0;
 
                       return AssetItem(
                         symbol: accountWithBalance.account.accountName,
                         amount: formattedBalance,
-                        changePercentage: change,
-                        backgroundColor: change >= 0
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFFFFEBEE),
+                        changePercentage: percentValue,
+                        backgroundColor: const Color(0xFFE8F5E9),
+                        percent: '${percentValue.toStringAsFixed(2)}%',
                       );
                     }).toList();
 
@@ -184,24 +184,28 @@ class OverviewPage extends ConsumerWidget {
                           amount: '¥0.00',
                           changePercentage: 0.0,
                           backgroundColor: const Color(0xFFE8F5E9),
+                          percent: '0.00%',
                         ),
                         AssetItem(
                           symbol: '支付宝',
                           amount: '¥0.00',
                           changePercentage: 0.0,
                           backgroundColor: const Color(0xFFE8F5E9),
+                          percent: '0.00%',
                         ),
                         AssetItem(
                           symbol: '微信',
                           amount: '¥0.00',
                           changePercentage: 0.0,
                           backgroundColor: const Color(0xFFE8F5E9),
+                          percent: '0.00%',
                         ),
                         AssetItem(
                           symbol: '银行卡',
                           amount: '¥0.00',
                           changePercentage: 0.0,
                           backgroundColor: const Color(0xFFE8F5E9),
+                          percent: '0.00%',
                         ),
                       ];
 

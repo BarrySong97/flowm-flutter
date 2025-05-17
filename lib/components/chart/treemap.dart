@@ -239,32 +239,35 @@ class _TreemapWidgetState extends State<TreemapWidget> {
               behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.all(2),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      dataItem.name,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: nameFontSize,
-                          fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                    // Show percentage if available, regardless of its value (font size will handle visibility)
-                    if (dataItem.percentageOfLevel != null) ...[
-                      const SizedBox(height: 1),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                       Text(
-                        '${dataItem.percentageOfLevel!.toStringAsFixed(1)}%',
+                        dataItem.name,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: Colors.white70, fontSize: percFontSize),
+                            color: Colors.white,
+                            fontSize: nameFontSize,
+                            fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
-                    ]
-                  ],
+                      if (dataItem.percentageOfLevel != null) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          '${dataItem.percentageOfLevel!.toStringAsFixed(1)}%',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: percFontSize),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ]
+                    ],
+                  ),
                 ),
               ),
             );

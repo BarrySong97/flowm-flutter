@@ -7,12 +7,14 @@ class AssetItem {
   final String amount;
   final double changePercentage;
   final Color backgroundColor;
+  final String percent;
 
   const AssetItem({
     required this.symbol,
     required this.amount,
     required this.changePercentage,
     required this.backgroundColor,
+    required this.percent,
   });
 }
 
@@ -129,8 +131,6 @@ class AssetsOverviewGrid extends ConsumerWidget {
 
   Widget _buildAssetCard(AssetItem asset) {
     final isPositive = asset.changePercentage >= 0;
-    final changeText =
-        '${isPositive ? "+" : ""}${asset.changePercentage.toStringAsFixed(2)}%';
 
     return Container(
       decoration: BoxDecoration(
@@ -162,7 +162,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(0),
                 ),
                 child: Text(
-                  changeText,
+                  asset.percent,
                   style: TextStyle(
                     fontSize: 12,
                     color: isPositive ? Colors.green : Colors.red,

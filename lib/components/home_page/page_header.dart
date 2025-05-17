@@ -161,7 +161,6 @@ class LedgerSelector extends ConsumerWidget {
                   ),
                 ),
               ),
-              const Divider(),
               Flexible(
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -172,12 +171,17 @@ class LedgerSelector extends ConsumerWidget {
                         selectedLedger?.ledgerId == ledger.ledgerId;
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            isSelected ? Colors.blue[100] : Colors.grey[200],
+                      leading: Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(6),
+                          color:
+                              isSelected ? Colors.blue[100] : Colors.grey[200],
+                        ),
                         child: Text(
                           ledger.name.substring(0, 1),
                           style: TextStyle(
+                            fontSize: 16,
                             color: isSelected
                                 ? Colors.blue[800]
                                 : Colors.grey[800],
@@ -201,7 +205,6 @@ class LedgerSelector extends ConsumerWidget {
                   },
                 ),
               ),
-              const Divider(),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: ElevatedButton(
@@ -235,6 +238,8 @@ class LedgerSelector extends ConsumerWidget {
   void _showCreateLedgerDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+    final currencySymbolController =
+        TextEditingController(text: '¥'); // 默认使用人民币符号
 
     showDialog(
       context: context,
@@ -260,6 +265,16 @@ class LedgerSelector extends ConsumerWidget {
                 ),
                 maxLines: 2,
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: currencySymbolController,
+                decoration: const InputDecoration(
+                  labelText: '货币符号',
+                  border: OutlineInputBorder(),
+                  hintText: '¥',
+                ),
+                maxLength: 1,
+              ),
             ],
           ),
           actions: [
@@ -276,6 +291,7 @@ class LedgerSelector extends ConsumerWidget {
                             descriptionController.text.trim().isNotEmpty
                                 ? descriptionController.text.trim()
                                 : null,
+                        currencySymbol: currencySymbolController.text.trim(),
                         isSelected: true, // 创建后自动选中
                       );
                   Navigator.pop(context); // 关闭创建对话框

@@ -9,25 +9,29 @@ class LiabilitiesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Account investmentAccount = Account(
+      id: 1,
       name: '投资理财',
       amount: 5200.75,
       currencySymbol: '¥',
       children: [
         Account(
+            id: 1,
             name: '保险',
             amount: 1000.00,
             icon: Icons.shield,
             currencySymbol: '¥'),
         Account(
+            id: 2,
             name: '基金',
             amount: 3500.75,
             icon: Icons.trending_up,
             currencySymbol: '¥'),
-        Account(name: '零钱通', amount: 700.00, currencySymbol: '¥'),
+        Account(id: 3, name: '零钱通', amount: 700.00, currencySymbol: '¥'),
       ],
     );
 
     final Account savingsAccount = Account(
+      id: 3,
       name: '活期存款',
       amount: 10250.55,
       icon: Icons.account_balance_wallet,
@@ -35,12 +39,14 @@ class LiabilitiesPage extends StatelessWidget {
     );
 
     final Account cashAccount = Account(
+      id: 4,
       name: '现金',
       amount: 300.00,
       currencySymbol: '¥',
     );
 
     final Account stockAccount = Account(
+      id: 5,
       name: '股票账户',
       amount: 12345.67,
       children: [], // Potential parent, but no children currently

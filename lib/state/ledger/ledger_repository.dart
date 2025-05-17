@@ -59,9 +59,12 @@ class LedgerRepository {
     required String name,
     String? description,
     bool isSelected = false,
+    String? currencySymbol,
   }) async {
     final ledger = LedgersCompanion.insert(
       name: name,
+      currencySymbol:
+          currencySymbol == null ? const Value.absent() : Value(currencySymbol),
       description:
           description == null ? const Value.absent() : Value(description),
       createdAt: Value(DateTime.now()),
