@@ -323,7 +323,8 @@ class OverviewPage extends ConsumerWidget {
                           final date = sortedDates[dateIndex];
                           final transactionsOnDate = groupedTransactions[date]!;
                           final formattedDate =
-                              DateFormat('MM月dd日 EEEE', 'zh_CN').format(date);
+                              DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN')
+                                  .format(date);
 
                           // Calculate daily totals using the 'nature' field
                           double dailyIn = 0.0;

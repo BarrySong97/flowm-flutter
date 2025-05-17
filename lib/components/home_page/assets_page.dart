@@ -343,6 +343,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             // 账户列表，使用从数据库获取的UI格式账户数据
             uiAccountsAsync.when(
               data: (accounts) {
+                print('account.length:');
+                print(accounts.length);
                 if (accounts.isEmpty) {
                   return Center(
                     child: Padding(

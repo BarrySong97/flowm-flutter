@@ -23,8 +23,8 @@ class TransactionRepository {
       _transactionDao.getAllTransactions();
 
   /// 监听所有交易（响应式流）
-  Stream<List<Transaction>> watchAllTransactions() =>
-      _transactionDao.watchAllTransactions();
+  Stream<List<Transaction>> watchAllTransactions({int? ledgerId}) =>
+      _transactionDao.watchAllTransactions(ledgerId: ledgerId);
 
   /// 根据时间范围监听交易
   Stream<List<Transaction>> watchTransactionsByDateRange(
@@ -113,13 +113,7 @@ class TransactionRepository {
   /// 获取最新的交易
   Stream<List<TransactionWithAmount>> watchLatestTransactions(
       {int? ledgerId, int limit = 10}) {
-    if (ledgerId != null) {
-      // 获取与指定账本相关的最新交易
-      return _getLatestTransactionsByLedger(ledgerId, limit);
-    } else {
-      // 原来的实现，不考虑ledgerId
-      return _transactionDao.watchLatestTransactions(limit: limit);
-    }
+    return _transactionDao.watchLatestTransactionsByLedgerId(ledgerId!, limit);
   }
 
   /// 获取指定账本的最新交易

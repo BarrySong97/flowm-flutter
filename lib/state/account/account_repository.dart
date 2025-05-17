@@ -40,7 +40,8 @@ final topAssetAccountsProvider =
 final uiAccountsProvider =
     FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
-  return repository.getAssetsAccountTree();
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getAssetsAccountTree(ledgerId: selectedLedger?.ledgerId);
 });
 
 /// 年度资产趋势数据提供者，用于绘制资产变化曲线图
@@ -104,10 +105,10 @@ class AccountRepository {
 
   /// 获取UI展示所需的账户树
   /// 将数据库中的账户转换为UI组件所需的格式
-  Future<List<account_ui.Account>> getAssetsAccountTree() async {
+  Future<List<account_ui.Account>> getAssetsAccountTree({int? ledgerId}) async {
     try {
       // 获取账户树，先构建完整的层级关系
-      final accountTree = await getAccountTree();
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
 
       // 只保留资产类型的账户
       final assetAccounts = accountTree
@@ -311,9 +312,9 @@ class AccountRepository {
   /// 获取账户树
   ///
   /// 返回一个包含所有顶级账户及其子账户的嵌套结构
-  Future<List<AccountWithChildren>> getAccountTree() async {
+  Future<List<AccountWithChildren>> getAccountTree({int? ledgerId}) async {
     // 获取所有账户
-    final allAccounts = await _accountDao.getAllAccounts();
+    final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId ?? 0);
 
     // 找出顶级账户（没有父账户的账户）
     final rootAccounts = allAccounts

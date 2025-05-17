@@ -1,3 +1,4 @@
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ class TransactionsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 使用transactionRepositoryProvider获取仓库
     final transactionRepository = ref.watch(transactionRepositoryProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -29,7 +31,8 @@ class TransactionsPage extends ConsumerWidget {
       ),
       body: StreamBuilder<List<Transaction>>(
         // 使用仓库监听交易变化
-        stream: transactionRepository.watchAllTransactions(),
+        stream: transactionRepository.watchAllTransactions(
+            ledgerId: selectedLedger.value?.ledgerId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

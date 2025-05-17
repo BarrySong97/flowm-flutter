@@ -38,8 +38,39 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
           .getSingleOrNull();
 
   // Watch all transactions (reactive stream)
-  Stream<List<Transaction>> watchAllTransactions() =>
-      select(transactions).watch();
+  Stream<List<Transaction>> watchAllTransactions({int? ledgerId}) {
+    if (ledgerId == null) {
+      return select(transactions).watch();
+    } else {
+      // If ledgerId is provided, we need to find transactions
+      // associated with accounts under that ledger.
+      final query = select(transactions).join([
+        innerJoin(
+          db.postings,
+          db.postings.transactionId.equalsExp(transactions.transactionId),
+        ),
+        innerJoin(
+          db.accounts,
+          db.accounts.accountId.equalsExp(db.postings.accountId),
+        ),
+      ])
+        ..where(db.accounts.ledgerId.equals(ledgerId))
+        ..groupBy([
+          transactions.transactionId
+        ]); // Use groupBy to ensure distinct transactions
+
+      return query.watch().map((rows) {
+        // Map rows to distinct transactions
+        final transactionSet = <Transaction>{};
+        for (final row in rows) {
+          transactionSet.add(row.readTable(transactions));
+        }
+        return transactionSet.toList()
+          ..sort((a, b) => b.transactionDate
+              .compareTo(a.transactionDate)); // Optional: maintain order
+      });
+    }
+  }
 
   // Watch transactions by date range
   Stream<List<Transaction>> watchTransactionsByDateRange(
@@ -273,7 +304,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       FROM transactions t
       JOIN postings p ON t.transaction_id = p.transaction_id
       WHERE p.account_id IN (${List.filled(accountIds.length, '?').join(',')})
-      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      ORDER BY t.transaction_date ASC
       LIMIT ?
       ''',
       variables: [
@@ -355,4 +386,106 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   // Delete transaction
   Future<int> deleteTransaction(int id) =>
       (delete(transactions)..where((t) => t.transactionId.equals(id))).go();
+
+  // 新的优化版本
+  Stream<List<TransactionWithAmount>> watchLatestTransactionsByLedgerId(
+      int ledgerId, int limit) {
+    return customSelect(
+      '''
+      WITH RankedTransactions AS (
+        SELECT DISTINCT 
+          t.*,
+          p.amount,
+          a.account_id,
+          a.name as account_name,
+          a.account_type,
+          ROW_NUMBER() OVER (PARTITION BY t.transaction_id ORDER BY 
+            CASE WHEN p.amount < 0 THEN 1 ELSE 2 END) as row_num
+        FROM transactions t
+        INNER JOIN postings p ON t.transaction_id = p.transaction_id
+        INNER JOIN accounts a ON p.account_id = a.account_id
+        WHERE a.ledger_id = ?
+      )
+      SELECT 
+        t1.transaction_id,
+        t1.transaction_date,
+        t1.description,
+        t1.is_recurring,
+        ABS(t1.amount) as transaction_amount,
+        t1.account_id as from_account_id,
+        t1.account_name as from_account_name,
+        t1.account_type as from_account_type,
+        t2.account_id as to_account_id,
+        t2.account_name as to_account_name,
+        t2.account_type as to_account_type
+      FROM RankedTransactions t1
+      LEFT JOIN RankedTransactions t2 ON 
+        t1.transaction_id = t2.transaction_id AND t2.row_num = 2
+      WHERE t1.row_num = 1
+      ORDER BY t1.transaction_date DESC, t1.transaction_id DESC
+      LIMIT ?
+      ''',
+      variables: [
+        Variable.withInt(ledgerId),
+        Variable.withInt(limit),
+      ],
+      readsFrom: {transactions, postings, accounts},
+    ).watch().map((rows) {
+      return rows.map((row) {
+        final fromAccount = Account(
+          accountId: row.read<int>('from_account_id'),
+          accountName: row.read<String>('from_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('from_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: ledgerId,
+          fullPath:
+              row.read<String>('from_account_name'), // 使用账户名作为临时的 fullPath
+          isActive: true,
+          createdAt: DateTime.now(),
+          parentAccountId: null,
+        );
+
+        final toAccount = Account(
+          accountId: row.read<int>('to_account_id'),
+          accountName: row.read<String>('to_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('to_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: ledgerId,
+          fullPath: row.read<String>('to_account_name'), // 使用账户名作为临时的 fullPath
+          isActive: true,
+          createdAt: DateTime.now(),
+          parentAccountId: null,
+        );
+
+        final transaction = Transaction(
+          transactionId: row.read<int>('transaction_id'),
+          transactionDate: row.read<DateTime>('transaction_date'),
+          description: row.readNullable<String>('description'),
+          isRecurring: row.read<bool>('is_recurring'),
+          createdAt: row.readNullable<DateTime>('created_at') ?? DateTime.now(),
+        );
+
+        final nature = getTransactionNature(
+          fromAccount.accountType,
+          toAccount.accountType,
+        );
+
+        return TransactionWithAmount(
+          transaction: transaction,
+          amount: row.read<double>('transaction_amount'),
+          fromAccount: fromAccount,
+          toAccount: toAccount,
+          nature: nature,
+        );
+      }).toList();
+    });
+  }
 }
