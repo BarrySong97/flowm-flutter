@@ -1,16 +1,64 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flowm/components/chart/barchart.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
+import 'package:flowm/state/expense/expense_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 
-class ExpensesPage extends StatelessWidget {
+/// 当前选中的日期范围提供者
+final selectedDateRangeProvider = StateProvider<String>((ref) => 'month');
+
+/// 支出图表数据提供者
+final expenseChartDataProvider =
+    FutureProvider<List<barchart.ChartData>>((ref) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final dateRange = ref.watch(selectedDateRangeProvider);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  // 根据选择的日期范围计算开始和结束时间
+  final now = DateTime.now();
+  DateTime startDate;
+  final endDate = now;
+
+  switch (dateRange) {
+    case 'month':
+      startDate = DateTime(now.year, now.month, 1);
+      break;
+    case 'year':
+      startDate = DateTime(now.year, 1, 1);
+      break;
+    case '60days':
+      startDate = now.subtract(const Duration(days: 60));
+      break;
+    case '30days':
+      startDate = now.subtract(const Duration(days: 30));
+      break;
+    case '15days':
+      startDate = now.subtract(const Duration(days: 15));
+      break;
+    default:
+      startDate = DateTime(now.year, now.month, 1);
+  }
+
+  return repository.getExpenseChartData(
+    startDate: startDate,
+    endDate: endDate,
+    ledgerId: selectedLedger.ledgerId,
+  );
+});
+
+class ExpensesPage extends ConsumerWidget {
   const ExpensesPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
       PopoverSelectItem(value: 'year', label: '本年'),
@@ -111,6 +159,8 @@ class ExpensesPage extends StatelessWidget {
       );
     }).toList();
 
+    final chartDataAsync = ref.watch(expenseChartDataProvider);
+
     return SingleChildScrollView(
         child: Padding(
       padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
@@ -132,17 +182,26 @@ class ExpensesPage extends StatelessWidget {
                       children: [
                         PopoverSelect(
                           items: dateRangeOptions,
-                          defaultValue: 'month', // Default to '本周'
+                          value: ref.watch(selectedDateRangeProvider),
                           onChanged: (value) {
-                            print('Selected value: $value');
-                            // Handle an ECharts refresh here based on the selected value
+                            ref.read(selectedDateRangeProvider.notifier).state =
+                                value;
                           },
                         ),
                       ],
                     ),
                   ),
-                  MyBarChart(
-                    barColor: Colors.red,
+                  chartDataAsync.when(
+                    data: (chartData) => barchart.MyBarChart(
+                      barColor: Colors.red,
+                      chartData: chartData,
+                    ),
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                    error: (error, stack) => Center(
+                      child: Text('加载失败: $error'),
+                    ),
                   ),
                 ],
               )),

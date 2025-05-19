@@ -10,13 +10,13 @@ class PopoverSelectItem {
 
 class PopoverSelect extends StatefulWidget {
   final List<PopoverSelectItem> items;
-  final String defaultValue;
+  final String value;
   final Function(String)? onChanged;
 
   const PopoverSelect({
     super.key,
     required this.items,
-    required this.defaultValue,
+    required this.value,
     this.onChanged,
   });
 
@@ -30,7 +30,7 @@ class _PopoverSelectState extends State<PopoverSelect> {
   @override
   void initState() {
     super.initState();
-    _selectedValue = widget.defaultValue;
+    _selectedValue = widget.value;
   }
 
   String get _selectedLabel {

@@ -35,6 +35,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       PopoverSelectItem(value: 'year', label: '本年'),
       // PopoverSelectItem(value: 'custom', label: '自定义'),
     ];
+    final selectedDateRange = ref.watch(selectedDateRangeProvider);
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
@@ -68,7 +69,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                         ),
                         PopoverSelect(
                           items: dateRangeOptions,
-                          defaultValue: 'month', // Default to 'month'
+                          value: selectedDateRange,
                           onChanged: (value) {
                             // Update the selectedDateRangeProvider when PopoverSelect changes
                             ref.read(selectedDateRangeProvider.notifier).state =

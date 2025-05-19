@@ -229,7 +229,10 @@ class _ExpenseIncomeDetailPageState extends State<ExpenseIncomeDetailPage>
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: const MyBarChart(barColor: Color(0xFF3cba92)),
+                  child: const MyBarChart(
+                    barColor: Color(0xFF3cba92),
+                    chartData: [],
+                  ),
                 ),
               ),
             ),

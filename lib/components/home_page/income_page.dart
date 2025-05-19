@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flowm/components/chart/barchart.dart';
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
@@ -130,20 +128,20 @@ class IncomePage extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        PopoverSelect(
-                          items: dateRangeOptions,
-                          defaultValue: 'month', // Default to '本周'
-                          onChanged: (value) {
-                            print('Selected value: $value');
-                            // Handle an ECharts refresh here based on the selected value
-                          },
-                        ),
+                        // PopoverSelect(
+                        //   items: dateRangeOptions,
+                        //   defaultValue: 'month', // Default to '本周'
+                        //   onChanged: (value) {
+                        //     print('Selected value: $value');
+                        //     // Handle an ECharts refresh here based on the selected value
+                        //   },
+                        // ),
                       ],
                     ),
                   ),
-                  MyBarChart(
-                    barColor: Colors.red,
-                  ),
+                  // MyBarChart(
+                  //   barColor: Colors.red,
+                  // ),
                 ],
               )),
           Row(

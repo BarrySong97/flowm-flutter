@@ -74,6 +74,9 @@ class _TopAssetsAccountDetailPageState
               );
             }).toList() ??
             [];
+
+    final selectedDateRange = ref.watch(selectedDateRangeProvider);
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFFF5F6FB),
@@ -129,7 +132,8 @@ class _TopAssetsAccountDetailPageState
                             ),
                             PopoverSelect(
                               items: dateRangeOptions,
-                              defaultValue: 'month', // Default to 'month'
+                              value: selectedDateRange, // Default to 'month'
+
                               onChanged: (value) {
                                 // Update the selectedDateRangeProvider when PopoverSelect changes
                                 ref
