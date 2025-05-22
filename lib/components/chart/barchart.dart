@@ -118,7 +118,7 @@ class MyBarChartState extends State<MyBarChart> {
               width: 0.8, // Adjust bar width (0.0 to 1.0)
               color: widget.barColor,
               borderRadius: BorderRadius.zero, // Square corners
-              animationDuration: 0,
+              animationDuration: 500,
               // Enable touch interaction for tooltips
               enableTooltip: true,
             ),

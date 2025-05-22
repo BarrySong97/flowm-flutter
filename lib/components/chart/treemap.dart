@@ -224,14 +224,10 @@ class _TreemapWidgetState extends State<TreemapWidget> {
             return GestureDetector(
               onLongPress: () {
                 if (dataItem.canDrillDown) {
-                  print('长按标签下钻: ${dataItem.name}');
                   widget.onDrillDownSelected?.call(dataItem.name);
-                } else {
-                  print('长按标签: ${dataItem.name} (不可下钻)');
-                }
+                } else {}
               },
               onDoubleTap: () {
-                print('双击标签: ${dataItem.name}');
                 if (widget.onDoubleClick != null) {
                   widget.onDoubleClick!(dataItem.name);
                 }

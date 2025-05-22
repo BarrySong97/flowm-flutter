@@ -130,8 +130,6 @@ class OverviewPage extends ConsumerWidget {
                       balance: '加载中...',
                     ),
                 error: (error, stackTrace) {
-                  print(
-                      'Error in monthlyOverviewDataProvider: $error\n$stackTrace');
                   return const MonthlyOverviewCard(
                     month: '--月',
                     expense: '错误',

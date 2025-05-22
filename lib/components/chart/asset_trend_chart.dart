@@ -14,7 +14,6 @@ class AssetTrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     // 定义图表主色调
     final Color primaryColor = const Color(0xFF22C5C2);
-    print(this.assetData.length);
     return Container(
       padding: EdgeInsets.zero,
       child: SizedBox(

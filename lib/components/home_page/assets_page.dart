@@ -291,8 +291,6 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                               } else {
                                 // Optional: Log or show a message if trying to drill into an account without children.
                                 // This case should ideally be prevented by canDrillDown being false.
-                                print(
-                                    'Cannot drill down: ${accountName} has no children or was not found in the current view.');
                               }
                             },
                             onDoubleClick: (accountName) {
@@ -301,8 +299,6 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                                   displayedAccounts.firstWhereOrNull(
                                       (acc) => acc.name == accountName);
                               if (selectedAccountToNavigate != null) {
-                                print(
-                                    '双击 ${accountName} 于 AssetsPage, 准备导航到详情页');
                                 bool hasChildren =
                                     selectedAccountToNavigate.children !=
                                             null &&
@@ -321,10 +317,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                                         'account': selectedAccountToNavigate
                                       });
                                 }
-                              } else {
-                                print(
-                                    '双击 ${accountName} 于 AssetsPage, 但未找到对应账户数据');
-                              }
+                              } else {}
                             },
                           ),
                         ),
@@ -342,8 +335,6 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             // 账户列表，使用从数据库获取的UI格式账户数据
             uiAccountsAsync.when(
               data: (accounts) {
-                print('account.length:');
-                print(accounts.length);
                 if (accounts.isEmpty) {
                   return Center(
                     child: Padding(

@@ -7,7 +7,6 @@ import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Re-add for Account model
 import 'package:flowm/components/account/account_row.dart'; // Import AccountRow
 import 'package:flowm/state/account/account_repository.dart';
-// import 'package:flowm/db/dao/account_dao.dart'; // Account model comes from account_item.dart
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 
@@ -371,9 +370,7 @@ class _TopAssetsAccountDetailPageState
                                             'account': selectedAccountToNavigate
                                           });
                                     }
-                                  } else {
-                                    print('双击 $accountName, 但未找到对应账户数据');
-                                  }
+                                  } else {}
                                 },
                               ),
                             ),

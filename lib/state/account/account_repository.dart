@@ -131,7 +131,6 @@ class AccountRepository {
       final result = await _convertAccountsToUIFormat(assetAccounts);
       return result;
     } catch (e) {
-      print('获取资产账户树时出错: $e');
       return []; // 发生错误时返回空列表
     }
   }
@@ -146,29 +145,33 @@ class AccountRepository {
     final List<account_ui.Account> results = [];
 
     for (final acc in accounts) {
-      double balance = 0.0;
-      List<account_ui.Account>? children;
+      // 1. 获取当前账户自身的直接余额
+      // 我们假设 _accountDao.getAccountBalance 返回的是该账户所有直接记账的总和。
+      final double directBalance =
+          await _accountDao.getAccountBalance(acc.account.accountId);
 
-      // 如果有子账户，先递归处理子账户
+      double childrensTotalAmount = 0.0;
+      List<account_ui.Account>? uiChildren;
+
+      // 2. 如果有子账户，递归处理子账户并累加其UI显示的金额
       if (acc.children.isNotEmpty) {
-        children = await _convertAccountsToUIFormat(acc.children);
-
-        // 父账户余额就是所有子账户余额之和
-        for (final child in children) {
-          balance += child.amount;
+        uiChildren = await _convertAccountsToUIFormat(acc.children);
+        for (final childUiAccount in uiChildren) {
+          // childUiAccount.amount 已经是经过递归计算的完整余额（自身+其子项）
+          childrensTotalAmount += childUiAccount.amount;
         }
-      } else {
-        // 只有叶子账户才直接查询余额
-        balance = await _accountDao.getAccountBalance(acc.account.accountId);
       }
+
+      // 3. 当前账户在UI上显示的总金额 = 自身直接余额 + 子账户UI显示金额总和
+      final double totalAmountForUI = directBalance + childrensTotalAmount;
 
       // 创建UI需要的Account对象
       results.add(account_ui.Account(
         id: acc.account.accountId,
         name: acc.account.accountName,
-        amount: balance,
-        children: children,
-        currencySymbol: '¥', // 默认使用人民币符号
+        amount: totalAmountForUI, // 使用新计算的总金额
+        children: uiChildren, // 传递已经处理过的UI子账户列表
+        currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
       ));
     }
 
@@ -199,59 +202,69 @@ class AccountRepository {
       DateTime start, DateTime end,
       {required int ledgerId, int? accountId}) async {
     try {
-      List<Account> leafAssetAccounts;
+      List<Account> targetAssetAccounts = [];
+
+      // 1. 获取账本下的所有账户基础数据
+      final allAccountsInLedger =
+          await _accountDao.getAccountsByLedgerId(ledgerId);
+      if (allAccountsInLedger.isEmpty) {
+        print(
+            '[AccountRepository] getAssetHistoryByTime: No accounts found in ledger $ledgerId.');
+        return [];
+      }
 
       if (accountId != null) {
-        // 如果指定了accountId，获取该账户下的所有叶子节点
-        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-        final accountTree = _buildAccountTree(
-            allAccounts.firstWhere((acc) => acc.accountId == accountId),
-            allAccounts);
+        // 2a. 如果指定了 accountId，则处理该账户及其子树
+        Account? rootAccountForTree;
+        try {
+          rootAccountForTree = allAccountsInLedger.firstWhere(
+            (acc) => acc.accountId == accountId && acc.ledgerId == ledgerId,
+          );
+        } catch (e) {
+          // Element not found
+          print(
+              '[AccountRepository] getAssetHistoryByTime: Account with ID $accountId not found in ledger $ledgerId or does not belong to it.');
+          return []; // 指定的账户ID无效或不属于该账本
+        }
 
-        // 获取所有叶子节点
-        leafAssetAccounts = _getLeafAccounts(accountTree);
-
-        // 验证账户是否属于指定的ledger
-        if (leafAssetAccounts.any((acc) => acc.ledgerId != ledgerId)) {
+        // 确保找到的账户是资产类型，如果不是，则没有可处理的资产历史
+        if (rootAccountForTree.accountType != AccountType.ASSET) {
+          print(
+              '[AccountRepository] getAssetHistoryByTime: Specified account ID $accountId is not an ASSET account.');
           return [];
         }
+
+        final accountTree =
+            _buildAccountTree(rootAccountForTree, allAccountsInLedger);
+        final allRelevantAccountsFromTree =
+            _flattenAccountTreeHelper(accountTree);
+
+        targetAssetAccounts = allRelevantAccountsFromTree
+            .where((acc) =>
+                acc.accountType == AccountType.ASSET &&
+                acc.ledgerId == ledgerId) // 确保是资产类型且属于当前账本
+            .toList();
       } else {
-        // 获取所有资产账户
-        final allAssetAccounts =
-            await _accountDao.getAccountsByLedgerId(ledgerId);
-        if (allAssetAccounts.isEmpty) {
-          return [];
-        }
-
-        // 获取所有作为父账户的账户ID
-        final parentAccountIds = await _accountDao
-            .customSelect(
-              'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL AND ledger_id = ?',
-              variables: [Variable.withInt(ledgerId)],
-            )
-            .get()
-            .then((rows) =>
-                rows.map((row) => row.read<int>('parent_account_id')).toSet());
-
-        // 过滤出叶子资产账户
-        leafAssetAccounts = allAssetAccounts
-            .where((account) =>
-                account.accountType == AccountType.ASSET &&
-                !parentAccountIds.contains(account.accountId))
+        // 2b. 如果没有指定 accountId，则处理账本下所有的资产账户
+        targetAssetAccounts = allAccountsInLedger
+            .where((account) => account.accountType == AccountType.ASSET)
             .toList();
       }
 
-      if (leafAssetAccounts.isEmpty) {
+      if (targetAssetAccounts.isEmpty) {
+        print(
+            '[AccountRepository] getAssetHistoryByTime: No ASSET accounts found to process after filtering.');
         return [];
       }
 
       final List<AssetHistoryData> history = [];
-      // Iterate from start date to end date, day by day
+      // 3. 迭代日期范围，计算每日总资产
       for (DateTime currentDate = start;
           currentDate.isBefore(end.add(const Duration(days: 1)));
           currentDate = currentDate.add(const Duration(days: 1))) {
         double dailyTotalAssets = 0.0;
-        for (final account in leafAssetAccounts) {
+        for (final account in targetAssetAccounts) {
+          // _getAccountBalanceAtDate 会计算单个账户在指定日期的余额（包含其自身所有记账）
           dailyTotalAssets +=
               await _getAccountBalanceAtDate(account.accountId, currentDate);
         }
@@ -259,23 +272,20 @@ class AccountRepository {
             AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
       }
       return history;
-    } catch (e) {
-      print('获取资产历史数据时出错: $e');
+    } catch (e, s) {
+      print('[AccountRepository] Error in getAssetHistoryByTime: $e');
+      print('[AccountRepository] Stacktrace: $s');
       return [];
     }
   }
 
-  // 递归获取所有叶子账户
-  List<Account> _getLeafAccounts(AccountWithChildren accountTree) {
-    if (accountTree.children.isEmpty) {
-      return [accountTree.account];
+  // 辅助方法：扁平化账户树，获取节点及其所有子孙账户
+  List<Account> _flattenAccountTreeHelper(AccountWithChildren treeNode) {
+    final List<Account> accounts = [treeNode.account];
+    for (final child in treeNode.children) {
+      accounts.addAll(_flattenAccountTreeHelper(child));
     }
-
-    List<Account> leafAccounts = [];
-    for (var child in accountTree.children) {
-      leafAccounts.addAll(_getLeafAccounts(child));
-    }
-    return leafAccounts;
+    return accounts;
   }
 
   /// 获取年度资产历史数据
@@ -308,7 +318,6 @@ class AccountRepository {
 
       return result.read<double?>('balance') ?? 0.0;
     } catch (e) {
-      print('获取指定日期账户余额时出错: $e');
       return 0.0;
     }
   }
@@ -412,7 +421,6 @@ class AccountRepository {
       }
       return totalExpense;
     } catch (e) {
-      print('获取支出时出错: $e');
       return 0.0;
     }
   }
@@ -438,7 +446,6 @@ class AccountRepository {
       }
       return totalIncome;
     } catch (e) {
-      print('获取收入时出错: $e');
       return 0.0;
     }
   }
@@ -465,7 +472,6 @@ class AccountRepository {
 
       return (result.read<double?>('expense') ?? 0.0).abs(); // 转为正值
     } catch (e) {
-      print('获取账户支出时出错: $e');
       return 0.0;
     }
   }
@@ -492,7 +498,6 @@ class AccountRepository {
 
       return result.read<double?>('income') ?? 0.0;
     } catch (e) {
-      print('获取账户收入时出错: $e');
       return 0.0;
     }
   }
@@ -522,7 +527,6 @@ class AccountRepository {
 
       return totalLiabilities;
     } catch (e) {
-      print('获取总负债时出错: $e');
       return 0.0;
     }
   }
@@ -538,24 +542,16 @@ class AccountRepository {
               account.accountType == AccountType.ASSET && account.isActive)
           .toList();
 
-      // 获取所有具有子账户的账户ID
-      final parentIdsResult = await _accountDao.customSelect(
-        'SELECT DISTINCT parent_account_id FROM accounts WHERE parent_account_id IS NOT NULL AND ledger_id = ?',
-        variables: [Variable.withInt(ledgerId)],
-      ).get();
+      if (assetAccounts.isEmpty) {
+        print(
+            '[AccountRepository] getTopAssetAccountsByLedger: No active asset accounts found in ledger $ledgerId.');
+        return [];
+      }
 
-      final accountsWithChildren = parentIdsResult
-          .map((row) => row.read<int>('parent_account_id'))
-          .toSet();
-
-      // 过滤掉有子账户的账户，只保留叶子节点账户
-      final leafAccounts = assetAccounts
-          .where((account) => !accountsWithChildren.contains(account.accountId))
-          .toList();
-
-      // 计算每个账户的余额
+      // 计算每个资产账户的余额 (不再只计算叶子节点)
       final List<AccountWithBalance> accountsWithBalance = [];
-      for (final account in leafAccounts) {
+      for (final account in assetAccounts) {
+        // _accountDao.getAccountBalance 应该能正确计算单个账户的总余额（包含其所有记账）
         final balance = await _accountDao.getAccountBalance(account.accountId);
         accountsWithBalance.add(
           AccountWithBalance(
@@ -572,8 +568,9 @@ class AccountRepository {
       return limit != null
           ? accountsWithBalance.take(limit).toList()
           : accountsWithBalance;
-    } catch (e) {
-      print('获取顶级资产账户时出错: $e');
+    } catch (e, s) {
+      print('[AccountRepository] Error in getTopAssetAccountsByLedger: $e');
+      print('[AccountRepository] Stacktrace: $s');
       return [];
     }
   }

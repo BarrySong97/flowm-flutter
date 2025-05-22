@@ -3,10 +3,12 @@ import 'package:flowm/components/account/styled_account_item.dart';
 
 class StyledAccountList extends StatelessWidget {
   final List<StyledAccount> accounts;
+  final Function(int index)? onItemTap;
 
   const StyledAccountList({
     Key? key,
     required this.accounts,
+    this.onItemTap,
   }) : super(key: key);
 
   @override
@@ -27,7 +29,10 @@ class StyledAccountList extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
           horizontal: 16.0), // Add horizontal padding here for the whole list
       itemBuilder: (context, index) {
-        return StyledAccountItem(account: accounts[index]);
+        return StyledAccountItem(
+          account: accounts[index],
+          onTap: onItemTap != null ? () => onItemTap!(index) : null,
+        );
       },
     );
   }

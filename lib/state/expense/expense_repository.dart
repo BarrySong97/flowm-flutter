@@ -5,6 +5,7 @@ import '../../db/dao/posting_dao.dart';
 import '../../components/chart/barchart.dart' as barchart;
 import '../database/database_provider.dart';
 import '../../db/tables/account_table.dart';
+import '../../models/account_expense_node.dart';
 
 /// 支出仓库提供者
 final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
@@ -31,12 +32,6 @@ class ExpenseRepository {
     int? accountId,
   }) async {
     try {
-      print('Debug: 查询参数');
-      print('startDate: $startDate');
-      print('endDate: $endDate');
-      print('ledgerId: $ledgerId');
-      print('accountId: $accountId');
-
       // 首先检查是否有支出类型的账户
       final expenseAccounts = await _postingDao.customSelect(
         '''
@@ -51,10 +46,8 @@ class ExpenseRepository {
       ).getSingle();
 
       final expenseAccountCount = expenseAccounts.read<int>('count');
-      print('Debug: 支出账户数量: $expenseAccountCount');
 
       if (expenseAccountCount == 0) {
-        print('Debug: 没有支出类型的账户');
         return [];
       }
 
@@ -102,8 +95,6 @@ class ExpenseRepository {
         ],
       ).get();
 
-      print('Debug: 查询结果数量: ${result.length}');
-
       // 将查询结果转换为ChartData列表
       final List<barchart.ChartData> chartData = [];
       int index = 0;
@@ -112,13 +103,11 @@ class ExpenseRepository {
         try {
           final dateStr = row.read<String>('date');
           if (dateStr == null || dateStr.isEmpty) {
-            print('Debug: 跳过空日期');
             continue;
           }
 
           final dateParts = dateStr.split('-');
           if (dateParts.length != 3) {
-            print('Debug: 无效的日期格式: $dateStr');
             continue;
           }
 
@@ -131,23 +120,151 @@ class ExpenseRepository {
           final amount = row.read<double>('total_expense');
           final count = row.read<int>('daily_count');
 
-          print('Debug: 日期: $dateStr, 金额: $amount, 交易数: $count');
-
           final formattedDate = '${date.month}/${date.day}';
           chartData
               .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
           index++;
         } catch (e) {
-          print('处理行数据时出错: $e');
-          print('Row data: ${row.data}');
           continue;
         }
       }
 
       return chartData;
     } catch (e) {
-      print('获取支出图表数据时出错: $e');
-      print('错误堆栈: ${e.toString()}');
+      return [];
+    }
+  }
+
+  /// 获取指定时间范围内的支出账户树形结构数据
+  ///
+  /// [startDate] 开始时间
+  /// [endDate] 结束时间
+  /// [ledgerId] 账本ID
+  Future<List<AccountExpenseNode>> getExpenseAccountTree({
+    required DateTime startDate,
+    required DateTime endDate,
+    required int ledgerId,
+  }) async {
+    print(
+        '[ExpenseRepository] getExpenseAccountTree called with: startDate: $startDate, endDate: $endDate, ledgerId: $ledgerId');
+    try {
+      // 1. 获取所有支出账户 (包括层级关系)
+      final allExpenseAccountsQuery = _postingDao.customSelect(
+        '''
+        SELECT * 
+        FROM accounts
+        WHERE ledger_id = ? AND account_type = ?
+        ORDER BY parent_account_id ASC, account_id ASC; 
+        ''',
+        variables: [
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.EXPENSE.name),
+        ],
+      );
+      final allExpenseAccountRows = await allExpenseAccountsQuery.get();
+      final allExpenseAccounts = allExpenseAccountRows
+          .map((row) => _postingDao.db.accounts.map(row.data))
+          .toList();
+
+      print(
+          '[ExpenseRepository] Fetched ${allExpenseAccounts.length} expense accounts:');
+      // for (final acc in allExpenseAccounts) {
+      //   print('[ExpenseRepository] Account: ${acc.toJson()}'); // toJson might be too verbose for Account data class
+      // }
+
+      if (allExpenseAccounts.isEmpty) {
+        print(
+            '[ExpenseRepository] No expense accounts found for ledgerId: $ledgerId.');
+        return [];
+      }
+
+      final List<AccountExpenseNode> accountNodes = [];
+      final Map<int, AccountExpenseNode> accountNodeMap = {};
+
+      print(
+          '[ExpenseRepository] Calculating direct expenses for each account...');
+      for (final account in allExpenseAccounts) {
+        final directExpenseResult = await _postingDao.customSelect(
+          '''
+          SELECT COALESCE(SUM(p.amount), 0) as direct_balance
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id = ? 
+            -- AND t.ledger_id = ? -- Removed: transactions table does not have ledger_id direct_balance
+            AND t.transaction_date >= ? 
+            AND t.transaction_date <= ?
+            AND p.amount > 0; -- 假设支出记为正数，或者根据您的分录设计调整
+          ''',
+          variables: [
+            Variable.withInt(account.accountId),
+            // Variable.withInt(ledgerId), // Removed corresponding variable
+            Variable.withDateTime(startDate),
+            Variable.withDateTime(endDate),
+          ],
+        ).getSingle();
+
+        final directBalance =
+            directExpenseResult.read<double>('direct_balance');
+        print(
+            '[ExpenseRepository] Account: ${account.accountName} (ID: ${account.accountId}), Direct Balance: $directBalance');
+
+        final node = AccountExpenseNode(
+          accountData: account,
+          balance: directBalance,
+        );
+        accountNodes.add(node);
+        accountNodeMap[account.accountId] = node;
+      }
+
+      // 3. 构建树形结构并计算父节点余额
+      print('[ExpenseRepository] Building tree structure...');
+      final List<AccountExpenseNode> rootNodes = [];
+      for (final node in accountNodes) {
+        if (node.accountData.parentAccountId != null &&
+            accountNodeMap.containsKey(node.accountData.parentAccountId)) {
+          accountNodeMap[node.accountData.parentAccountId!]!.children.add(node);
+        } else {
+          rootNodes.add(node);
+        }
+      }
+      print('[ExpenseRepository] Found ${rootNodes.length} root nodes.');
+      // for (final rNode in rootNodes) {
+      //   print('[ExpenseRepository] Root Node: ${rNode.toJson()}'); // toJson on node can be verbose
+      // }
+
+      // 4. 递归计算父节点的余额 和总支出
+      print('[ExpenseRepository] Calculating total balances for root nodes...');
+      double totalOverallExpense = 0;
+      double updateTotalBalances(AccountExpenseNode node) {
+        double childrenBalance = 0;
+        for (final child in node.children) {
+          childrenBalance += updateTotalBalances(child);
+        }
+        node.balance += childrenBalance;
+        return node.balance;
+      }
+
+      for (final rootNode in rootNodes) {
+        totalOverallExpense += updateTotalBalances(rootNode);
+      }
+      print(
+          '[ExpenseRepository] Calculated totalOverallExpense: $totalOverallExpense');
+
+      // 5. 计算百分比
+      if (totalOverallExpense > 0) {
+        print('[ExpenseRepository] Calculating percentages...');
+        for (final node in accountNodes) {
+          node.percentage = (node.balance / totalOverallExpense) * 100;
+        }
+      }
+
+      print(
+          '[ExpenseRepository] getExpenseAccountTree returning ${rootNodes.length} root nodes.');
+      // rootNodes.forEach((node) => print('[ExpenseRepository] Final Root Node: ${node.toJson()}'));
+      return rootNodes;
+    } catch (e, s) {
+      print('[ExpenseRepository] Error in getExpenseAccountTree: $e');
+      print('[ExpenseRepository] Stacktrace: $s');
       return [];
     }
   }
