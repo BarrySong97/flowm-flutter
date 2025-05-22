@@ -91,6 +91,7 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
                           child: Padding(
                             padding: const EdgeInsets.all(20),
                             child: Column(
+                              spacing: 8,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Placeholder for app bar height
@@ -113,8 +114,6 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
                                   ),
                                 ),
 
-                                const SizedBox(height: 8),
-
                                 // Balance amount
                                 Text(
                                   '${widget.account.currencySymbol}${widget.account.amount}',
@@ -124,8 +123,6 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
                                     color: Colors.white,
                                   ),
                                 ),
-
-                                const SizedBox(height: 20),
 
                                 // Additional info row
                               ],

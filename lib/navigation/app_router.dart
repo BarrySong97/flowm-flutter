@@ -1,13 +1,15 @@
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/pages/assets_liability_detail_page.dart';
-import 'package:flowm/pages/expebse_income_detail_page.dart';
+import 'package:flowm/pages/expense_detail_page.dart';
+import 'package:flowm/pages/income_detail_page.dart';
+import 'package:flowm/pages/top_income_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 // import 'package:flowm/pages/home_page.dart'; // No longer the initial route
 import 'package:flowm/pages/main_screen.dart'; // Import MainScreen
 import 'package:flowm/pages/demo_page.dart';
-import 'package:flowm/pages/top_expense_income_detail_page.dart';
+import 'package:flowm/pages/top_expense_detail_page.dart';
 import 'package:flowm/pages/top_assets_account_detail_page.dart'; // 引入页面
 
 class AppRouter {
@@ -24,15 +26,15 @@ class AppRouter {
         builder: (context, state) => const DemoPage(),
       ),
       GoRoute(
-        path: '/top-expenses-income-detail',
-        name: 'topExpensesIncomeDetail',
+        path: '/top-expenses-detail',
+        name: 'topExpensesDetail',
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
           return CustomTransitionPage<void>(
             key: state.pageKey,
-            child: TopExpensesIncomeDetailPage(account: account),
+            child: TopExpensesDetailPage(account: account),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);
@@ -49,15 +51,65 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/expenses-income-detail',
-        name: 'expensesIncomeDetail',
+        path: '/top-income-detail',
+        name: 'topIncomeDetail',
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
           return CustomTransitionPage<void>(
             key: state.pageKey,
-            child: ExpensesIncomeDetailPage(account: account),
+            child: TopIncomeDetailPage(account: account),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0);
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var offsetAnimation = animation.drive(tween);
+
+              return SlideTransition(position: offsetAnimation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/expenses-detail',
+        name: 'expensesDetail',
+        pageBuilder: (context, state) {
+          final Map<String, dynamic>? extra =
+              state.extra as Map<String, dynamic>?;
+          final account = extra?['account'] as AccountExpenseNode;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: ExpensesDetailPage(account: account),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              const begin = Offset(1.0, 0.0);
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var offsetAnimation = animation.drive(tween);
+
+              return SlideTransition(position: offsetAnimation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/income-detail',
+        name: 'incomeDetail',
+        pageBuilder: (context, state) {
+          final Map<String, dynamic>? extra =
+              state.extra as Map<String, dynamic>?;
+          final account = extra?['account'] as AccountExpenseNode;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: IncomeDetailPage(account: account),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);

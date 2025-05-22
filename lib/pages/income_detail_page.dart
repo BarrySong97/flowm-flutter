@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
-import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
-import 'package:flowm/state/expense/expense_repository.dart';
+import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
+import 'package:intl/intl.dart'; // For currency formatting
 
 /// 当前选中的月份提供者
 final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
-/// 支出图表数据提供者
+/// 收入图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
-final expenseChartDataProvider =
+final incomeChartDataProvider =
     FutureProvider.family<List<barchart.ChartData>, int?>(
         (ref, accountId) async {
-  final repository = ref.watch(expenseRepositoryProvider);
+  final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
 
@@ -31,9 +31,9 @@ final expenseChartDataProvider =
       DateTime(selectedDate.year, selectedDate.month + 1, 0);
 
   print(
-      '[expenseChartDataProvider] Fetching chart data with accountId: $accountId');
+      '[incomeChartDataProvider] Fetching chart data with accountId: $accountId');
 
-  return repository.getExpenseChartData(
+  return repository.getIncomeChartData(
     startDate: startDate,
     endDate: endDate,
     ledgerId: selectedLedger.ledgerId,
@@ -41,18 +41,39 @@ final expenseChartDataProvider =
   );
 });
 
-class ExpensesIncomeDetailPage extends ConsumerStatefulWidget {
+/// 指定账户当月总收入提供者
+final accountMonthlyIncomeProvider =
+    FutureProvider.family<double, int>((ref, accountId) async {
+  final repository = ref.watch(IncomeRepositoryProvider);
+  final selectedDate = ref.watch(selectedMonthProvider);
+  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+  final DateTime endDate =
+      DateTime(selectedDate.year, selectedDate.month + 1, 0);
+
+  return repository.getAccountIncomeBalance(
+    accountId: accountId,
+    startDate: startDate,
+    endDate: endDate,
+  );
+});
+
+/// 指定账户累计总收入提供者 (不区分时间)
+final accountOverallIncomeProvider =
+    FutureProvider.family<double, int>((ref, accountId) async {
+  final repository = ref.watch(IncomeRepositoryProvider);
+  return repository.getAccountIncomeTotalBalance(accountId: accountId);
+});
+
+class IncomeDetailPage extends ConsumerStatefulWidget {
   final AccountExpenseNode account;
 
-  const ExpensesIncomeDetailPage({super.key, required this.account});
+  const IncomeDetailPage({super.key, required this.account});
 
   @override
-  ConsumerState<ExpensesIncomeDetailPage> createState() =>
-      _ExpensesIncomeDetailPageState();
+  ConsumerState<IncomeDetailPage> createState() => _IncomeDetailPageState();
 }
 
-class _ExpensesIncomeDetailPageState
-    extends ConsumerState<ExpensesIncomeDetailPage> {
+class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
 
@@ -87,11 +108,68 @@ class _ExpensesIncomeDetailPageState
     super.dispose();
   }
 
+  Widget _buildStatisticItem(String label, Widget valueWidget) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white70,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+        const SizedBox(height: 2),
+        valueWidget,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chartDataAsync = ref
-        .watch(expenseChartDataProvider(widget.account.accountData.accountId));
+        .watch(incomeChartDataProvider(widget.account.accountData.accountId));
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
+    final monthlyIncomeAsync = ref.watch(
+        accountMonthlyIncomeProvider(widget.account.accountData.accountId));
+    final overallIncomeAsync = ref.watch(
+        accountOverallIncomeProvider(widget.account.accountData.accountId));
+    final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+
+    Widget buildValueText(double value) {
+      return Text(
+        currencyFormat.format(value),
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }
+
+    Widget buildLoadingIndicator() {
+      return const SizedBox(
+        height: 16, // Match text height
+        width: 16, // Match text height
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      );
+    }
+
+    Widget buildErrorText() {
+      return const Text(
+        '加载失败',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.white70,
+        ),
+      );
+    }
 
     return Scaffold(
       body: NestedScrollView(
@@ -113,7 +191,7 @@ class _ExpensesIncomeDetailPageState
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              // Using colors from assets_liability_detail_page for similarity
+                              // 使用不同的绿色渐变
                               Color(0xFF0ba360),
                               Color(0xFF3cba92),
                             ],
@@ -126,10 +204,10 @@ class _ExpensesIncomeDetailPageState
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              spacing: 8,
                               children: [
                                 const SizedBox(
-                                    height:
-                                        kToolbarHeight / 2), // Adjusted padding
+                                    height: kToolbarHeight), // Adjusted padding
                                 AnimatedOpacity(
                                   opacity: _isCollapsed ? 0.0 : 1.0,
                                   duration: const Duration(milliseconds: 250),
@@ -141,6 +219,30 @@ class _ExpensesIncomeDetailPageState
                                       color: Colors.white,
                                     ),
                                   ),
+                                ),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  spacing: 20,
+                                  children: [
+                                    monthlyIncomeAsync.when(
+                                      data: (total) => _buildStatisticItem(
+                                          '当月总收入', buildValueText(total)),
+                                      loading: () => _buildStatisticItem(
+                                          '当月总收入', buildLoadingIndicator()),
+                                      error: (err, stack) =>
+                                          _buildStatisticItem(
+                                              '当月总收入', buildErrorText()),
+                                    ),
+                                    overallIncomeAsync.when(
+                                      data: (total) => _buildStatisticItem(
+                                          '累计总收入', buildValueText(total)),
+                                      loading: () => _buildStatisticItem(
+                                          '累计总收入', buildLoadingIndicator()),
+                                      error: (err, stack) =>
+                                          _buildStatisticItem(
+                                              '累计总收入', buildErrorText()),
+                                    ),
+                                  ],
                                 ),
                                 // You can add more info here if needed, like total amount, etc.
                               ],
@@ -194,7 +296,7 @@ class _ExpensesIncomeDetailPageState
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        // 支出统计
+                        // 收入统计
                         child: Column(
                           children: [
                             MonthSelectorHeader(
@@ -216,7 +318,7 @@ class _ExpensesIncomeDetailPageState
                               ),
                               child: chartDataAsync.when(
                                 data: (chartData) => barchart.MyBarChart(
-                                  barColor: Colors.red,
+                                  barColor: Colors.green,
                                   chartData: chartData,
                                 ),
                                 loading: () => const Center(

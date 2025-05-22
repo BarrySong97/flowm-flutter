@@ -63,11 +63,10 @@ final expenseAccountTreeDataProvider =
   );
 });
 
-class TopExpensesIncomeDetailPage extends ConsumerWidget {
+class TopExpensesDetailPage extends ConsumerWidget {
   final AccountExpenseNode account; // 接收 account 参数
 
-  const TopExpensesIncomeDetailPage(
-      {super.key, required this.account}); // 修改构造函数
+  const TopExpensesDetailPage({super.key, required this.account}); // 修改构造函数
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Sample data for the pie chart - 这部分将被动态数据替代
@@ -236,7 +235,7 @@ class TopExpensesIncomeDetailPage extends ConsumerWidget {
                           onItemTap: (index) {
                             final selectedNode = childrenNodes[index];
                             GoRouter.of(context).pushNamed(
-                              'expensesIncomeDetail',
+                              'expensesDetail',
                               extra: {'account': selectedNode},
                             );
                           },

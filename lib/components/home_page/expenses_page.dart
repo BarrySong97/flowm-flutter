@@ -190,10 +190,16 @@ class ExpensesPage extends ConsumerWidget {
                       child: StyledAccountList(
                         accounts: styledAccounts,
                         onItemTap: (index) {
-                          if (index < accountTreeNodes.length) {
+                          final selectedNode = accountTreeNodes[index];
+                          if (selectedNode.children.isNotEmpty) {
+                            GoRouter.of(context).pushNamed(
+                              'topExpensesDetail',
+                              extra: {'account': selectedNode},
+                            );
+                          } else {
                             final selectedNode = accountTreeNodes[index];
                             GoRouter.of(context).pushNamed(
-                              'topExpensesIncomeDetail',
+                              'expensesDetail',
                               extra: {'account': selectedNode},
                             );
                           }
