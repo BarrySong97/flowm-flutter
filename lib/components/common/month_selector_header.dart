@@ -142,21 +142,21 @@ class _MonthSelectorHeaderState extends State<MonthSelectorHeader> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Color(0xFFF5F6FB),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: GestureDetector(
+          GestureDetector(
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFFF5F6FB),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
                 child: const Icon(
                   Icons.arrow_back_ios_outlined,
                   size: 16,
                 ),
-                onTap: () => _changeMonth(-1),
               ),
             ),
+            onTap: () => _changeMonth(-1),
           ),
           GestureDetector(
             onTap: () => _showDatePickerBottomSheet(context),
@@ -179,21 +179,21 @@ class _MonthSelectorHeaderState extends State<MonthSelectorHeader> {
               ),
             ),
           ),
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Color(0xFFF5F6FB),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: GestureDetector(
+          GestureDetector(
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFFF5F6FB),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
                 child: const Icon(
                   Icons.arrow_forward_ios_outlined,
                   size: 14,
                 ),
-                onTap: () => _changeMonth(1),
               ),
             ),
+            onTap: () => _changeMonth(1),
           )
         ],
       ),
