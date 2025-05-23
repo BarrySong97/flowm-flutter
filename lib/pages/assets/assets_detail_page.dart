@@ -6,11 +6,16 @@ import 'package:flowm/components/chart/barchart.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/sankey_chart.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
+import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/assets/assets_repository.dart';
+import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flowm/db/dao/transaction_dao.dart';
+import 'package:flowm/db/tables/account_table.dart';
 import 'package:sankey_flutter/sankey_helpers.dart';
 import 'package:sankey_flutter/sankey_link.dart';
 import 'package:sankey_flutter/sankey_node.dart';
+import 'package:intl/intl.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
   final Account account;
@@ -228,23 +233,15 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
             // 移除粘性时间范围选择器
           ];
         },
-        body: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Color(0xFFF5F6FB),
-          ),
-          child: Column(
-            spacing: 12,
-            children: [
-              // 流向选择Tab
-              _buildFlowSelector(),
-
-              // Sankey 图表
-              Expanded(
-                child: _buildSankeyChart(),
-              ),
-            ],
-          ),
+        body: AssetsDetailBody(
+          account: widget.account,
+          selectedFlow: _selectedFlow,
+          selectedTimeRange: _selectedTimeRange,
+          onFlowChanged: (flow) {
+            setState(() {
+              _selectedFlow = flow;
+            });
+          },
         ),
       ),
     );
@@ -338,8 +335,49 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
       ),
     );
   }
+}
 
-  Widget _buildFlowSelector() {
+// 独立的页面主体内容 Widget
+class AssetsDetailBody extends StatelessWidget {
+  final Account account;
+  final String selectedFlow;
+  final TimeRange selectedTimeRange;
+  final Function(String) onFlowChanged;
+
+  const AssetsDetailBody({
+    Key? key,
+    required this.account,
+    required this.selectedFlow,
+    required this.selectedTimeRange,
+    required this.onFlowChanged,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Color(0xFFF5F6FB),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          spacing: 12,
+          children: [
+            // 流向选择Tab
+            _buildFlowSelector(context),
+
+            // Sankey 图表
+            _buildSankeyChart(),
+
+            // 交易列表
+            _buildTransactionList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlowSelector(BuildContext context) {
     return Container(
       height: 45,
       decoration: BoxDecoration(
@@ -356,23 +394,21 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
       child: Row(
         children: [
           Expanded(
-            child: _buildFlowTab('资金流入', 'in'),
+            child: _buildFlowTab(context, '资金流入', 'in'),
           ),
           Expanded(
-            child: _buildFlowTab('资金流出', 'out'),
+            child: _buildFlowTab(context, '资金流出', 'out'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFlowTab(String label, String flow) {
-    final isSelected = _selectedFlow == flow;
+  Widget _buildFlowTab(BuildContext context, String label, String flow) {
+    final isSelected = selectedFlow == flow;
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedFlow = flow;
-        });
+        onFlowChanged(flow);
       },
       child: Container(
         height: 45,
@@ -396,10 +432,83 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
   }
 
   Widget _buildSankeyChart() {
+    return SankeyChartWidget(
+      key:
+          ValueKey('sankey_${account.id}_${selectedFlow}_${selectedTimeRange}'),
+      account: account,
+      selectedFlow: selectedFlow,
+      selectedTimeRange: selectedTimeRange,
+    );
+  }
+
+  Widget _buildTransactionList() {
+    return AccountTransactionList(
+      account: account,
+      selectedTimeRange: selectedTimeRange,
+    );
+  }
+}
+
+// 独立的 Sankey 图表 Widget
+class SankeyChartWidget extends ConsumerStatefulWidget {
+  final Account account;
+  final String selectedFlow;
+  final TimeRange selectedTimeRange;
+
+  const SankeyChartWidget({
+    Key? key,
+    required this.account,
+    required this.selectedFlow,
+    required this.selectedTimeRange,
+  }) : super(key: key);
+
+  @override
+  ConsumerState<SankeyChartWidget> createState() => _SankeyChartWidgetState();
+}
+
+class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
+    with AutomaticKeepAliveClientMixin {
+  Future<SankeyChartData>? _futureData;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  @override
+  void didUpdateWidget(SankeyChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 只有当关键参数发生变化时才重新加载数据
+    if (oldWidget.account.id != widget.account.id ||
+        oldWidget.selectedFlow != widget.selectedFlow ||
+        oldWidget.selectedTimeRange != widget.selectedTimeRange) {
+      _loadData();
+    }
+  }
+
+  void _loadData() {
+    final assetsRepository = ref.read(assetsRepositoryProvider);
+    _futureData = assetsRepository.getAccountFlowForSankey(
+      accountId: widget.account.id,
+      flow: widget.selectedFlow,
+      limit: 50,
+      startDate: _getStartDateFromTimeRange(widget.selectedTimeRange),
+      endDate: _getEndDateFromTimeRange(widget.selectedTimeRange),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // 必须调用以启用 AutomaticKeepAliveClientMixin
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -423,7 +532,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                 ),
                 SizedBox(width: 8),
                 Text(
-                  _selectedFlow == 'in' ? '资金流入分析' : '资金流出分析',
+                  widget.selectedFlow == 'in' ? '资金流入分析' : '资金流出分析',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -432,141 +541,106 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                 ),
               ],
             ),
-            Consumer(
-              builder: (context, ref, child) {
-                final assetsRepository = ref.watch(assetsRepositoryProvider);
+            FutureBuilder<SankeyChartData>(
+              future: _futureData,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  );
+                }
 
-                return FutureBuilder<SankeyChartData>(
-                  future: assetsRepository.getAccountFlowForSankey(
-                    accountId: widget.account.id,
-                    flow: _selectedFlow,
-                    limit: 50,
-                    startDate: _getStartDateFromTimeRange(_selectedTimeRange),
-                    endDate: _getEndDateFromTimeRange(_selectedTimeRange),
-                  ),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Colors.grey.shade400,
+                          size: 48,
                         ),
-                      );
-                    }
-
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Colors.grey.shade400,
-                              size: 48,
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              '加载失败',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '${snapshot.error}',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                        SizedBox(height: 12),
+                        Text(
+                          '加载失败',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
                         ),
-                      );
-                    }
-
-                    if (!snapshot.hasData || snapshot.data!.nodes.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.analytics_outlined,
-                              color: Colors.grey.shade400,
-                              size: 48,
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              '暂无数据',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '该时间段内没有${_selectedFlow == 'in' ? '流入' : '流出'}记录',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                        SizedBox(height: 4),
+                        Text(
+                          '${snapshot.error}',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                      );
-                    }
+                      ],
+                    ),
+                  );
+                }
 
-                    final sankeyData = snapshot.data!;
+                if (!snapshot.hasData || snapshot.data!.nodes.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.analytics_outlined,
+                          color: Colors.grey.shade400,
+                          size: 48,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          '暂无数据',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '该时间段内没有${widget.selectedFlow == 'in' ? '流入' : '流出'}记录',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                    // 详细调试信息 - 用于校验金额正确性
-                    print('=== Sankey 数据校验 ===');
-                    print('目标账户ID: ${widget.account.id}');
-                    print('当前流向: $_selectedFlow');
-                    print(
-                        '时间范围: ${_getStartDateFromTimeRange(_selectedTimeRange)} 到 ${_getEndDateFromTimeRange(_selectedTimeRange)}');
+                final sankeyData = snapshot.data!;
 
-                    print('\n节点信息 (${sankeyData.nodes.length}个):');
-                    for (final node in sankeyData.nodes) {
-                      print('  节点 ${node.id}: ${node.label}');
-                    }
+                // 创建 SankeyDataSet
+                final sankeyDataSet = SankeyDataSet(
+                  nodes: sankeyData.nodes,
+                  links: sankeyData.links,
+                );
 
-                    print('\n链接信息 (${sankeyData.links.length}个):');
-                    double totalFlow = 0;
-                    for (final link in sankeyData.links) {
-                      print(
-                          '  ${link.source.label} → ${link.target.label}: ¥${link.value.toStringAsFixed(2)}');
-                      totalFlow += link.value;
-                    }
+                // 生成布局
+                final sankey = generateSankeyLayout(
+                  width: 350,
+                  height: 200,
+                  nodeWidth: 12,
+                  nodePadding: 20,
+                );
+                sankeyDataSet.layout(sankey);
 
-                    print('\n总流量: ¥${totalFlow.toStringAsFixed(2)}');
-                    print('================');
-
-                    // 创建 SankeyDataSet
-                    final sankeyDataSet = SankeyDataSet(
-                      nodes: sankeyData.nodes,
-                      links: sankeyData.links,
-                    );
-
-                    // 生成布局
-                    final sankey = generateSankeyLayout(
-                      width: 350,
-                      height: 200,
-                      nodeWidth: 12,
-                      nodePadding: 20,
-                    );
-                    sankeyDataSet.layout(sankey);
-
-                    return SankeyDiagramWidget(
-                      data: sankeyDataSet,
-                      nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
-                      selectedNodeId: null,
-                      onNodeTap: (nodeId) {
-                        print('点击了节点: $nodeId');
-                        // 这里可以添加节点点击的处理逻辑
-                      },
-                      size: Size(350, 250),
-                    );
+                return SankeyDiagramWidget(
+                  data: sankeyDataSet,
+                  nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
+                  selectedNodeId: null,
+                  onNodeTap: (nodeId) {
+                    print('点击了节点: $nodeId');
+                    // 这里可以添加节点点击的处理逻辑
                   },
+                  size: Size(350, 200),
                 );
               },
             ),
@@ -596,5 +670,277 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
 
   DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
     return DateTime.now();
+  }
+}
+
+// 账户交易列表组件
+class AccountTransactionList extends ConsumerWidget {
+  final Account account;
+  final TimeRange selectedTimeRange;
+
+  const AccountTransactionList({
+    Key? key,
+    required this.account,
+    required this.selectedTimeRange,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transactionsAsync = ref.watch(accountTransactionsProvider((
+      accountId: account.id,
+      timeRange: selectedTimeRange,
+    )));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 16, left: 16, bottom: 0),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.receipt_long,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '相关交易',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          transactionsAsync.when(
+            data: (transactions) {
+              if (transactions.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_outlined,
+                          color: Colors.grey.shade400,
+                          size: 48,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          '暂无交易记录',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '该时间段内没有相关交易',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // 按日期分组交易
+              final groupedTransactions =
+                  <DateTime, List<TransactionWithAmount>>{};
+              for (var transactionWithAmount in transactions) {
+                final transactionDate = DateTime(
+                  transactionWithAmount.transaction.transactionDate.year,
+                  transactionWithAmount.transaction.transactionDate.month,
+                  transactionWithAmount.transaction.transactionDate.day,
+                );
+                if (groupedTransactions.containsKey(transactionDate)) {
+                  groupedTransactions[transactionDate]!
+                      .add(transactionWithAmount);
+                } else {
+                  groupedTransactions[transactionDate] = [
+                    transactionWithAmount
+                  ];
+                }
+              }
+
+              // 按日期降序排列
+              final sortedDates = groupedTransactions.keys.toList()
+                ..sort((a, b) => b.compareTo(a));
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
+                itemCount: sortedDates.length,
+                itemBuilder: (context, dateIndex) {
+                  final date = sortedDates[dateIndex];
+                  final transactionsOnDate = groupedTransactions[date]!;
+                  final formattedDate =
+                      DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN').format(date);
+
+                  // 计算当日收支总额
+                  double dailyIn = 0.0;
+                  double dailyOut = 0.0;
+
+                  for (var twa in transactionsOnDate) {
+                    if (twa.nature == TransactionNature.INFLOW) {
+                      dailyIn += twa.amount.abs();
+                    } else if (twa.nature == TransactionNature.OUTFLOW) {
+                      dailyOut += twa.amount.abs();
+                    }
+                  }
+
+                  final formatter =
+                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formattedDailyIn = formatter.format(dailyIn);
+                  final formattedDailyOut = formatter.format(dailyOut);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              formattedDate,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  '出 $formattedDailyOut',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '入 $formattedDailyIn',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: transactionsOnDate.length,
+                        itemBuilder: (context, transactionIndex) {
+                          final transactionWithAmount =
+                              transactionsOnDate[transactionIndex];
+                          final transaction = transactionWithAmount.transaction;
+
+                          // 判断是否为支出
+                          final bool isExpense = transactionWithAmount.nature ==
+                              TransactionNature.OUTFLOW;
+
+                          final formatter = NumberFormat.currency(
+                              locale: 'zh_CN', symbol: '¥');
+                          final formattedAmount = formatter
+                              .format(transactionWithAmount.amount.abs());
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 0, vertical: 0),
+                            child: TransactionListItem(
+                              title: transaction.description ?? '无描述',
+                              subtitle:
+                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                              amount: formattedAmount,
+                              type: getTransactionFlowType(
+                                transactionWithAmount
+                                        .fromAccount?.accountType ??
+                                    AccountType.ASSET,
+                                transactionWithAmount.toAccount?.accountType ??
+                                    AccountType.ASSET,
+                              ),
+                              statusColor: isExpense
+                                  ? const Color(0xFF007AFF) // 蓝色表示支出
+                                  : const Color(0xFF34C759), // 绿色表示收入
+                              isExpense: isExpense,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (error, stack) => Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.grey.shade400,
+                      size: 48,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '加载失败',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '$error',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

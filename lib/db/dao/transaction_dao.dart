@@ -488,4 +488,272 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       }).toList();
     });
   }
+
+  // 根据账户ID和日期范围查询相关的所有交易记录
+  Stream<List<TransactionWithAmount>> watchTransactionsByAccountAndDateRange({
+    required int accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    return customSelect(
+      '''
+      SELECT DISTINCT 
+        t.transaction_id,
+        t.transaction_date,
+        t.description,
+        t.is_recurring,
+        t.created_at,
+        p1.amount as target_account_amount,
+        a1.account_id as target_account_id,
+        a1.account_name as target_account_name,
+        a1.account_type as target_account_type,
+        a1.ledger_id as target_ledger_id,
+        a1.full_path as target_full_path,
+        a1.is_active as target_is_active,
+        a1.parent_account_id as target_parent_account_id,
+        a1.created_at as target_account_created_at,
+        p2.amount as other_account_amount,
+        a2.account_id as other_account_id,
+        a2.account_name as other_account_name,
+        a2.account_type as other_account_type,
+        a2.ledger_id as other_ledger_id,
+        a2.full_path as other_full_path,
+        a2.is_active as other_is_active,
+        a2.parent_account_id as other_parent_account_id,
+        a2.created_at as other_account_created_at
+      FROM transactions t
+      INNER JOIN postings p1 ON t.transaction_id = p1.transaction_id
+      INNER JOIN accounts a1 ON p1.account_id = a1.account_id
+      LEFT JOIN postings p2 ON t.transaction_id = p2.transaction_id AND p2.account_id != ?
+      LEFT JOIN accounts a2 ON p2.account_id = a2.account_id
+      WHERE p1.account_id = ?
+        AND t.transaction_date >= ?
+        AND t.transaction_date <= ?
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      ''',
+      variables: [
+        Variable.withInt(accountId),
+        Variable.withInt(accountId),
+        Variable.withDateTime(startDate),
+        Variable.withDateTime(endDate),
+      ],
+      readsFrom: {transactions, postings, accounts},
+    ).watch().map((rows) {
+      return rows.map((row) {
+        // 构建目标账户（就是我们查询的账户）
+        final targetAccount = Account(
+          accountId: row.read<int>('target_account_id'),
+          accountName: row.read<String>('target_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('target_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('target_ledger_id'),
+          fullPath: row.read<String>('target_full_path'),
+          isActive: row.read<bool>('target_is_active'),
+          createdAt: row.read<DateTime>('target_account_created_at'),
+          parentAccountId: row.readNullable<int>('target_parent_account_id'),
+        );
+
+        // 构建对方账户（如果存在）
+        Account? otherAccount;
+        if (row.readNullable<int>('other_account_id') != null) {
+          otherAccount = Account(
+            accountId: row.read<int>('other_account_id'),
+            accountName: row.read<String>('other_account_name'),
+            accountType: AccountType.values.firstWhere(
+              (type) =>
+                  type.toString().split('.').last ==
+                  row.read<String>('other_account_type'),
+              orElse: () => AccountType.ASSET,
+            ),
+            ledgerId: row.read<int>('other_ledger_id'),
+            fullPath: row.read<String>('other_full_path'),
+            isActive: row.read<bool>('other_is_active'),
+            createdAt: row.read<DateTime>('other_account_created_at'),
+            parentAccountId: row.readNullable<int>('other_parent_account_id'),
+          );
+        }
+
+        // 构建交易记录
+        final transaction = Transaction(
+          transactionId: row.read<int>('transaction_id'),
+          transactionDate: row.read<DateTime>('transaction_date'),
+          description: row.readNullable<String>('description'),
+          isRecurring: row.read<bool>('is_recurring'),
+          createdAt: row.read<DateTime>('created_at'),
+        );
+
+        // 获取目标账户的金额（绝对值）
+        final targetAmount = row.read<double>('target_account_amount');
+        final transactionAmount = targetAmount.abs();
+
+        // 确定 fromAccount 和 toAccount
+        Account? fromAccount;
+        Account? toAccount;
+
+        if (targetAmount < 0) {
+          // 目标账户金额为负，说明是借方，资金从目标账户流出
+          fromAccount = targetAccount;
+          toAccount = otherAccount;
+        } else {
+          // 目标账户金额为正，说明是贷方，资金流入目标账户
+          fromAccount = otherAccount;
+          toAccount = targetAccount;
+        }
+
+        // 确定交易性质
+        final nature = getTransactionNature(
+          fromAccount?.accountType,
+          toAccount?.accountType,
+        );
+
+        return TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccount,
+          toAccount: toAccount,
+          nature: nature,
+        );
+      }).toList();
+    });
+  }
+
+  // 根据账户ID和日期范围查询相关的所有交易记录（Future版本，一次性加载）
+  Future<List<TransactionWithAmount>> getTransactionsByAccountAndDateRange({
+    required int accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+    int? limit,
+  }) async {
+    final limitClause = limit != null ? 'LIMIT $limit' : '';
+
+    final results = await customSelect(
+      '''
+      SELECT DISTINCT 
+        t.transaction_id,
+        t.transaction_date,
+        t.description,
+        t.is_recurring,
+        t.created_at,
+        p1.amount as target_account_amount,
+        a1.account_id as target_account_id,
+        a1.account_name as target_account_name,
+        a1.account_type as target_account_type,
+        a1.ledger_id as target_ledger_id,
+        a1.full_path as target_full_path,
+        a1.is_active as target_is_active,
+        a1.parent_account_id as target_parent_account_id,
+        a1.created_at as target_account_created_at,
+        p2.amount as other_account_amount,
+        a2.account_id as other_account_id,
+        a2.account_name as other_account_name,
+        a2.account_type as other_account_type,
+        a2.ledger_id as other_ledger_id,
+        a2.full_path as other_full_path,
+        a2.is_active as other_is_active,
+        a2.parent_account_id as other_parent_account_id,
+        a2.created_at as other_account_created_at
+      FROM transactions t
+      INNER JOIN postings p1 ON t.transaction_id = p1.transaction_id
+      INNER JOIN accounts a1 ON p1.account_id = a1.account_id
+      LEFT JOIN postings p2 ON t.transaction_id = p2.transaction_id AND p2.account_id != ?
+      LEFT JOIN accounts a2 ON p2.account_id = a2.account_id
+      WHERE p1.account_id = ?
+        AND t.transaction_date >= ?
+        AND t.transaction_date <= ?
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      $limitClause
+      ''',
+      variables: [
+        Variable.withInt(accountId),
+        Variable.withInt(accountId),
+        Variable.withDateTime(startDate),
+        Variable.withDateTime(endDate),
+      ],
+      readsFrom: {transactions, postings, accounts},
+    ).get();
+
+    return results.map((row) {
+      // 构建目标账户（就是我们查询的账户）
+      final targetAccount = Account(
+        accountId: row.read<int>('target_account_id'),
+        accountName: row.read<String>('target_account_name'),
+        accountType: AccountType.values.firstWhere(
+          (type) =>
+              type.toString().split('.').last ==
+              row.read<String>('target_account_type'),
+          orElse: () => AccountType.ASSET,
+        ),
+        ledgerId: row.read<int>('target_ledger_id'),
+        fullPath: row.read<String>('target_full_path'),
+        isActive: row.read<bool>('target_is_active'),
+        createdAt: row.read<DateTime>('target_account_created_at'),
+        parentAccountId: row.readNullable<int>('target_parent_account_id'),
+      );
+
+      // 构建对方账户（如果存在）
+      Account? otherAccount;
+      if (row.readNullable<int>('other_account_id') != null) {
+        otherAccount = Account(
+          accountId: row.read<int>('other_account_id'),
+          accountName: row.read<String>('other_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('other_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('other_ledger_id'),
+          fullPath: row.read<String>('other_full_path'),
+          isActive: row.read<bool>('other_is_active'),
+          createdAt: row.read<DateTime>('other_account_created_at'),
+          parentAccountId: row.readNullable<int>('other_parent_account_id'),
+        );
+      }
+
+      // 构建交易记录
+      final transaction = Transaction(
+        transactionId: row.read<int>('transaction_id'),
+        transactionDate: row.read<DateTime>('transaction_date'),
+        description: row.readNullable<String>('description'),
+        isRecurring: row.read<bool>('is_recurring'),
+        createdAt: row.read<DateTime>('created_at'),
+      );
+
+      // 获取目标账户的金额（绝对值）
+      final targetAmount = row.read<double>('target_account_amount');
+      final transactionAmount = targetAmount.abs();
+
+      // 确定 fromAccount 和 toAccount
+      Account? fromAccount;
+      Account? toAccount;
+
+      if (targetAmount < 0) {
+        // 目标账户金额为负，说明是借方，资金从目标账户流出
+        fromAccount = targetAccount;
+        toAccount = otherAccount;
+      } else {
+        // 目标账户金额为正，说明是贷方，资金流入目标账户
+        fromAccount = otherAccount;
+        toAccount = targetAccount;
+      }
+
+      // 确定交易性质
+      final nature = getTransactionNature(
+        fromAccount?.accountType,
+        toAccount?.accountType,
+      );
+
+      return TransactionWithAmount(
+        transaction: transaction,
+        amount: transactionAmount,
+        fromAccount: fromAccount,
+        toAccount: toAccount,
+        nature: nature,
+      );
+    }).toList();
+  }
 }

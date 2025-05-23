@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../../db/dao/account_dao.dart';
 import '../../db/dao/posting_dao.dart';
+import '../../db/dao/transaction_dao.dart';
 import '../database/database_provider.dart';
 import '../../db/app_database.dart';
 import '../../db/tables/account_table.dart';
+import '../../components/common/time_range_selector.dart';
 import 'package:sankey_flutter/sankey_node.dart';
 import 'package:sankey_flutter/sankey_link.dart';
 
@@ -12,7 +14,8 @@ import 'package:sankey_flutter/sankey_link.dart';
 final assetsRepositoryProvider = Provider<AssetsRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
   final postingDao = ref.watch(postingDaoProvider);
-  return AssetsRepository(accountDao, postingDao);
+  final transactionDao = ref.watch(transactionDaoProvider);
+  return AssetsRepository(accountDao, postingDao, transactionDao);
 });
 
 /// 资产流转数据
@@ -49,8 +52,9 @@ class SankeyChartData {
 class AssetsRepository {
   final AccountDao _accountDao;
   final PostingDao _postingDao;
+  final TransactionDao _transactionDao;
 
-  AssetsRepository(this._accountDao, this._postingDao);
+  AssetsRepository(this._accountDao, this._postingDao, this._transactionDao);
 
   /// 获取指定账户的资产流转数据并转换为 Sankey 图表格式
   ///
@@ -479,6 +483,45 @@ class AssetsRepository {
 
     return path;
   }
+
+  /// 监听指定账户在指定时间范围内的交易记录
+  Stream<List<TransactionWithAmount>> watchAccountTransactions({
+    required int accountId,
+    required TimeRange timeRange,
+  }) {
+    final startDate = _getStartDateFromTimeRange(timeRange);
+    final endDate = _getEndDateFromTimeRange(timeRange);
+
+    return _transactionDao.watchTransactionsByAccountAndDateRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  /// 根据TimeRange获取开始日期
+  DateTime _getStartDateFromTimeRange(TimeRange timeRange) {
+    final now = DateTime.now();
+    switch (timeRange) {
+      case TimeRange.thisMonth:
+        return DateTime(now.year, now.month, 1);
+      case TimeRange.this3Months:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.this90Days:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.thisYear:
+        return DateTime(now.year, 1, 1);
+      case TimeRange.all:
+        return DateTime(now.year - 10, 1, 1); // 默认返回10年前
+      default:
+        return now.subtract(Duration(days: 30));
+    }
+  }
+
+  /// 根据TimeRange获取结束日期
+  DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
+    return DateTime.now();
+  }
 }
 
 /// 层级链接辅助类
@@ -493,6 +536,17 @@ class HierarchicalLink {
     required this.amount,
   });
 }
+
+/// 监听账户交易的Provider
+final accountTransactionsProvider = StreamProvider.family<
+    List<TransactionWithAmount>,
+    ({int accountId, TimeRange timeRange})>((ref, params) {
+  final assetsRepository = ref.watch(assetsRepositoryProvider);
+  return assetsRepository.watchAccountTransactions(
+    accountId: params.accountId,
+    timeRange: params.timeRange,
+  );
+});
 
 /*
 使用示例：
