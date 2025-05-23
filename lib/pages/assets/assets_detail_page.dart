@@ -520,7 +520,7 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          spacing: 12,
+          spacing: 16,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -789,6 +789,7 @@ class AccountTransactionList extends ConsumerWidget {
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(top: 0),
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 12),
                 itemCount: sortedDates.length,
@@ -819,8 +820,8 @@ class AccountTransactionList extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 0),
+                        padding: const EdgeInsets.only(
+                            left: 16, right: 16, top: 12, bottom: 4),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -857,6 +858,7 @@ class AccountTransactionList extends ConsumerWidget {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
                         itemCount: transactionsOnDate.length,
                         itemBuilder: (context, transactionIndex) {
                           final transactionWithAmount =
