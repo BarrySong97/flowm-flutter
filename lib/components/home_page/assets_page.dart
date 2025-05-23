@@ -312,7 +312,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                                       });
                                 } else {
                                   GoRouter.of(context).pushNamed(
-                                      'assetsLiabilityDetail', // Navigate to accountDetail if no children
+                                      'assetsDetail', // Navigate to accountDetail if no children
                                       extra: {
                                         'account': selectedAccountToNavigate
                                       });

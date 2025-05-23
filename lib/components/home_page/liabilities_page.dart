@@ -1,10 +1,10 @@
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/chart/asset_trend_chart.dart';
-import 'package:flowm/components/chart/treemap.dart';
+import 'package:flowm/components/chart/liability_trend_chart.dart';
+import 'package:flowm/components/chart/liability_treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
-import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
 
@@ -22,10 +22,10 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
   @override
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
-    // 使用topAssetAccountsProvider代替直接调用repository
-    final topAssetsAsync = ref.watch(topAssetAccountsProvider);
-    // 使用uiAccountsProvider获取UI格式的账户数据
-    final uiAccountsAsync = ref.watch(uiAccountsProvider);
+    // 使用topLiabilitiesAsync代替直接调用repository
+    final topLiabilitiesAsync = ref.watch(topLiabilityAccountsProvider);
+    // 使用uiLiabilitiesAsync获取UI格式的账户数据
+    final uiLiabilitiesAsync = ref.watch(uiLiabilityAccountsProvider);
 
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
@@ -44,7 +44,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 12,
           children: [
-            // 总资产区域
+            // 总负债区域
             Container(
               padding: EdgeInsets.only(top: 16),
               decoration: BoxDecoration(
@@ -62,7 +62,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '总资产',
+                          '总负债',
                           style: const TextStyle(
                             fontSize: 14,
                           ),
@@ -81,12 +81,12 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                   ),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: topAssetsAsync.when(
+                    child: topLiabilitiesAsync.when(
                       data: (accounts) {
-                        final totalAssets = accounts.fold(
+                        final totalLiabilities = accounts.fold(
                             0.0, (sum, account) => sum + account.balance);
                         return Text(
-                          '¥${totalAssets.toStringAsFixed(2)}',
+                          '¥${totalLiabilities.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 32,
@@ -112,21 +112,19 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                     ),
                   ),
                   // AssetTrendChart()
-                  // Watch the asset trend provider by date range
+                  // Watch the liability trend provider by date range
                   Consumer(builder: (context, ref, child) {
-                    // Watch the new provider
-                    final assetTrendAsync =
-                        ref.watch(assetTrendProviderByDateRange(null));
-                    return assetTrendAsync.when(
-                      data: (assetData) {
-                        if (assetData.isEmpty) {
+                    final liabilityTrendAsync =
+                        ref.watch(liabilityTrendProviderByDateRange(null));
+                    return liabilityTrendAsync.when(
+                      data: (liabilityData) {
+                        if (liabilityData.isEmpty) {
                           return const SizedBox(
                               height: 140,
-                              child: Center(
-                                  child:
-                                      Text('暂无该时间段资产趋势数据'))); // Updated message
+                              child: Center(child: Text('暂无该时间段负债趋势数据')));
                         }
-                        return AssetTrendChart(assetData: assetData);
+                        return LiabilityTrendChart(
+                            liabilityData: liabilityData);
                       },
                       loading: () => const SizedBox(
                           height: 140,
@@ -140,13 +138,13 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
               ),
             ),
 
-            // 资产分布标题
+            // 负债分布标题
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '资产分布',
+                  '负债分布',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -156,7 +154,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
               ],
             ),
 
-            // 资产分布图表
+            // 负债分布图表
             Container(
               height: _drilledDownAccountName == null
                   ? 240
@@ -166,16 +164,16 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                 borderRadius: BorderRadius.circular(6),
               ),
               clipBehavior: Clip.hardEdge,
-              child: uiAccountsAsync.when(
+              child: uiLiabilitiesAsync.when(
                 data: (allAccounts) {
                   // Renamed to allAccounts for clarity
                   if (allAccounts.isEmpty) {
-                    return Center(child: Text('暂无资产数据'));
+                    return Center(child: Text('暂无负债数据'));
                   }
 
                   List<dynamic>
                       displayedAccounts; // Assuming 'dynamic' for now, replace with your Account model type
-                  String currentTreemapTitle = '资产分布';
+                  String currentTreemapTitle = '负债分布';
                   bool isDrilledDown = _drilledDownAccountName != null;
 
                   if (!isDrilledDown) {
@@ -188,7 +186,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                         parentAccount.children != null &&
                         parentAccount.children!.isNotEmpty) {
                       displayedAccounts = parentAccount.children!;
-                      currentTreemapTitle = '资产分布 > $_drilledDownAccountName';
+                      currentTreemapTitle = '负债分布 > $_drilledDownAccountName';
                     } else {
                       // Fallback: If parent not found or has no children, show top level and reset drill-down
                       displayedAccounts = allAccounts;
@@ -218,7 +216,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                       percentage =
                           (account.amount / totalValueAtThisLevel) * 100;
                     }
-                    return TreemapData(
+                    return LiabilityTreemapData(
                       name: account.name,
                       value: account.amount,
                       canDrillDown: account.children != null &&
@@ -230,11 +228,10 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                   if (treeMapData.isEmpty) {
                     return Center(
                         child:
-                            Text(isDrilledDown ? '此分类下无子账户数据' : '暂无可显示的资产数据'));
+                            Text(isDrilledDown ? '此分类下无子账户数据' : '暂无可显示的负债数据'));
                   }
 
                   return Column(
-                    // Wrap Treemap with a Column to add a back button
                     children: [
                       if (isDrilledDown)
                         Padding(
@@ -256,8 +253,6 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                                       Theme.of(context).primaryColor,
                                 ),
                               ),
-                              // Spacer(),
-                              // Text(currentTreemapTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -269,7 +264,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                             return FadeTransition(
                                 opacity: animation, child: child);
                           },
-                          child: TreemapWidget(
+                          child: LiabilityTreemapWidget(
                             key: ValueKey(
                                 _drilledDownAccountName ?? '__treemap_root__'),
                             title: currentTreemapTitle,
@@ -277,7 +272,6 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                             tooltipValueSuffix: ' ¥',
                             drilledDownAccountName: _drilledDownAccountName,
                             onDrillDownSelected: (accountName) {
-                              // Check if the selected account (from currently displayedAccounts) has children
                               final selectedAccount =
                                   displayedAccounts.firstWhereOrNull(
                                       (acc) => acc.name == accountName);
@@ -288,13 +282,9 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                                 setState(() {
                                   _drilledDownAccountName = accountName;
                                 });
-                              } else {
-                                // Optional: Log or show a message if trying to drill into an account without children.
-                                // This case should ideally be prevented by canDrillDown being false.
                               }
                             },
                             onDoubleClick: (accountName) {
-                              // 新增 onDoubleClick 回调
                               final selectedAccountToNavigate =
                                   displayedAccounts.firstWhereOrNull(
                                       (acc) => acc.name == accountName);
@@ -306,18 +296,18 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                                             .children!.isNotEmpty;
                                 if (hasChildren) {
                                   GoRouter.of(context).pushNamed(
-                                      'topAssetsAccountDetail',
+                                      'topLiabilitiesAccountDetail',
                                       extra: {
                                         'account': selectedAccountToNavigate
                                       });
                                 } else {
                                   GoRouter.of(context).pushNamed(
-                                      'assetsLiabilityDetail', // Navigate to accountDetail if no children
+                                      'assetsLiabilityDetail',
                                       extra: {
                                         'account': selectedAccountToNavigate
                                       });
                                 }
-                              } else {}
+                              }
                             },
                           ),
                         ),
@@ -333,7 +323,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
             ),
 
             // 账户列表，使用从数据库获取的UI格式账户数据
-            uiAccountsAsync.when(
+            uiLiabilitiesAsync.when(
               data: (accounts) {
                 if (accounts.isEmpty) {
                   return Center(

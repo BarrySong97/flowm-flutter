@@ -1,28 +1,29 @@
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/chart/area_chart.dart';
-import 'package:flowm/components/chart/asset_trend_chart.dart';
-import 'package:flowm/components/chart/treemap.dart';
+import 'package:flowm/components/chart/liability_trend_chart.dart';
+import 'package:flowm/components/chart/liability_treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Re-add for Account model
 import 'package:flowm/components/account/account_row.dart'; // Import AccountRow
-import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/account/account_repository.dart'
+    hide selectedDateRangeProvider;
+import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 
-class TopAssetsAccountDetailPage extends ConsumerStatefulWidget {
+class TopLiabilitiesAccountDetailPage extends ConsumerStatefulWidget {
   final Account account; // 接收 account 参数
 
-  const TopAssetsAccountDetailPage(
+  const TopLiabilitiesAccountDetailPage(
       {super.key, required this.account}); // 修改构造函数
 
   @override
-  ConsumerState<TopAssetsAccountDetailPage> createState() =>
+  ConsumerState<TopLiabilitiesAccountDetailPage> createState() =>
       _TopAssetsAccountDetailPageState();
 }
 
 class _TopAssetsAccountDetailPageState
-    extends ConsumerState<TopAssetsAccountDetailPage>
+    extends ConsumerState<TopLiabilitiesAccountDetailPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
   // dynamic _currentAccount; // _currentAccount is assigned widget.account but widget.account is used directly.
@@ -160,18 +161,18 @@ class _TopAssetsAccountDetailPageState
                       Consumer(builder: (context, ref, child) {
                         // Watch the new provider with null for now
                         // TODO: Add accountId to Account model and use it here
-                        final assetTrendAsync = ref.watch(
-                            assetTrendProviderByDateRange(widget.account.id));
-                        return assetTrendAsync.when(
-                          data: (assetData) {
-                            if (assetData.isEmpty) {
+                        final liabilityTrendAsync = ref.watch(
+                            liabilityTrendProviderByDateRange(
+                                widget.account.id));
+                        return liabilityTrendAsync.when(
+                          data: (liabilityData) {
+                            if (liabilityData.isEmpty) {
                               return const SizedBox(
                                   height: 200,
-                                  child: Center(
-                                      child: Text(
-                                          '暂无该时间段资产趋势数据'))); // Updated message
+                                  child: Center(child: Text('暂无该时间段负债趋势数据')));
                             }
-                            return AssetTrendChart(assetData: assetData);
+                            return LiabilityTrendChart(
+                                liabilityData: liabilityData);
                           },
                           loading: () => const SizedBox(
                               height: 200,
@@ -192,7 +193,7 @@ class _TopAssetsAccountDetailPageState
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '资产分布',
+                      '负债分布',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -268,7 +269,7 @@ class _TopAssetsAccountDetailPageState
                           percentage =
                               (account.amount / totalValueAtThisLevel) * 100;
                         }
-                        return TreemapData(
+                        return LiabilityTreemapData(
                           name: account.name,
                           value: account.amount,
                           canDrillDown: account.children != null &&
@@ -322,7 +323,7 @@ class _TopAssetsAccountDetailPageState
                                 return FadeTransition(
                                     opacity: animation, child: child);
                               },
-                              child: TreemapWidget(
+                              child: LiabilityTreemapWidget(
                                 key: ValueKey(_drilledDownAccountName ??
                                     widget.account.name), // Simpler key
                                 title: currentTreemapTitle,
@@ -359,13 +360,13 @@ class _TopAssetsAccountDetailPageState
                                                 .children!.isNotEmpty;
                                     if (hasChildren) {
                                       GoRouter.of(context).pushNamed(
-                                          'topAssetsAccountDetail',
+                                          'topLiabilitiesAccountDetail',
                                           extra: {
                                             'account': selectedAccountToNavigate
                                           });
                                     } else {
                                       GoRouter.of(context).pushNamed(
-                                          'assetsLiabilityDetail', // Navigate to accountDetail if no children
+                                          'liabilitiesDetail', // Navigate to accountDetail if no children
                                           extra: {
                                             'account': selectedAccountToNavigate
                                           });

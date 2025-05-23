@@ -3,22 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flowm/components/chart/barchart.dart';
 import 'package:flowm/components/sankey_chart.dart';
+import 'package:flowm/components/common/time_range_selector.dart';
 
-class AssetsLiabilityDetailPage extends StatefulWidget {
+class LiabilitiesDetailPage extends StatefulWidget {
   final Account account;
-  const AssetsLiabilityDetailPage({Key? key, required this.account})
-      : super(key: key);
+  const LiabilitiesDetailPage({super.key, required this.account});
 
   @override
-  State<AssetsLiabilityDetailPage> createState() =>
-      _AssetsLiabilityDetailPageState();
+  State<LiabilitiesDetailPage> createState() => _LiabilitiesDetailPageState();
 }
 
-class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
+class _LiabilitiesDetailPageState extends State<LiabilitiesDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
+  TimeRange _selectedTimeRange = TimeRange.thisMonth;
 
   @override
   void initState() {
@@ -45,6 +45,12 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
         _isCollapsed = isCollapsed;
       });
     }
+  }
+
+  void _onTimeRangeChanged(TimeRange timeRange) {
+    // 处理时间范围变化的逻辑
+    print('Time range changed to: ${timeRange.label}');
+    // 在这里可以添加更多逻辑，比如刷新数据、更新图表等
   }
 
   @override
@@ -173,7 +179,21 @@ class _AssetsLiabilityDetailPageState extends State<AssetsLiabilityDetailPage>
             color: Color(0xFFF5F6FB),
           ),
           child: Column(
-            children: [],
+            children: [
+              // 时间选择器
+              TimeRangeSelector(
+                value: _selectedTimeRange,
+                onChanged: (TimeRange timeRange) {
+                  setState(() {
+                    _selectedTimeRange = timeRange;
+                  });
+                  // 在这里可以添加时间范围变化时的逻辑
+                  _onTimeRangeChanged(timeRange);
+                },
+              ),
+              const SizedBox(height: 16),
+              // 其他内容可以在这里添加
+            ],
           ),
         ),
       ),

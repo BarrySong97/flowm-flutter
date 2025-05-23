@@ -1,28 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
-import '../../state/account/account_repository.dart'; // Still needed for AssetHistoryData type
+import '../../state/liabilities/liabilities_repository.dart';
 
-/// 资产趋势线图组件
+/// 负债趋势线图组件
 ///
-/// 显示资产变化趋势，数据通过参数传入
-class AssetTrendChart extends StatelessWidget {
-  final List<AssetHistoryData> assetData;
-  const AssetTrendChart({super.key, required this.assetData});
+/// 显示负债变化趋势，数据通过参数传入
+class LiabilityTrendChart extends StatelessWidget {
+  final List<LiabilityHistoryData> liabilityData;
+  const LiabilityTrendChart({super.key, required this.liabilityData});
 
   @override
   Widget build(BuildContext context) {
-    // 定义图表主色调
-    final Color primaryColor = const Color(0xFF8CC398);
-    final Color gradientColor = const Color(0xFFF3F8F3);
+    // 定义图表主色调 - 使用红色系表示负债
+    final Color primaryColor = Colors.redAccent;
     return Container(
       padding: EdgeInsets.zero,
       child: SizedBox(
         width: double.infinity,
-        height: 140, // 固定高度，可根据需要调整
+        height: 140,
         child: () {
-          if (assetData.isEmpty) {
-            return const Center(child: Text('暂无资产趋势数据'));
+          if (liabilityData.isEmpty) {
+            return const Center(child: Text('暂无负债趋势数据'));
           }
 
           // 格式化货币显示
@@ -40,16 +39,13 @@ class AssetTrendChart extends StatelessWidget {
               labelPlacement: LabelPlacement.onTicks,
               edgeLabelPlacement: EdgeLabelPlacement.shift,
               axisLabelFormatter: (AxisLabelRenderDetails args) {
-                // args.value is the index for CategoryAxis
                 final int currentIndex = args.value.toInt();
-                final int totalCount = assetData.length;
+                final int totalCount = liabilityData.length;
 
                 if (totalCount == 0) {
-                  // Handle empty data
                   return ChartAxisLabel('', args.textStyle);
                 }
 
-                // Only show the label for the last data point
                 if (currentIndex == totalCount - 1) {
                   return ChartAxisLabel(args.text, args.textStyle);
                 }
@@ -58,56 +54,50 @@ class AssetTrendChart extends StatelessWidget {
             ),
             primaryYAxis: NumericAxis(
               isVisible: false,
-              // numberFormat handles the formatting of the labels
               numberFormat: NumberFormat.compact(locale: 'zh_CN'),
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
               axisLine: const AxisLine(width: 0),
               majorTickLines: const MajorTickLines(size: 0),
-              // Set min/max based on data to guide the axis range.
-              // assetData.isEmpty check is important to avoid error on reduce.
-              minimum: assetData.isEmpty
+              minimum: liabilityData.isEmpty
                   ? null
-                  : assetData
-                          .map((e) => e.totalAssets)
+                  : liabilityData
+                          .map((e) => e.totalLiabilities)
                           .reduce((a, b) => a < b ? a : b) *
                       0.95,
-              maximum: assetData.isEmpty
+              maximum: liabilityData.isEmpty
                   ? null
-                  : assetData
-                          .map((e) => e.totalAssets)
+                  : liabilityData
+                          .map((e) => e.totalLiabilities)
                           .reduce((a, b) => a > b ? a : b) *
                       1.01,
-              desiredIntervals:
-                  1, // This should result in labels at the effective min and max of the axis.
-              // The custom axisLabelFormatter is removed as desiredIntervals: 1 and numberFormat should suffice.
+              desiredIntervals: 1,
             ),
             series: <CartesianSeries>[
               // 折线图+面积图组合展示
-              SplineAreaSeries<AssetHistoryData, String>(
-                dataSource: assetData,
+              SplineAreaSeries<LiabilityHistoryData, String>(
+                dataSource: liabilityData,
                 xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalAssets,
+                yValueMapper: (data, _) => data.totalLiabilities,
                 splineType: SplineType.natural,
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    gradientColor.withOpacity(1.0), // 顶部颜色更深
-                    gradientColor.withOpacity(0.0), // 底部完全透明
+                    primaryColor.withOpacity(0.3),
+                    primaryColor.withOpacity(0.05),
                   ],
                 ),
                 borderColor: primaryColor,
                 borderWidth: 2,
               ),
               // 添加折线和数据点
-              SplineSeries<AssetHistoryData, String>(
-                dataSource: assetData,
+              SplineSeries<LiabilityHistoryData, String>(
+                dataSource: liabilityData,
                 xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalAssets,
+                yValueMapper: (data, _) => data.totalLiabilities,
                 color: primaryColor,
                 width: 2,
-                markerSettings:
-                    const MarkerSettings(isVisible: false), // Hide markers
+                markerSettings: const MarkerSettings(isVisible: false),
               ),
             ],
             trackballBehavior: TrackballBehavior(
@@ -136,13 +126,8 @@ class AssetTrendChart extends StatelessWidget {
                         ),
                       ],
                     ),
-                    //                     child: Text(
-                    //   '$formattedDate: ${formatter.format(currentY)}',
-                    //   style: const TextStyle(color: Colors.black, fontSize: 12),
-                    // ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      // mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(

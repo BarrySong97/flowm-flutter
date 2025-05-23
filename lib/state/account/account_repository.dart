@@ -5,6 +5,7 @@ import '../../db/app_database.dart';
 import '../../db/dao/account_dao.dart';
 import '../../db/tables/account_table.dart';
 import '../../components/account/account_item.dart' as account_ui;
+import '../../components/common/time_range_selector.dart';
 import '../database/database_provider.dart';
 import '../ledger/ledger_repository.dart';
 
@@ -96,6 +97,51 @@ final assetTrendProviderByDateRange =
     endDate,
     ledgerId: selectedLedger.ledgerId,
     accountId: accountId,
+  );
+});
+
+// 基于TimeRange类型的资产趋势数据提供者
+final assetTrendProviderByTimeRange = FutureProvider.family<
+    List<AssetHistoryData>,
+    ({int? accountId, TimeRange timeRange})>((ref, params) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  DateTime endDate = DateTime.now();
+  DateTime startDate;
+
+  switch (params.timeRange) {
+    case TimeRange.all:
+      // 获取所有历史数据，从一年前开始
+      startDate = DateTime(endDate.year - 1, endDate.month, endDate.day);
+      break;
+    case TimeRange.thisYear:
+      startDate = DateTime(endDate.year, 1, 1);
+      break;
+    case TimeRange.this3Months:
+      startDate = DateTime(endDate.year, endDate.month - 3, endDate.day);
+      if (startDate.isAfter(endDate)) {
+        startDate = DateTime(endDate.year - 1, endDate.month + 9, endDate.day);
+      }
+      break;
+    case TimeRange.this90Days:
+      startDate = endDate.subtract(const Duration(days: 89));
+      break;
+    case TimeRange.thisMonth:
+    default:
+      startDate = DateTime(endDate.year, endDate.month, 1);
+      break;
+  }
+
+  return repository.getAssetHistoryByTimeRange(
+    startDate,
+    endDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: params.accountId,
   );
 });
 
