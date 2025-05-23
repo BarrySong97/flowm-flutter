@@ -9,9 +9,36 @@ import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart'; // Added for formatting
 
 /// 当前选中的月份提供者
 final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
+/// 上个月支出数据提供者 (family)
+final previousMonthExpenseProviderFamily =
+    FutureProvider.family<List<barchart.ChartData>, int?>(
+        (ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final selectedDate = ref.watch(selectedMonthProvider);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  // 计算上个月的开始和结束时间
+  final DateTime prevMonthStartDate =
+      DateTime(selectedDate.year, selectedDate.month - 1, 1);
+  final DateTime prevMonthEndDate =
+      DateTime(selectedDate.year, selectedDate.month, 0);
+
+  return repository.getExpenseChartData(
+    startDate: prevMonthStartDate,
+    endDate: prevMonthEndDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: accountId, // 传递 accountId
+  );
+});
 
 /// 支出图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
@@ -67,6 +94,69 @@ class TopExpensesDetailPage extends ConsumerWidget {
   final AccountExpenseNode account; // 接收 account 参数
 
   const TopExpensesDetailPage({super.key, required this.account}); // 修改构造函数
+
+  // 辅助方法格式化数字 (Copied from ExpensesPage)
+  String _formatCurrency(double amount) {
+    if (amount.abs() >= 100000) {
+      // Use abs() for negative numbers too
+      return '${(amount / 1000).toStringAsFixed(2)}k';
+    } else {
+      return NumberFormat('#,##0.00', 'zh_CN').format(amount);
+    }
+  }
+
+  // 构建统计项的通用方法 (Copied and adapted from ExpensesPage)
+  Widget _buildStatsItem(
+      WidgetRef ref,
+      String title,
+      AsyncValue<List<barchart.ChartData>> asyncData,
+      double Function(List<barchart.ChartData> data, DateTime selectedMonth)
+          calculateValue) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        height: 54,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: asyncData.when(
+          data: (data) {
+            final selectedMonth = ref.watch(selectedMonthProvider);
+            final value = calculateValue(data, selectedMonth);
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center, // Center content
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                Text(
+                  '¥ ${_formatCurrency(value)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const Center(
+            child: SizedBox(
+              width: 24, // Specify size for CircularProgressIndicator
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          error: (error, stack) => const Text('加载失败'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Sample data for the pie chart - 这部分将被动态数据替代
@@ -80,6 +170,9 @@ class TopExpensesDetailPage extends ConsumerWidget {
     // 使用 .family 传递 accountId
     final chartDataAsync =
         ref.watch(expenseChartDataProvider(currentAccountId));
+    // Watch the new provider for previous month's data
+    final previousMonthDataAsync =
+        ref.watch(previousMonthExpenseProviderFamily(currentAccountId));
 
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
 
@@ -144,6 +237,157 @@ class TopExpensesDetailPage extends ConsumerWidget {
                           ref.read(selectedMonthProvider.notifier).state =
                               newDate;
                         },
+                      ),
+                      const SizedBox(
+                        height: 12,
+                        child: ColoredBox(color: Colors.transparent),
+                      ),
+                      // START: Added Statistics Row (Copied and adapted from ExpensesPage)
+                      Row(
+                        children: [
+                          // 当月总支出
+                          _buildStatsItem(
+                            ref,
+                            '当月总支出',
+                            chartDataAsync,
+                            (data, selectedMonth) {
+                              double total = 0;
+                              for (var item in data) {
+                                total += item.y;
+                              }
+                              return total;
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          // 当月日均支出
+                          _buildStatsItem(
+                            ref,
+                            '当月日均',
+                            chartDataAsync,
+                            (data, selectedMonth) {
+                              double total = 0;
+                              for (var item in data) {
+                                total += item.y;
+                              }
+                              final daysInMonth = DateTime(
+                                selectedMonth.year,
+                                selectedMonth.month + 1,
+                                0,
+                              ).day;
+                              return daysInMonth > 0 ? total / daysInMonth : 0;
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          // 较上月支出
+                          Expanded(
+                            child: Container(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: chartDataAsync.when(
+                                data: (currentData) {
+                                  return previousMonthDataAsync.when(
+                                    data: (previousData) {
+                                      double currentTotal = 0;
+                                      for (var item in currentData) {
+                                        currentTotal += item.y;
+                                      }
+
+                                      double previousTotal = 0;
+                                      for (var item in previousData) {
+                                        previousTotal += item.y;
+                                      }
+
+                                      double changePercent = 0;
+                                      if (previousTotal.abs() > 0.001) {
+                                        changePercent =
+                                            ((currentTotal - previousTotal) /
+                                                    previousTotal.abs()) *
+                                                100;
+                                      } else if (currentTotal.abs() > 0.001) {
+                                        changePercent =
+                                            currentTotal > 0 ? 100.0 : -100.0;
+                                      }
+
+                                      final isPositive = changePercent > 0.001;
+                                      final isNegative = changePercent < -0.001;
+
+                                      return Tooltip(
+                                        message:
+                                            '上月支出: ¥ ${_formatCurrency(previousTotal)}',
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment
+                                              .center, // Center content
+                                          children: [
+                                            const Text(
+                                              '较上月支出',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                if (isPositive)
+                                                  Icon(Icons.arrow_upward,
+                                                      color: Colors.red,
+                                                      size: 16),
+                                                if (isNegative)
+                                                  Icon(Icons.arrow_downward,
+                                                      color: Colors.green,
+                                                      size: 16),
+                                                if (!isPositive && !isNegative)
+                                                  const SizedBox(width: 16),
+                                                Text(
+                                                  '${changePercent.toStringAsFixed(0)}%',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isPositive
+                                                        ? Colors.red
+                                                        : (isNegative
+                                                            ? Colors.green
+                                                            : Colors.grey),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                    loading: () => const Center(
+                                      child: SizedBox(
+                                        width:
+                                            24, // Specify size for CircularProgressIndicator
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                    ),
+                                    error: (error, stack) => const Text('加载失败'),
+                                  );
+                                },
+                                loading: () => const Center(
+                                  child: SizedBox(
+                                    width:
+                                        24, // Specify size for CircularProgressIndicator
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                ),
+                                error: (error, stack) => const Text('加载失败'),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(
                         height: 12,
@@ -246,6 +490,12 @@ class TopExpensesDetailPage extends ConsumerWidget {
                 }),
               ),
               // Add a title for the accounts section
+
+              // END: Added Statistics Row
+              const SizedBox(
+                height: 12,
+                child: ColoredBox(color: Colors.transparent),
+              ),
             ],
           ),
         ))));

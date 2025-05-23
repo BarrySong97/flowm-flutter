@@ -18,19 +18,19 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   // 页面列表
-  late final List<Widget> _pages;
+  late final List<Widget Function()> _pageBuilders;
 
   @override
   void initState() {
     super.initState();
 
-    // 初始化页面列表
-    _pages = [
-      const OverviewPage(),
-      const AssetsPage(),
-      const ExpensesPage(),
-      const IncomePage(),
-      const LiabilitiesPage(),
+    // 初始化页面构建函数列表
+    _pageBuilders = [
+      () => const OverviewPage(),
+      () => const AssetsPage(),
+      () => const ExpensesPage(),
+      () => const IncomePage(),
+      () => const LiabilitiesPage(),
     ];
   }
 
@@ -63,12 +63,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               Expanded(
                 // 使用PageView但启用了更好的性能设置
-                child: PageView(
+                child: PageView.builder(
                   controller: pageController,
                   // 使用适中的物理滚动效果
                   physics: const ClampingScrollPhysics(),
-                  // 禁用页面缓存，提高性能
-                  children: _pages,
+                  itemCount: _pageBuilders.length,
+                  itemBuilder: (context, index) {
+                    return _pageBuilders[index]();
+                  },
                   onPageChanged: (index) {
                     // 当用户滑动页面时更新状态
                     if (index != currentIndex) {

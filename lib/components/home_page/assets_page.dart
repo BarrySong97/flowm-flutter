@@ -121,7 +121,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                       data: (assetData) {
                         if (assetData.isEmpty) {
                           return const SizedBox(
-                              height: 200,
+                              height: 140,
                               child: Center(
                                   child:
                                       Text('暂无该时间段资产趋势数据'))); // Updated message
@@ -129,10 +129,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                         return AssetTrendChart(assetData: assetData);
                       },
                       loading: () => const SizedBox(
-                          height: 200,
+                          height: 140,
                           child: Center(child: CircularProgressIndicator())),
                       error: (error, stack) => SizedBox(
-                          height: 200,
+                          height: 140,
                           child: Center(child: Text('加载趋势图失败: $error'))),
                     );
                   }),

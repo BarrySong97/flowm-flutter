@@ -31,8 +31,6 @@ class IncomeRepository {
     required int ledgerId,
     int? accountId,
   }) async {
-    print(
-        '[IncomeRepository] getIncomeChartData called with: startDate: $startDate, endDate: $endDate, ledgerId: $ledgerId, accountId: $accountId');
     try {
       // 首先检查是否有收入类型的账户
       final incomeAccounts = await _postingDao.customSelect(
@@ -48,16 +46,11 @@ class IncomeRepository {
       ).getSingle();
 
       final incomeAccountCount = incomeAccounts.read<int>('count');
-      print(
-          '[IncomeRepository] Found $incomeAccountCount income accounts for ledgerId: $ledgerId');
 
       if (incomeAccountCount == 0) {
-        print(
-            '[IncomeRepository] No income accounts found, returning empty list');
         return [];
       }
 
-      print('[IncomeRepository] Executing SQL query to get daily income data');
       // 构建SQL查询，获取每日收入总额
       final result = await _postingDao.customSelect(
         '''
@@ -102,32 +95,22 @@ class IncomeRepository {
         ],
       ).get();
 
-      print(
-          '[IncomeRepository] SQL query completed. Retrieved ${result.length} rows');
-
       // 将查询结果转换为ChartData列表
       final List<barchart.ChartData> chartData = [];
       int index = 0;
 
-      print('[IncomeRepository] Processing query results:');
       for (final row in result) {
         try {
           final dateStr = row.read<String>('date');
           final amount = row.read<double>('total_income');
           final count = row.read<int>('daily_count');
 
-          print(
-              '[IncomeRepository] Row data: date=$dateStr, amount=$amount, count=$count');
-
           if (dateStr == null || dateStr.isEmpty) {
-            print('[IncomeRepository] Skipping row due to empty date string');
             continue;
           }
 
           final dateParts = dateStr.split('-');
           if (dateParts.length != 3) {
-            print(
-                '[IncomeRepository] Skipping row due to invalid date format: $dateStr');
             continue;
           }
 
@@ -140,8 +123,7 @@ class IncomeRepository {
           final formattedDate = '${date.month}/${date.day}';
           chartData
               .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
-          print(
-              '[IncomeRepository] Added chart data: index=$index, amount=$amount, formattedDate=$formattedDate');
+
           index++;
         } catch (e) {
           print('[IncomeRepository] Error processing row: $e');
@@ -149,8 +131,6 @@ class IncomeRepository {
         }
       }
 
-      print(
-          '[IncomeRepository] Returning ${chartData.length} chart data items');
       return chartData;
     } catch (e, s) {
       print('[IncomeRepository] Error in getIncomeChartData: $e');
@@ -169,8 +149,6 @@ class IncomeRepository {
     required DateTime endDate,
     required int ledgerId,
   }) async {
-    print(
-        '[IncomeRepository] getIncomeAccountTree called with: startDate: $startDate, endDate: $endDate, ledgerId: $ledgerId');
     try {
       // 1. 获取所有收入账户 (包括层级关系)
       final allIncomeAccountsQuery = _postingDao.customSelect(
@@ -190,22 +168,13 @@ class IncomeRepository {
           .map((row) => _postingDao.db.accounts.map(row.data))
           .toList();
 
-      print(
-          '[IncomeRepository] Fetched ${allIncomeAccounts.length} income accounts:');
-      // for (final acc in allIncomeAccounts) {
-      //   print('[IncomeRepository] Account: ${acc.toJson()}'); // toJson might be too verbose for Account data class
-      // }
-
       if (allIncomeAccounts.isEmpty) {
-        print(
-            '[IncomeRepository] No income accounts found for ledgerId: $ledgerId.');
         return [];
       }
 
       final List<AccountExpenseNode> accountNodes = [];
       final Map<int, AccountExpenseNode> accountNodeMap = {};
 
-      print('[IncomeRepository] Calculating direct income for each account...');
       for (final account in allIncomeAccounts) {
         final directIncomeResult = await _postingDao.customSelect(
           '''
@@ -227,8 +196,6 @@ class IncomeRepository {
         ).getSingle();
 
         final directBalance = directIncomeResult.read<double>('direct_balance');
-        print(
-            '[IncomeRepository] Account: ${account.accountName} (ID: ${account.accountId}), Direct Balance: $directBalance');
 
         final node = AccountExpenseNode(
           accountData: account,
@@ -239,7 +206,7 @@ class IncomeRepository {
       }
 
       // 3. 构建树形结构并计算父节点余额
-      print('[IncomeRepository] Building tree structure...');
+
       final List<AccountExpenseNode> rootNodes = [];
       for (final node in accountNodes) {
         if (node.accountData.parentAccountId != null &&
@@ -249,13 +216,8 @@ class IncomeRepository {
           rootNodes.add(node);
         }
       }
-      print('[IncomeRepository] Found ${rootNodes.length} root nodes.');
-      // for (final rNode in rootNodes) {
-      //   print('[IncomeRepository] Root Node: ${rNode.toJson()}'); // toJson on node can be verbose
-      // }
 
       // 4. 递归计算父节点的余额 和总收入
-      print('[IncomeRepository] Calculating total balances for root nodes...');
       double totalOverallIncome = 0;
       double updateTotalBalances(AccountExpenseNode node) {
         double childrenBalance = 0;
@@ -269,22 +231,15 @@ class IncomeRepository {
       for (final rootNode in rootNodes) {
         totalOverallIncome += updateTotalBalances(rootNode);
       }
-      print(
-          '[IncomeRepository] Calculated totalOverallIncome: $totalOverallIncome');
 
       // 5. 计算百分比
       if (totalOverallIncome > 0) {
-        print('[IncomeRepository] Calculating percentages...');
         for (final node in accountNodes) {
           // 直接计算百分比，不进行任何四舍五入
           node.percentage = (node.balance / totalOverallIncome) * 100;
-          print(
-              '[IncomeRepository] Account: ${node.accountData.accountName}, Balance: ${node.balance}, Percentage: ${node.percentage}');
         }
       }
 
-      print(
-          '[IncomeRepository] getIncomeAccountTree returning ${rootNodes.length} root nodes.');
       // rootNodes.forEach((node) => print('[IncomeRepository] Final Root Node: ${node.toJson()}'));
       return rootNodes;
     } catch (e, s) {
