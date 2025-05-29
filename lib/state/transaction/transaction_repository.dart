@@ -147,4 +147,10 @@ class TransactionRepository {
   /// 获取某一天交易
   Stream<List<TransactionWithAmount>> watchTransactionsByDay(DateTime day) =>
       _transactionDao.watchTransactionsWithAmountByDay(day);
+
+  /// 根据时间范围监听交易 (TransactionWithAmount)
+  Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDateRange(
+          DateTime startDate, DateTime endDate) =>
+      _transactionDao.watchTransactionsWithAmountByDateRange(
+          startDate, endDate);
 }

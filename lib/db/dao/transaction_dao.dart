@@ -252,30 +252,52 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
         Account? fromAccountObj;
         Account? toAccountObj;
         double transactionAmount = 0;
+        TransactionNature nature = TransactionNature.OTHER; // Default nature
 
         if (postingsWithAccounts.isNotEmpty) {
-          final firstPosting =
-              postingsWithAccounts.first.readTable(db.postings);
-          // The amount in TransactionWithAmount is typically the "principal" amount of the transaction, often positive.
-          // The nature (income/expense/transfer) defines its effect.
-          transactionAmount = firstPosting.amount.abs();
-        }
+          // Attempt to determine amount more robustly if multiple postings exist
+          // For simple two-posting transactions, one is positive, one is negative.
+          // The absolute value of either could be the "amount" of the transaction.
+          // We'll take the absolute amount of the first posting for simplicity,
+          // assuming it represents the transaction's magnitude.
+          // More complex transactions (e.g. splits) might need different logic.
+          final firstPostingAmount =
+              postingsWithAccounts.first.readTable(db.postings).amount;
+          transactionAmount = firstPostingAmount.abs();
 
-        for (final rowData in postingsWithAccounts) {
-          final posting = rowData.readTable(db.postings);
-          final account = rowData.readTable(db.accounts);
-          // This logic assumes a simple two-posting transaction (debit/credit)
-          // For more complex splits, this might need adjustment or rely on how 'nature' is determined
-          if (posting.amount < 0) {
-            fromAccountObj = account;
-          } else if (posting.amount > 0) {
-            toAccountObj = account;
+          // Determine from/to accounts and overall nature
+          double totalPositive = 0;
+          double totalNegative = 0;
+          List<Account> positiveAccounts = [];
+          List<Account> negativeAccounts = [];
+
+          for (final rowData in postingsWithAccounts) {
+            final posting = rowData.readTable(db.postings);
+            final account = rowData.readTable(db.accounts);
+            if (posting.amount > 0) {
+              totalPositive += posting.amount;
+              positiveAccounts.add(account);
+            } else if (posting.amount < 0) {
+              totalNegative += posting.amount; // amount is negative
+              negativeAccounts.add(account);
+            }
           }
-        }
 
-        // Determine transaction nature
-        final nature = getTransactionNature(
-            fromAccountObj?.accountType, toAccountObj?.accountType);
+          // Simplified from/to logic: first negative as from, first positive as to
+          // This might need refinement for complex transactions (e.g., multiple from/to)
+          fromAccountObj =
+              negativeAccounts.isNotEmpty ? negativeAccounts.first : null;
+          toAccountObj =
+              positiveAccounts.isNotEmpty ? positiveAccounts.first : null;
+
+          nature = getTransactionNature(
+              fromAccountObj?.accountType, toAccountObj?.accountType);
+
+          // If it's a simple transfer or expense/income, amount might be more clearly defined
+          // For example, if one posting is ASSET and negative, and other is EXPENSE and positive
+          // the amount is the value of that movement.
+          // The current transactionAmount from firstPosting.amount.abs() is a common case.
+        }
 
         resultList.add(TransactionWithAmount(
           transaction: transaction,
@@ -285,6 +307,100 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
           nature: nature,
         ));
       }
+      return resultList;
+    });
+  }
+
+  // Watch transactions with amount by date range
+  Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDateRange(
+      DateTime startDate, DateTime endDate) {
+    final query = select(transactions).join([
+      // Left join postings, as a transaction might not have postings (though unlikely in a valid system)
+      leftOuterJoin(db.postings,
+          db.postings.transactionId.equalsExp(transactions.transactionId)),
+      // Left join accounts from postings, as a posting must have an account
+      leftOuterJoin(
+          db.accounts, db.accounts.accountId.equalsExp(db.postings.accountId)),
+    ])
+      ..where(transactions.transactionDate.isBetweenValues(startDate, endDate))
+      ..orderBy([
+        OrderingTerm(
+            expression: transactions.transactionDate, mode: OrderingMode.desc),
+        OrderingTerm(
+            expression: transactions.transactionId, mode: OrderingMode.desc),
+      ]);
+
+    return query.watch().map((rows) {
+      final Map<int, TransactionWithAmount> tempResults = {};
+      final Map<int, List<TypedResult>> transactionRows = {};
+
+      // Group rows by transactionId first
+      for (final row in rows) {
+        final transaction = row.readTable(transactions);
+        transactionRows
+            .putIfAbsent(transaction.transactionId, () => [])
+            .add(row);
+      }
+
+      transactionRows.forEach((transactionId, rowsOfTransaction) {
+        if (rowsOfTransaction.isEmpty) return;
+
+        final transaction = rowsOfTransaction.first.readTable(transactions);
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+        TransactionNature nature = TransactionNature.OTHER;
+
+        // Consolidate postings for the current transaction
+        List<Account> positiveAccounts = [];
+        List<Account> negativeAccounts = [];
+        bool amountSet = false;
+
+        for (final rowData in rowsOfTransaction) {
+          final posting = rowData.readTableOrNull(db.postings);
+          final account = rowData.readTableOrNull(db.accounts);
+
+          if (posting != null && account != null) {
+            if (!amountSet) {
+              // Heuristic: take the first posting's amount as the transaction's face value
+              transactionAmount = posting.amount.abs();
+              amountSet = true;
+            }
+            if (posting.amount > 0) {
+              positiveAccounts.add(account);
+            } else if (posting.amount < 0) {
+              negativeAccounts.add(account);
+            }
+          }
+        }
+
+        fromAccountObj =
+            negativeAccounts.isNotEmpty ? negativeAccounts.first : null;
+        toAccountObj =
+            positiveAccounts.isNotEmpty ? positiveAccounts.first : null;
+
+        nature = getTransactionNature(
+            fromAccountObj?.accountType, toAccountObj?.accountType);
+
+        tempResults[transactionId] = TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
+          nature: nature,
+        );
+      });
+
+      // Preserve original order based on transaction date and ID (descending)
+      final resultList = tempResults.values.toList();
+      resultList.sort((a, b) {
+        int dateComp = b.transaction.transactionDate
+            .compareTo(a.transaction.transactionDate);
+        if (dateComp != 0) return dateComp;
+        return b.transaction.transactionId
+            .compareTo(a.transaction.transactionId);
+      });
+
       return resultList;
     });
   }

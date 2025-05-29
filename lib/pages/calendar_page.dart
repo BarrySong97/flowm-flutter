@@ -12,25 +12,48 @@ import 'package:flowm/components/common/transaction_list_item.dart';
 import '../../utils/transaction_type_map.dart';
 import '../../utils/transaction_utils.dart';
 
-// Provider to get daily income and expense summary for a specific day
-final calendarDaySummaryProvider = StreamProvider.autoDispose
-    .family<({double income, double expenses})?, DateTime>((ref, day) {
+// Provider to get daily income and expense summary for a specific month
+final monthlyCalendarSummaryProvider = StreamProvider.autoDispose
+    .family<Map<int, ({double income, double expenses})>, DateTime>(
+        (ref, dayForMonth) {
   final transactionRepository = ref.watch(transactionRepositoryProvider);
-  // Normalize day to ensure time component doesn't affect grouping or fetching
-  final normalizedDay = DateTime(day.year, day.month, day.day);
 
+  final firstDayOfMonth = DateTime(dayForMonth.year, dayForMonth.month, 1);
+  final lastDayOfMonth = (dayForMonth.month < 12)
+      ? DateTime(dayForMonth.year, dayForMonth.month + 1, 0, 23, 59, 59)
+      : DateTime(dayForMonth.year + 1, 1, 0, 23, 59, 59);
+
+  // Assuming TransactionRepository has an equivalent of watchTransactionsByDay
+  // that returns List<TransactionWithAmount> for a date range.
+  // Let's call it watchTransactionsWithAmountByDateRange for this example.
+  // This method needs to be implemented in TransactionRepository.
   return transactionRepository
-      .watchTransactionsByDay(normalizedDay)
-      .map((transactions) {
-    if (transactions.isEmpty) {
-      return null;
+      .watchTransactionsWithAmountByDateRange(firstDayOfMonth, lastDayOfMonth)
+      .map((transactionsWithAmount) {
+    final Map<int, ({double income, double expenses})> monthlySummary = {};
+    if (transactionsWithAmount.isEmpty) {
+      return monthlySummary;
     }
-    final totals = calculateDailyIncomeAndExpense(transactions);
-    // Only return a summary if there's actual income or expense
-    if (totals['income']! == 0 && totals['expenses']! == 0) {
-      return null;
+
+    final Map<int, List<TransactionWithAmount>> transactionsByDay = {};
+    for (var ta in transactionsWithAmount) {
+      // Assuming TransactionWithAmount has access to the original transaction's date
+      // or has its own relevant date property.
+      // If TransactionWithAmount wraps a Transaction object, it would be like ta.transaction.transactionDate.day
+      // For now, let's assume 'ta.transaction.transactionDate.day' is the correct path.
+      // This needs to match the actual structure of TransactionWithAmount.
+      final day = ta.transaction.transactionDate.day;
+      transactionsByDay.putIfAbsent(day, () => []).add(ta);
     }
-    return (income: totals['income']!, expenses: totals['expenses']!);
+
+    transactionsByDay.forEach((day, dayTransactions) {
+      final totals = calculateDailyIncomeAndExpense(dayTransactions);
+      if (totals['income']! != 0 || totals['expenses']! != 0) {
+        monthlySummary[day] =
+            (income: totals['income']!, expenses: totals['expenses']!);
+      }
+    });
+    return monthlySummary;
   });
 });
 
@@ -143,16 +166,22 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               calendarBuilders: CalendarBuilders(
                 defaultBuilder: (context, day, focusedDay) {
                   return Consumer(builder: (context, ref, child) {
-                    final summaryAsyncValue =
-                        ref.watch(calendarDaySummaryProvider(day));
-                    return summaryAsyncValue.when(
-                      data: (summary) => CalendarDay(
-                        day: day,
-                        isToday: isSameDay(day, DateTime.now()),
-                        isSelected: isSameDay(_selectedDay, day),
-                        income: summary?.income,
-                        expense: summary?.expenses,
-                      ),
+                    // Normalize 'day' to the first day of its month to use as a consistent key for the provider
+                    final monthKey = DateTime(day.year, day.month, 1);
+                    final monthlySummaryAsyncValue =
+                        ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    return monthlySummaryAsyncValue.when(
+                      data: (summaryMap) {
+                        // Get the summary for the specific 'day' from the monthly map
+                        final daySummary = summaryMap[day.day];
+                        return CalendarDay(
+                          day: day,
+                          isToday: isSameDay(day, DateTime.now()),
+                          isSelected: isSameDay(_selectedDay, day),
+                          income: daySummary?.income,
+                          expense: daySummary?.expenses,
+                        );
+                      },
                       loading: () => CalendarDay(
                         day: day,
                         isToday: isSameDay(day, DateTime.now()),
@@ -168,16 +197,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 },
                 todayBuilder: (context, day, focusedDay) {
                   return Consumer(builder: (context, ref, child) {
-                    final summaryAsyncValue =
-                        ref.watch(calendarDaySummaryProvider(day));
-                    return summaryAsyncValue.when(
-                      data: (summary) => CalendarDay(
-                        day: day,
-                        isToday: true,
-                        isSelected: isSameDay(_selectedDay, day),
-                        income: summary?.income,
-                        expense: summary?.expenses,
-                      ),
+                    final monthKey = DateTime(day.year, day.month, 1);
+                    final monthlySummaryAsyncValue =
+                        ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    return monthlySummaryAsyncValue.when(
+                      data: (summaryMap) {
+                        final daySummary = summaryMap[day.day];
+                        return CalendarDay(
+                          day: day,
+                          isToday: true,
+                          isSelected: isSameDay(_selectedDay, day),
+                          income: daySummary?.income,
+                          expense: daySummary?.expenses,
+                        );
+                      },
                       loading: () => CalendarDay(
                         day: day,
                         isToday: true,
@@ -193,16 +226,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 },
                 selectedBuilder: (context, day, focusedDay) {
                   return Consumer(builder: (context, ref, child) {
-                    final summaryAsyncValue =
-                        ref.watch(calendarDaySummaryProvider(day));
-                    return summaryAsyncValue.when(
-                      data: (summary) => CalendarDay(
-                        day: day,
-                        isSelected: true,
-                        isToday: isSameDay(day, DateTime.now()),
-                        income: summary?.income,
-                        expense: summary?.expenses,
-                      ),
+                    final monthKey = DateTime(day.year, day.month, 1);
+                    final monthlySummaryAsyncValue =
+                        ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    return monthlySummaryAsyncValue.when(
+                      data: (summaryMap) {
+                        final daySummary = summaryMap[day.day];
+                        return CalendarDay(
+                          day: day,
+                          isSelected: true,
+                          isToday: isSameDay(day, DateTime.now()),
+                          income: daySummary?.income,
+                          expense: daySummary?.expenses,
+                        );
+                      },
                       loading: () => CalendarDay(
                         day: day,
                         isSelected: true,
