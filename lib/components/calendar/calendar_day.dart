@@ -57,11 +57,18 @@ class CalendarDay extends StatelessWidget {
                       : (isToday ? Colors.blue[700] : Colors.black87),
                 ),
               ),
-              if (hasIncome || hasExpense)
-                const SizedBox(height: 2), // Spacing between day and amounts
-              if (hasIncome)
-                Text(
-                  '+' + _formatCompactCurrency(income!),
+              const SizedBox(
+                  height:
+                      2), // Spacing between day and amounts, now unconditional
+              Visibility(
+                visible: hasIncome,
+                maintainSize: true,
+                maintainState: true,
+                maintainAnimation: true,
+                child: Text(
+                  // Ensure income is not null before calling _formatCompactCurrency
+                  // hasIncome already checks income != null
+                  hasIncome ? '+' + _formatCompactCurrency(income!) : '',
                   style: const TextStyle(
                     color: Colors.green,
                     fontSize: 9,
@@ -69,9 +76,16 @@ class CalendarDay extends StatelessWidget {
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-              if (hasExpense)
-                Text(
-                  '-' + _formatCompactCurrency(expense!),
+              ),
+              Visibility(
+                visible: hasExpense,
+                maintainSize: true,
+                maintainState: true,
+                maintainAnimation: true,
+                child: Text(
+                  // Ensure expense is not null before calling _formatCompactCurrency
+                  // hasExpense already checks expense != null
+                  hasExpense ? '-' + _formatCompactCurrency(expense!) : '',
                   style: const TextStyle(
                     color: Colors.red,
                     fontSize: 9,
@@ -79,10 +93,8 @@ class CalendarDay extends StatelessWidget {
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-              // Spacer to push content up if only one of income/expense is present
-              if ((hasIncome && !hasExpense) || (!hasIncome && hasExpense))
-                const SizedBox(
-                    height: 10.5), // Height of one text line + padding
+              ),
+              // Removed conditional SizedBox for balancing single income/expense
 
               // Indicator for 'today' - a small dot below everything if not selected
               if (isToday && !isSelected)
