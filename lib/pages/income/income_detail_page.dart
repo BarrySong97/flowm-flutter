@@ -8,6 +8,11 @@ import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
+import 'package:flowm/components/common/transaction_list_item.dart';
+import 'package:flowm/components/common/time_range_selector.dart';
+import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/db/dao/transaction_dao.dart';
+import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:intl/intl.dart'; // For currency formatting
 
 /// 当前选中的月份提供者
@@ -332,13 +337,297 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                           ],
                         )),
 
-                    // Add a title for the accounts section
+                    // 添加交易列表
+                    AccountTransactionList(
+                      account: widget.account,
+                      startDate: DateTime(currentSelectedMonth.year,
+                          currentSelectedMonth.month, 1),
+                      endDate: DateTime(currentSelectedMonth.year,
+                          currentSelectedMonth.month + 1, 0),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// 账户交易列表组件
+class AccountTransactionList extends ConsumerWidget {
+  final AccountExpenseNode account;
+  final DateTime startDate;
+  final DateTime endDate;
+
+  const AccountTransactionList({
+    Key? key,
+    required this.account,
+    required this.startDate,
+    required this.endDate,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transactionsAsync = ref.watch(accountIncomeTransactionsProvider((
+      accountId: account.accountData.accountId,
+      startDate: startDate,
+      endDate: endDate,
+    )));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 16, left: 16, bottom: 0),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.receipt_long,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '相关交易',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          transactionsAsync.when(
+            data: (transactions) {
+              if (transactions.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_outlined,
+                          color: Colors.grey.shade400,
+                          size: 48,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          '暂无交易记录',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '该时间段内没有相关交易',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // 按日期分组交易
+              final groupedTransactions =
+                  <DateTime, List<TransactionWithAmount>>{};
+              for (var transactionWithAmount in transactions) {
+                final transactionDate = DateTime(
+                  transactionWithAmount.transaction.transactionDate.year,
+                  transactionWithAmount.transaction.transactionDate.month,
+                  transactionWithAmount.transaction.transactionDate.day,
+                );
+                if (groupedTransactions.containsKey(transactionDate)) {
+                  groupedTransactions[transactionDate]!
+                      .add(transactionWithAmount);
+                } else {
+                  groupedTransactions[transactionDate] = [
+                    transactionWithAmount
+                  ];
+                }
+              }
+
+              // 按日期降序排列
+              final sortedDates = groupedTransactions.keys.toList()
+                ..sort((a, b) => b.compareTo(a));
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(top: 0),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
+                itemCount: sortedDates.length,
+                itemBuilder: (context, dateIndex) {
+                  final date = sortedDates[dateIndex];
+                  final transactionsOnDate = groupedTransactions[date]!;
+                  final formattedDate =
+                      DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN').format(date);
+
+                  // 计算当日收支总额
+                  double dailyIn = 0.0;
+                  double dailyOut = 0.0;
+
+                  for (var twa in transactionsOnDate) {
+                    if (twa.nature == TransactionNature.INFLOW) {
+                      dailyIn += twa.amount.abs();
+                    } else if (twa.nature == TransactionNature.OUTFLOW) {
+                      dailyOut += twa.amount.abs();
+                    }
+                  }
+
+                  final formatter =
+                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formattedDailyIn = formatter.format(dailyIn);
+                  final formattedDailyOut = formatter.format(dailyOut);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            left: 16, right: 16, top: 12, bottom: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              formattedDate,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  '出 $formattedDailyOut',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '入 $formattedDailyIn',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: transactionsOnDate.length,
+                        itemBuilder: (context, transactionIndex) {
+                          final transactionWithAmount =
+                              transactionsOnDate[transactionIndex];
+                          final transaction = transactionWithAmount.transaction;
+
+                          // 判断是否为收入
+                          final bool isIncome = transactionWithAmount.nature ==
+                              TransactionNature.INFLOW;
+
+                          final formatter = NumberFormat.currency(
+                              locale: 'zh_CN', symbol: '¥');
+                          final formattedAmount = formatter
+                              .format(transactionWithAmount.amount.abs());
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 0, vertical: 0),
+                            child: TransactionListItem(
+                              title: transaction.description ?? '无描述',
+                              subtitle:
+                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                              amount: formattedAmount,
+                              type: getTransactionFlowType(
+                                transactionWithAmount
+                                        .fromAccount?.accountType ??
+                                    AccountType.ASSET,
+                                transactionWithAmount.toAccount?.accountType ??
+                                    AccountType.ASSET,
+                              ),
+                              statusColor: isIncome
+                                  ? const Color(0xFF34C759) // 绿色表示收入
+                                  : const Color(0xFF007AFF), // 蓝色表示支出
+                              isExpense: !isIncome,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (error, stack) => Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.grey.shade400,
+                      size: 48,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '加载失败',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '$error',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

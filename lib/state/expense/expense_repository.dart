@@ -6,6 +6,8 @@ import '../../components/chart/barchart.dart' as barchart;
 import '../database/database_provider.dart';
 import '../../db/tables/account_table.dart';
 import '../../models/account_expense_node.dart';
+import '../../components/common/time_range_selector.dart';
+import '../../db/dao/transaction_dao.dart';
 
 /// 支出仓库提供者
 final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
@@ -320,4 +322,53 @@ class ExpenseRepository {
       return 0.0;
     }
   }
+
+  /// 监听指定账户在指定时间范围内的交易记录
+  Stream<List<TransactionWithAmount>> watchAccountTransactions({
+    required int accountId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    return _postingDao.db.transactionDao.watchTransactionsByAccountAndDateRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  /// 根据TimeRange获取开始日期
+  DateTime _getStartDateFromTimeRange(TimeRange timeRange) {
+    final now = DateTime.now();
+    switch (timeRange) {
+      case TimeRange.thisMonth:
+        return DateTime(now.year, now.month, 1);
+      case TimeRange.this3Months:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.this90Days:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.thisYear:
+        return DateTime(now.year, 1, 1);
+      case TimeRange.all:
+        return DateTime(now.year - 10, 1, 1); // 默认返回10年前
+      default:
+        return now.subtract(Duration(days: 30));
+    }
+  }
+
+  /// 根据TimeRange获取结束日期
+  DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
+    return DateTime.now();
+  }
 }
+
+/// 监听账户交易的Provider
+final accountExpenseTransactionsProvider = StreamProvider.family<
+    List<TransactionWithAmount>,
+    ({int accountId, DateTime startDate, DateTime endDate})>((ref, params) {
+  final expenseRepository = ref.watch(expenseRepositoryProvider);
+  return expenseRepository.watchAccountTransactions(
+    accountId: params.accountId,
+    startDate: params.startDate,
+    endDate: params.endDate,
+  );
+});

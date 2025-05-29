@@ -394,6 +394,20 @@ class _TopAssetsAccountDetailPageState
                         accountsWithPercentage.length, // Use the new list
                     itemBuilder: (context, index) {
                       return AccountRow(
+                          onTap: (account) {
+                            // 实现和treemap相同的导航逻辑
+                            bool hasChildren = account.children != null &&
+                                account.children!.isNotEmpty;
+                            if (hasChildren) {
+                              GoRouter.of(context).pushNamed(
+                                  'topLiabilitiesAccountDetail',
+                                  extra: {'account': account});
+                            } else {
+                              GoRouter.of(context).pushNamed(
+                                  'liabilitiesDetail', // Navigate to assetsDetail if no children
+                                  extra: {'account': account});
+                            }
+                          },
                           account: accountsWithPercentage[index],
                           percentage: accountsWithPercentage[index].percentage,
                           showCurrencySymbolInAmount:
