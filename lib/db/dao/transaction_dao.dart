@@ -38,13 +38,24 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
           .getSingleOrNull();
 
   // Watch all transactions (reactive stream)
-  Stream<List<Transaction>> watchAllTransactions({int? ledgerId}) {
+  Stream<List<Transaction>> watchAllTransactions({int? ledgerId, int? limit}) {
+    print('watchAllTransactions: $ledgerId, $limit');
     if (ledgerId == null) {
-      return select(transactions).watch();
+      var query = select(transactions)
+        ..orderBy([
+          (t) => OrderingTerm(
+              expression: t.transactionDate, mode: OrderingMode.desc),
+          (t) =>
+              OrderingTerm(expression: t.transactionId, mode: OrderingMode.desc)
+        ]);
+      if (limit != null && limit > 0) {
+        query = query..limit(limit);
+      }
+      return query.watch();
     } else {
       // If ledgerId is provided, we need to find transactions
       // associated with accounts under that ledger.
-      final query = select(transactions).join([
+      var queryBuilder = select(transactions).join([
         innerJoin(
           db.postings,
           db.postings.transactionId.equalsExp(transactions.transactionId),
@@ -57,17 +68,23 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
         ..where(db.accounts.ledgerId.equals(ledgerId))
         ..groupBy([
           transactions.transactionId
-        ]); // Use groupBy to ensure distinct transactions
+        ]) // Use groupBy to ensure distinct transactions
+        ..orderBy([
+          OrderingTerm(
+              expression: transactions.transactionDate,
+              mode: OrderingMode.desc),
+          OrderingTerm(
+              expression: transactions.transactionId, mode: OrderingMode.desc)
+        ]);
 
-      return query.watch().map((rows) {
-        // Map rows to distinct transactions
-        final transactionSet = <Transaction>{};
-        for (final row in rows) {
-          transactionSet.add(row.readTable(transactions));
-        }
-        return transactionSet.toList()
-          ..sort((a, b) => b.transactionDate
-              .compareTo(a.transactionDate)); // Optional: maintain order
+      if (limit != null && limit > 0) {
+        queryBuilder = queryBuilder..limit(limit);
+      }
+
+      return queryBuilder.watch().map((typedResults) {
+        // The typedResults are already ordered, limited, and represent distinct transactions
+        // due to groupBy and orderBy/limit on the query.
+        return typedResults.map((row) => row.readTable(transactions)).toList();
       });
     }
   }
@@ -154,68 +171,147 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
 
   // Watch transactions with amount and pagination
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(
-      {required int limit, required int offset}) {
-    final paginatedTransactionsQuery = select(transactions)
-      ..orderBy([
-        (t) => OrderingTerm(
-            expression: t.transactionDate, mode: OrderingMode.desc),
-        (t) =>
-            OrderingTerm(expression: t.transactionId, mode: OrderingMode.desc),
+      {required int limit, required int offset, int? ledgerId}) {
+    //日志 ledgerId
+    print(
+        'watchTransactionsWithAmountPaginated: ledgerId: $ledgerId, limit: $limit, offset: $offset');
+
+    if (ledgerId != null) {
+      // If ledgerId is provided, filter transactions by accounts under that ledger.
+      final queryBuilder = select(transactions).join([
+        innerJoin(
+          db.postings,
+          db.postings.transactionId.equalsExp(transactions.transactionId),
+        ),
+        innerJoin(
+          db.accounts,
+          db.accounts.accountId.equalsExp(db.postings.accountId),
+        ),
       ])
-      ..limit(limit, offset: offset);
-
-    return paginatedTransactionsQuery
-        .watch()
-        .asyncMap((paginatedTransactionsList) async {
-      if (paginatedTransactionsList.isEmpty) {
-        return <TransactionWithAmount>[];
-      }
-
-      final resultList = <TransactionWithAmount>[];
-
-      for (final transaction in paginatedTransactionsList) {
-        final postingsQuery = select(db.postings).join([
-          innerJoin(db.accounts,
-              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ..where(db.accounts.ledgerId.equals(ledgerId))
+        ..groupBy([transactions.transactionId]) // Ensure distinct transactions
+        ..orderBy([
+          OrderingTerm(
+              expression: transactions.transactionDate,
+              mode: OrderingMode.desc),
+          OrderingTerm(
+              expression: transactions.transactionId, mode: OrderingMode.desc)
         ])
-          ..where(db.postings.transactionId.equals(transaction.transactionId));
+        ..limit(limit, offset: offset);
 
-        final postingsWithAccounts = await postingsQuery.get();
+      return queryBuilder.watch().asyncMap((typedResults) async {
+        final paginatedTransactionsList =
+            typedResults.map((row) => row.readTable(transactions)).toList();
 
-        Account? fromAccountObj;
-        Account? toAccountObj;
-        double transactionAmount = 0;
-
-        if (postingsWithAccounts.isNotEmpty) {
-          final firstPosting =
-              postingsWithAccounts.first.readTable(db.postings);
-          transactionAmount = firstPosting.amount.abs();
+        if (paginatedTransactionsList.isEmpty) {
+          return <TransactionWithAmount>[];
         }
+        final resultList = <TransactionWithAmount>[];
+        for (final transaction in paginatedTransactionsList) {
+          final postingsQuery = select(db.postings).join([
+            innerJoin(db.accounts,
+                db.accounts.accountId.equalsExp(db.postings.accountId)),
+          ])
+            ..where(
+                db.postings.transactionId.equals(transaction.transactionId));
 
-        for (final rowData in postingsWithAccounts) {
-          final posting = rowData.readTable(db.postings);
-          final account = rowData.readTable(db.accounts);
-          if (posting.amount < 0) {
-            fromAccountObj = account;
-          } else if (posting.amount > 0) {
-            toAccountObj = account;
+          final postingsWithAccounts = await postingsQuery.get();
+          Account? fromAccountObj;
+          Account? toAccountObj;
+          double transactionAmount = 0;
+
+          if (postingsWithAccounts.isNotEmpty) {
+            final firstPosting =
+                postingsWithAccounts.first.readTable(db.postings);
+            transactionAmount = firstPosting.amount.abs();
           }
+
+          for (final rowData in postingsWithAccounts) {
+            final posting = rowData.readTable(db.postings);
+            final account = rowData.readTable(db.accounts);
+            if (posting.amount < 0) {
+              fromAccountObj = account;
+            } else if (posting.amount > 0) {
+              toAccountObj = account;
+            }
+          }
+          final nature = getTransactionNature(
+              fromAccountObj?.accountType, toAccountObj?.accountType);
+          resultList.add(TransactionWithAmount(
+            transaction: transaction,
+            amount: transactionAmount,
+            fromAccount: fromAccountObj,
+            toAccount: toAccountObj,
+            nature: nature,
+          ));
+        }
+        return resultList;
+      });
+    } else {
+      // This part is executed only if ledgerId is null
+      final paginatedTransactionsQuery = select(transactions)
+        ..orderBy([
+          (t) => OrderingTerm(
+              expression: t.transactionDate, mode: OrderingMode.desc),
+          (t) => OrderingTerm(
+              expression: t.transactionId, mode: OrderingMode.desc),
+        ])
+        ..limit(limit, offset: offset);
+
+      return paginatedTransactionsQuery
+          .watch()
+          .asyncMap((paginatedTransactionsList) async {
+        if (paginatedTransactionsList.isEmpty) {
+          return <TransactionWithAmount>[];
         }
 
-        // Determine transaction nature
-        final nature = getTransactionNature(
-            fromAccountObj?.accountType, toAccountObj?.accountType);
+        final resultList = <TransactionWithAmount>[];
 
-        resultList.add(TransactionWithAmount(
-          transaction: transaction,
-          amount: transactionAmount,
-          fromAccount: fromAccountObj,
-          toAccount: toAccountObj,
-          nature: nature,
-        ));
-      }
-      return resultList;
-    });
+        for (final transaction in paginatedTransactionsList) {
+          final postingsQuery = select(db.postings).join([
+            innerJoin(db.accounts,
+                db.accounts.accountId.equalsExp(db.postings.accountId)),
+          ])
+            ..where(
+                db.postings.transactionId.equals(transaction.transactionId));
+
+          final postingsWithAccounts = await postingsQuery.get();
+
+          Account? fromAccountObj;
+          Account? toAccountObj;
+          double transactionAmount = 0;
+
+          if (postingsWithAccounts.isNotEmpty) {
+            final firstPosting =
+                postingsWithAccounts.first.readTable(db.postings);
+            transactionAmount = firstPosting.amount.abs();
+          }
+
+          for (final rowData in postingsWithAccounts) {
+            final posting = rowData.readTable(db.postings);
+            final account = rowData.readTable(db.accounts);
+            if (posting.amount < 0) {
+              fromAccountObj = account;
+            } else if (posting.amount > 0) {
+              toAccountObj = account;
+            }
+          }
+
+          // Determine transaction nature
+          final nature = getTransactionNature(
+              fromAccountObj?.accountType, toAccountObj?.accountType);
+
+          resultList.add(TransactionWithAmount(
+            transaction: transaction,
+            amount: transactionAmount,
+            fromAccount: fromAccountObj,
+            toAccount: toAccountObj,
+            nature: nature,
+          ));
+        }
+        return resultList;
+      });
+    }
   }
 
   // Watch transactions with amount by day
@@ -313,7 +409,21 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
 
   // Watch transactions with amount by date range
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDateRange(
-      DateTime startDate, DateTime endDate) {
+      DateTime startDate, DateTime endDate, int? ledgerId) {
+    if (ledgerId == null) {
+      return Stream.value([]);
+    }
+
+    // Subquery to get transaction_ids that are associated with the given ledgerId
+    final transactionIdsInLedgerSubquery = selectOnly(db.postings,
+        distinct: true)
+      ..addColumns([db.postings.transactionId])
+      ..join([
+        innerJoin(
+            db.accounts, db.accounts.accountId.equalsExp(db.postings.accountId))
+      ])
+      ..where(db.accounts.ledgerId.equals(ledgerId));
+
     final query = select(transactions).join([
       // Left join postings, as a transaction might not have postings (though unlikely in a valid system)
       leftOuterJoin(db.postings,
@@ -322,7 +432,8 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       leftOuterJoin(
           db.accounts, db.accounts.accountId.equalsExp(db.postings.accountId)),
     ])
-      ..where(transactions.transactionDate.isBetweenValues(startDate, endDate))
+      ..where(transactions.transactionDate.isBetweenValues(startDate, endDate) &
+          transactions.transactionId.isInQuery(transactionIdsInLedgerSubquery))
       ..orderBy([
         OrderingTerm(
             expression: transactions.transactionDate, mode: OrderingMode.desc),
@@ -506,102 +617,66 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   // 新的优化版本
   Stream<List<TransactionWithAmount>> watchLatestTransactionsByLedgerId(
       int ledgerId, int limit) {
-    return customSelect(
-      '''
-      WITH RankedTransactions AS (
-        SELECT DISTINCT 
-          t.*,
-          p.amount,
-          a.account_id,
-          a.account_name,
-          a.account_type,
-          ROW_NUMBER() OVER (PARTITION BY t.transaction_id ORDER BY 
-            CASE WHEN p.amount < 0 THEN 1 ELSE 2 END) as row_num
-        FROM transactions t
-        INNER JOIN postings p ON t.transaction_id = p.transaction_id
-        INNER JOIN accounts a ON p.account_id = a.account_id
-        WHERE a.ledger_id = ?
-      )
-      SELECT 
-        t1.transaction_id,
-        t1.transaction_date,
-        t1.description,
-        t1.is_recurring,
-        ABS(t1.amount) as transaction_amount,
-        t1.account_id as from_account_id,
-        t1.account_name as from_account_name,
-        t1.account_type as from_account_type,
-        t2.account_id as to_account_id,
-        t2.account_name as to_account_name,
-        t2.account_type as to_account_type
-      FROM RankedTransactions t1
-      LEFT JOIN RankedTransactions t2 ON 
-        t1.transaction_id = t2.transaction_id AND t2.row_num = 2
-      WHERE t1.row_num = 1
-      ORDER BY t1.transaction_date DESC, t1.transaction_id DESC
-      LIMIT ?
-      ''',
-      variables: [
-        Variable.withInt(ledgerId),
-        Variable.withInt(limit),
-      ],
-      readsFrom: {transactions, postings, accounts},
-    ).watch().map((rows) {
-      return rows.map((row) {
-        final fromAccount = Account(
-          accountId: row.read<int>('from_account_id'),
-          accountName: row.read<String>('from_account_name'),
-          accountType: AccountType.values.firstWhere(
-            (type) =>
-                type.toString().split('.').last ==
-                row.read<String>('from_account_type'),
-            orElse: () => AccountType.ASSET,
-          ),
-          ledgerId: ledgerId,
-          fullPath:
-              row.read<String>('from_account_name'), // 使用账户名作为临时的 fullPath
-          isActive: true,
-          createdAt: DateTime.now(),
-          parentAccountId: null,
-        );
+    print('watchLatestTransactionsByLedgerId: $ledgerId, $limit');
+    // Call watchAllTransactions, which now handles ordering and limiting at the DB level
+    return watchAllTransactions(ledgerId: ledgerId, limit: limit)
+        // The .map((transactionsList) => transactionsList.take(limit).toList()) is now removed
+        .asyncMap((latestTransactionsList) async {
+      // latestTransactionsList is already correctly ordered and limited
+      if (latestTransactionsList.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+      for (final transaction in latestTransactionsList) {
+        print('Transaction ID: ${transaction.transactionId}');
+        print('Transaction Date: ${transaction.transactionDate}');
+        print('Transaction Description: ${transaction.description}');
+        print('Is Recurring: ${transaction.isRecurring}');
+        print('---');
+      }
 
-        final toAccount = Account(
-          accountId: row.read<int>('to_account_id'),
-          accountName: row.read<String>('to_account_name'),
-          accountType: AccountType.values.firstWhere(
-            (type) =>
-                type.toString().split('.').last ==
-                row.read<String>('to_account_type'),
-            orElse: () => AccountType.ASSET,
-          ),
-          ledgerId: ledgerId,
-          fullPath: row.read<String>('to_account_name'), // 使用账户名作为临时的 fullPath
-          isActive: true,
-          createdAt: DateTime.now(),
-          parentAccountId: null,
-        );
+      final resultList = <TransactionWithAmount>[];
 
-        final transaction = Transaction(
-          transactionId: row.read<int>('transaction_id'),
-          transactionDate: row.read<DateTime>('transaction_date'),
-          description: row.readNullable<String>('description'),
-          isRecurring: row.read<bool>('is_recurring'),
-          createdAt: row.readNullable<DateTime>('created_at') ?? DateTime.now(),
-        );
+      for (final transaction in latestTransactionsList) {
+        final postingsQuery = select(db.postings).join([
+          innerJoin(db.accounts,
+              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ])
+          ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+        final postingsWithAccounts = await postingsQuery.get();
+
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+
+        if (postingsWithAccounts.isNotEmpty) {
+          final firstPosting =
+              postingsWithAccounts.first.readTable(db.postings);
+          transactionAmount = firstPosting.amount.abs();
+
+          for (final rowData in postingsWithAccounts) {
+            final posting = rowData.readTable(db.postings);
+            final account = rowData.readTable(db.accounts);
+            if (posting.amount < 0) {
+              fromAccountObj = account;
+            } else if (posting.amount > 0) {
+              toAccountObj = account;
+            }
+          }
+        }
 
         final nature = getTransactionNature(
-          fromAccount.accountType,
-          toAccount.accountType,
-        );
+            fromAccountObj?.accountType, toAccountObj?.accountType);
 
-        return TransactionWithAmount(
+        resultList.add(TransactionWithAmount(
           transaction: transaction,
-          amount: row.read<double>('transaction_amount'),
-          fromAccount: fromAccount,
-          toAccount: toAccount,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
           nature: nature,
-        );
-      }).toList();
+        ));
+      }
+      return resultList;
     });
   }
 

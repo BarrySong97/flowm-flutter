@@ -140,9 +140,9 @@ class TransactionRepository {
 
   /// 获取分页的交易记录 (TransactionWithAmount)
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(
-          {required int limit, required int offset}) =>
+          {required int limit, required int offset, int? ledgerId}) =>
       _transactionDao.watchTransactionsWithAmountPaginated(
-          limit: limit, offset: offset);
+          limit: limit, offset: offset, ledgerId: ledgerId);
 
   /// 获取某一天交易
   Stream<List<TransactionWithAmount>> watchTransactionsByDay(DateTime day) =>
@@ -150,7 +150,7 @@ class TransactionRepository {
 
   /// 根据时间范围监听交易 (TransactionWithAmount)
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDateRange(
-          DateTime startDate, DateTime endDate) =>
+          DateTime startDate, DateTime endDate, int? ledgerId) =>
       _transactionDao.watchTransactionsWithAmountByDateRange(
-          startDate, endDate);
+          startDate, endDate, ledgerId);
 }

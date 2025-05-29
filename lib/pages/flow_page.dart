@@ -1,4 +1,5 @@
 import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,10 +54,12 @@ class _FlowPageState extends ConsumerState<FlowPage> {
 
     try {
       final repository = ref.read(transactionRepositoryProvider);
+      final ledgerId = ref.read(selectedLedgerProvider).value?.ledgerId;
       final newTransactionsStream =
           repository.watchTransactionsWithAmountPaginated(
         limit: _perPage,
         offset: _currentPage * _perPage,
+        ledgerId: ledgerId,
       );
 
       // Listen to the stream once for the current batch of data

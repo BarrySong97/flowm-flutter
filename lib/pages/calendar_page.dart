@@ -1,3 +1,4 @@
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -18,6 +19,7 @@ final monthlyCalendarSummaryProvider = StreamProvider.autoDispose
         (ref, dayForMonth) {
   final transactionRepository = ref.watch(transactionRepositoryProvider);
 
+  final ledgerId = ref.read(selectedLedgerProvider).value?.ledgerId;
   final firstDayOfMonth = DateTime(dayForMonth.year, dayForMonth.month, 1);
   final lastDayOfMonth = (dayForMonth.month < 12)
       ? DateTime(dayForMonth.year, dayForMonth.month + 1, 0, 23, 59, 59)
@@ -28,7 +30,8 @@ final monthlyCalendarSummaryProvider = StreamProvider.autoDispose
   // Let's call it watchTransactionsWithAmountByDateRange for this example.
   // This method needs to be implemented in TransactionRepository.
   return transactionRepository
-      .watchTransactionsWithAmountByDateRange(firstDayOfMonth, lastDayOfMonth)
+      .watchTransactionsWithAmountByDateRange(
+          firstDayOfMonth, lastDayOfMonth, ledgerId)
       .map((transactionsWithAmount) {
     final Map<int, ({double income, double expenses})> monthlySummary = {};
     if (transactionsWithAmount.isEmpty) {
