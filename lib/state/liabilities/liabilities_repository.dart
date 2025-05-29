@@ -1,6 +1,11 @@
+import 'package:flowm/components/common/time_range_selector.dart';
+import 'package:flowm/db/dao/transaction_dao.dart';
+import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
+import 'package:sankey_flutter/sankey_link.dart';
+import 'package:sankey_flutter/sankey_node.dart';
 import '../../db/app_database.dart';
 import '../../db/dao/account_dao.dart';
 import '../../db/tables/account_table.dart';
@@ -11,6 +16,16 @@ import '../ledger/ledger_repository.dart';
 // StateProvider for the selected date range string
 final selectedDateRangeProvider =
     StateProvider<String>((ref) => 'month'); // Default to 'month'
+
+final liabilitiesAccountTransactionsProvider = StreamProvider.family<
+    List<TransactionWithAmount>,
+    ({int accountId, TimeRange timeRange})>((ref, params) {
+  final liabilitiesRepository = ref.watch(liabilitiesRepositoryProvider);
+  return liabilitiesRepository.watchAccountTransactions(
+    accountId: params.accountId,
+    timeRange: params.timeRange,
+  );
+});
 
 /// 顶级负债账户提供者，缓存获取的负债账户数据
 final topLiabilityAccountsProvider =
@@ -52,6 +67,49 @@ final yearlyLiabilityTrendProvider =
       ledgerId: selectedLedger.ledgerId);
 });
 
+final liabilityTrendProviderByTimeRange = FutureProvider.family<
+    List<LiabilityHistoryData>,
+    ({int? accountId, TimeRange timeRange})>((ref, params) async {
+  final repository = ref.watch(liabilitiesRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  DateTime endDate = DateTime.now();
+  DateTime startDate;
+
+  switch (params.timeRange) {
+    case TimeRange.all:
+      // 获取所有历史数据，从一年前开始
+      startDate = DateTime(endDate.year - 1, endDate.month, endDate.day);
+      break;
+    case TimeRange.thisYear:
+      startDate = DateTime(endDate.year, 1, 1);
+      break;
+    case TimeRange.this3Months:
+      startDate = DateTime(endDate.year, endDate.month - 3, endDate.day);
+      if (startDate.isAfter(endDate)) {
+        startDate = DateTime(endDate.year - 1, endDate.month + 9, endDate.day);
+      }
+      break;
+    case TimeRange.this90Days:
+      startDate = endDate.subtract(const Duration(days: 89));
+      break;
+    case TimeRange.thisMonth:
+    default:
+      startDate = DateTime(endDate.year, endDate.month, 1);
+      break;
+  }
+
+  return repository.getLiabilityHistoryByTimeRange(
+    startDate,
+    endDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: params.accountId,
+  );
+});
 // 基于日期范围的负债趋势提供者
 final liabilityTrendProviderByDateRange =
     FutureProvider.family<List<LiabilityHistoryData>, int?>(
@@ -97,14 +155,52 @@ final liabilityTrendProviderByDateRange =
 /// 负债仓库提供者，用于封装负债相关的数据库操作
 final liabilitiesRepositoryProvider = Provider<LiabilitiesRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
-  return LiabilitiesRepository(accountDao);
+  final transactionDao = ref.watch(transactionDaoProvider);
+  return LiabilitiesRepository(accountDao, transactionDao);
 });
 
 /// 负债仓库类
 class LiabilitiesRepository {
   final AccountDao _accountDao;
+  final TransactionDao _transactionDao;
+  LiabilitiesRepository(this._accountDao, this._transactionDao);
 
-  LiabilitiesRepository(this._accountDao);
+  DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
+    return DateTime.now();
+  }
+
+  Stream<List<TransactionWithAmount>> watchAccountTransactions({
+    required int accountId,
+    required TimeRange timeRange,
+  }) {
+    final startDate = _getStartDateFromTimeRange(timeRange);
+    final endDate = _getEndDateFromTimeRange(timeRange);
+
+    return _transactionDao.watchTransactionsByAccountAndDateRange(
+      accountId: accountId,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  /// 根据TimeRange获取开始日期
+  DateTime _getStartDateFromTimeRange(TimeRange timeRange) {
+    final now = DateTime.now();
+    switch (timeRange) {
+      case TimeRange.thisMonth:
+        return DateTime(now.year, now.month, 1);
+      case TimeRange.this3Months:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.this90Days:
+        return now.subtract(Duration(days: 90));
+      case TimeRange.thisYear:
+        return DateTime(now.year, 1, 1);
+      case TimeRange.all:
+        return DateTime(now.year - 10, 1, 1); // 默认返回10年前
+      default:
+        return now.subtract(Duration(days: 30));
+    }
+  }
 
   /// 获取UI展示所需的负债账户树
   Future<List<account_ui.Account>> getLiabilitiesAccountTree(
@@ -388,6 +484,431 @@ class LiabilitiesRepository {
       print('[LiabilitiesRepository] Stacktrace: $s');
       return [];
     }
+  }
+
+  /// 获取指定账户的资产流转数据并转换为 Sankey 图表格式
+  ///
+  /// [accountId] 目标账户ID
+  /// [flow] 流转方向，'in' 表示流入，'out' 表示流出
+  /// [limit] 限制返回的交易数量，默认为100
+  /// [startDate] 开始日期
+  /// [endDate] 结束日期
+  Future<SankeyChartData> getAccountFlowForSankey({
+    required int accountId,
+    required String flow, // 'in' | 'out'
+    int limit = 100,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    // 获取目标账户信息
+    final targetAccount = await _accountDao.getAccountById(accountId);
+    if (targetAccount == null) {
+      return SankeyChartData(nodes: [], links: []);
+    }
+
+    // 获取相关的资产流转数据
+    final flows = await _getAssetFlows(
+      accountId: accountId,
+      flow: flow,
+      limit: limit,
+      startDate: startDate,
+      endDate: endDate,
+    );
+
+    // 转换为 Sankey 图表数据
+    return await _convertToSankeyData(flows, targetAccount, flow);
+  }
+
+  /// 获取资产流转数据
+  Future<List<AssetFlow>> _getAssetFlows({
+    required int accountId,
+    required String flow,
+    int limit = 100,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    String dateFilter = '';
+    List<Variable> variables = [Variable.withInt(accountId)];
+
+    if (startDate != null && endDate != null) {
+      dateFilter = ' AND t.transaction_date BETWEEN ? AND ?';
+      variables.addAll([
+        Variable.withDateTime(startDate),
+        Variable.withDateTime(endDate),
+      ]);
+    }
+
+    String query;
+    if (flow == 'in') {
+      // 查询流入：目标账户作为借方（正数金额）
+      query = '''
+        SELECT 
+          p1.posting_id as source_posting_id,
+          p1.account_id as source_account_id,
+          a1.account_name as source_account_name,
+          a1.account_type as source_account_type,
+          a1.parent_account_id as source_parent_account_id,
+          a1.full_path as source_full_path,
+          p2.posting_id as target_posting_id,
+          p2.account_id as target_account_id,
+          a2.account_name as target_account_name,
+          a2.account_type as target_account_type,
+          a2.parent_account_id as target_parent_account_id,
+          a2.full_path as target_full_path,
+          ABS(p2.amount) as amount,
+          t.transaction_date,
+          t.description
+        FROM postings p1
+        JOIN transactions t ON p1.transaction_id = t.transaction_id
+        JOIN postings p2 ON p1.transaction_id = p2.transaction_id
+        JOIN accounts a1 ON p1.account_id = a1.account_id
+        JOIN accounts a2 ON p2.account_id = a2.account_id
+        WHERE p2.account_id = ? 
+          AND p2.amount > 0 
+          AND p1.amount < 0
+          AND p1.account_id != p2.account_id
+          $dateFilter
+        ORDER BY t.transaction_date DESC
+        LIMIT $limit
+      ''';
+    } else {
+      // 查询流出：目标账户作为贷方（负数金额）
+      query = '''
+        SELECT 
+          p1.posting_id as source_posting_id,
+          p1.account_id as source_account_id,
+          a1.account_name as source_account_name,
+          a1.account_type as source_account_type,
+          a1.parent_account_id as source_parent_account_id,
+          a1.full_path as source_full_path,
+          p2.posting_id as target_posting_id,
+          p2.account_id as target_account_id,
+          a2.account_name as target_account_name,
+          a2.account_type as target_account_type,
+          a2.parent_account_id as target_parent_account_id,
+          a2.full_path as target_full_path,
+          ABS(p1.amount) as amount,
+          t.transaction_date,
+          t.description
+        FROM postings p1
+        JOIN transactions t ON p1.transaction_id = t.transaction_id
+        JOIN postings p2 ON p1.transaction_id = p2.transaction_id
+        JOIN accounts a1 ON p1.account_id = a1.account_id
+        JOIN accounts a2 ON p2.account_id = a2.account_id
+        WHERE p1.account_id = ? 
+          AND p1.amount < 0 
+          AND p2.amount > 0
+          AND p1.account_id != p2.account_id
+          $dateFilter
+        ORDER BY t.transaction_date DESC
+        LIMIT $limit
+      ''';
+    }
+
+    final results =
+        await _accountDao.customSelect(query, variables: variables).get();
+
+    return results.map((row) {
+      final sourceAccount = Account(
+        accountId: row.read<int>('source_account_id'),
+        ledgerId: 0, // 这里可以根据需要优化
+        parentAccountId: row.read<int?>('source_parent_account_id'),
+        accountName: row.read<String>('source_account_name'),
+        fullPath: row.read<String>('source_full_path'),
+        accountType: AccountType.values.firstWhere(
+          (e) => e.name == row.read<String>('source_account_type'),
+        ),
+        isActive: true,
+        createdAt: DateTime.now(),
+      );
+
+      final targetAccount = Account(
+        accountId: row.read<int>('target_account_id'),
+        ledgerId: 0,
+        parentAccountId: row.read<int?>('target_parent_account_id'),
+        accountName: row.read<String>('target_account_name'),
+        fullPath: row.read<String>('target_full_path'),
+        accountType: AccountType.values.firstWhere(
+          (e) => e.name == row.read<String>('target_account_type'),
+        ),
+        isActive: true,
+        createdAt: DateTime.now(),
+      );
+
+      return AssetFlow(
+        fromAccount: sourceAccount,
+        toAccount: targetAccount,
+        amount: row.read<double>('amount'),
+        transactionDate: row.read<DateTime>('transaction_date'),
+        description: row.read<String?>('description'),
+      );
+    }).toList();
+  }
+
+  List<int> _getAccountPath(int accountId, Map<int, Account> accountMap) {
+    final List<int> path = [];
+    int? currentId = accountId;
+
+    while (currentId != null) {
+      path.add(currentId);
+      final account = accountMap[currentId];
+      currentId = account?.parentAccountId;
+    }
+
+    return path;
+  }
+
+  List<HierarchicalLink> _createHierarchicalLinks(
+    List<AssetFlow> flows,
+    Map<int, Account> accountMap,
+    int targetAccountId,
+    String flow,
+  ) {
+    final List<HierarchicalLink> links = [];
+
+    for (final assetFlow in flows) {
+      if (flow == 'in') {
+        // 流入：其他账户 -> 层级 -> 目标账户
+        final sourceAccount = assetFlow.fromAccount;
+        final amount = assetFlow.amount;
+
+        // 创建从源账户到其父级账户的链接（如果有父级）
+        int currentAccountId = sourceAccount.accountId;
+        double currentAmount = amount;
+
+        while (true) {
+          final currentAccount = accountMap[currentAccountId];
+          if (currentAccount?.parentAccountId != null) {
+            // 子级 -> 父级
+            links.add(HierarchicalLink(
+              sourceId: currentAccountId,
+              targetId: currentAccount!.parentAccountId!,
+              amount: currentAmount,
+            ));
+            currentAccountId = currentAccount.parentAccountId!;
+          } else {
+            // 最终 -> 目标账户
+            links.add(HierarchicalLink(
+              sourceId: currentAccountId,
+              targetId: targetAccountId,
+              amount: currentAmount,
+            ));
+            break;
+          }
+        }
+      } else {
+        // 流出：目标账户 -> 层级 -> 其他账户
+        final destinationAccount = assetFlow.toAccount;
+        final amount = assetFlow.amount;
+
+        // 获取目标账户到最终账户的层级路径
+        final destinationPath =
+            _getAccountPath(destinationAccount.accountId, accountMap);
+
+        // 从目标账户开始流向最终账户的层级
+        int previousAccountId = targetAccountId;
+
+        // 反向遍历路径（从最深层级到根），创建链接
+        for (int i = destinationPath.length - 1; i >= 0; i--) {
+          final currentAccountId = destinationPath[i];
+
+          links.add(HierarchicalLink(
+            sourceId: previousAccountId,
+            targetId: currentAccountId,
+            amount: amount,
+          ));
+
+          previousAccountId = currentAccountId;
+        }
+      }
+    }
+
+    return links;
+  }
+
+  Future<void> _loadParentAccounts(
+      Set<int> accountIds, Map<int, Account> accountMap) async {
+    final parentIds = <int>{};
+
+    // 收集所有父级账户ID
+    for (final account in accountMap.values) {
+      if (account.parentAccountId != null) {
+        parentIds.add(account.parentAccountId!);
+      }
+    }
+
+    // 递归加载父级账户
+    while (parentIds.isNotEmpty) {
+      final currentBatchIds = parentIds.toList();
+      parentIds.clear();
+
+      for (final parentId in currentBatchIds) {
+        if (!accountMap.containsKey(parentId)) {
+          final parentAccount = await _accountDao.getAccountById(parentId);
+          if (parentAccount != null) {
+            accountMap[parentId] = parentAccount;
+            if (parentAccount.parentAccountId != null) {
+              parentIds.add(parentAccount.parentAccountId!);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /// 将资产流转数据转换为 Sankey 图表数据（支持层级关系）
+  Future<SankeyChartData> _convertToSankeyData(
+    List<AssetFlow> flows,
+    Account targetAccount,
+    String flow,
+  ) async {
+    print('\n=== AssetsRepository 金额计算调试 ===');
+    print(
+        '目标账户: ${targetAccount.accountName} (ID: ${targetAccount.accountId})');
+    print('流向: $flow');
+    print('原始流转数据 (${flows.length}条):');
+
+    for (int i = 0; i < flows.length; i++) {
+      final assetFlow = flows[i];
+      print(
+          '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: ¥${assetFlow.amount.toStringAsFixed(2)}');
+    }
+
+    if (flows.isEmpty) {
+      print('无流转数据');
+      return SankeyChartData(nodes: [], links: []);
+    }
+
+    // 收集所有相关的账户
+    final Set<int> allAccountIds = {};
+    final Map<int, Account> accountMap = {};
+    final Map<String, double> linkAmounts = {}; // 用于聚合相同链接的金额
+    final Map<int, double> nodeAmounts = {}; // 用于计算节点金额
+
+    // 添加目标账户
+    allAccountIds.add(targetAccount.accountId);
+    accountMap[targetAccount.accountId] = targetAccount;
+
+    // 收集所有相关账户
+    for (final assetFlow in flows) {
+      allAccountIds.add(assetFlow.fromAccount.accountId);
+      allAccountIds.add(assetFlow.toAccount.accountId);
+      accountMap[assetFlow.fromAccount.accountId] = assetFlow.fromAccount;
+      accountMap[assetFlow.toAccount.accountId] = assetFlow.toAccount;
+    }
+
+    // 获取所有父级账户
+    await _loadParentAccounts(allAccountIds, accountMap);
+
+    // 创建层级链接
+    final hierarchicalLinks = _createHierarchicalLinks(
+        flows, accountMap, targetAccount.accountId, flow);
+
+    print('\n层级链接 (${hierarchicalLinks.length}条):');
+    for (int i = 0; i < hierarchicalLinks.length; i++) {
+      final link = hierarchicalLinks[i];
+      final sourceName = accountMap[link.sourceId]?.accountName ?? 'Unknown';
+      final targetName = accountMap[link.targetId]?.accountName ?? 'Unknown';
+      print(
+          '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): ¥${link.amount.toStringAsFixed(2)}');
+    }
+
+    // 聚合相同的链接和计算节点金额
+    for (final link in hierarchicalLinks) {
+      final linkKey = '${link.sourceId}->${link.targetId}';
+      linkAmounts[linkKey] = (linkAmounts[linkKey] ?? 0) + link.amount;
+
+      // 计算节点金额
+      if (flow == 'in') {
+        // 流入场景：源账户显示流出金额
+        nodeAmounts[link.sourceId] =
+            (nodeAmounts[link.sourceId] ?? 0) + link.amount;
+      } else {
+        // 流出场景：目标账户显示流入金额
+        nodeAmounts[link.targetId] =
+            (nodeAmounts[link.targetId] ?? 0) + link.amount;
+      }
+    }
+
+    print('\n聚合后的链接:');
+    linkAmounts.forEach((linkKey, amount) {
+      final parts = linkKey.split('->');
+      final sourceId = int.parse(parts[0]);
+      final targetId = int.parse(parts[1]);
+      final sourceName = accountMap[sourceId]?.accountName ?? 'Unknown';
+      final targetName = accountMap[targetId]?.accountName ?? 'Unknown';
+      print('  $sourceName → $targetName: ¥${amount.toStringAsFixed(2)}');
+    });
+
+    // 移除为账户设置余额的逻辑，只显示实际流转金额
+
+    print('\n最终节点金额:');
+    nodeAmounts.forEach((accountId, amount) {
+      final accountName = accountMap[accountId]?.accountName ?? 'Unknown';
+      print('  $accountName: ¥${amount.toStringAsFixed(2)}');
+    });
+
+    // 创建 SankeyNode 列表，只显示实际流转金额
+    final nodes = accountMap.values.map((account) {
+      final amount = nodeAmounts[account.accountId] ?? 0.0;
+
+      // 账户名称只显示两个字
+      String accountName = account.accountName;
+      if (accountName.length > 2) {
+        accountName = accountName.substring(0, 2);
+      }
+
+      // 目标账户不显示金额，其他账户显示实际流转金额
+      String formattedAmount = '';
+      if (account.accountId != targetAccount.accountId && amount > 0) {
+        if (amount >= 1000000) {
+          // 百万级，固定两位小数
+          final millions = amount / 1000000;
+          formattedAmount = ' (¥${millions.toStringAsFixed(2)}M)';
+        } else if (amount >= 1000) {
+          // 千级，固定两位小数
+          final thousands = amount / 1000;
+          formattedAmount = ' (¥${thousands.toStringAsFixed(2)}K)';
+        } else {
+          // 小额，固定两位小数
+          formattedAmount = ' (¥${amount.toStringAsFixed(2)})';
+        }
+      }
+
+      return SankeyNode(
+        id: account.accountId,
+        label: '$accountName$formattedAmount',
+      );
+    }).toList();
+
+    // 创建节点ID到节点的映射
+    final Map<int, SankeyNode> nodeMap = {
+      for (final node in nodes) node.id: node
+    };
+
+    // 创建 SankeyLink 列表
+    final links = <SankeyLink>[];
+    linkAmounts.forEach((linkKey, amount) {
+      final parts = linkKey.split('->');
+      final sourceId = int.parse(parts[0]);
+      final targetId = int.parse(parts[1]);
+
+      final sourceNode = nodeMap[sourceId];
+      final targetNode = nodeMap[targetId];
+
+      if (sourceNode != null && targetNode != null) {
+        links.add(SankeyLink(
+          source: sourceNode,
+          target: targetNode,
+          value: amount,
+        ));
+      }
+    });
+
+    return SankeyChartData(
+      nodes: nodes,
+      links: links,
+    );
   }
 }
 
