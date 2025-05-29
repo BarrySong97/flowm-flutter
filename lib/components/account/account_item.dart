@@ -26,10 +26,12 @@ class Account {
 
 class AccountItem extends StatefulWidget {
   final Account account;
+  final void Function(Account account)? onTap; // 添加onTap回调参数
 
   const AccountItem({
     Key? key,
     required this.account,
+    this.onTap, // 可选的onTap参数
   }) : super(key: key);
 
   @override
@@ -85,20 +87,25 @@ class _AccountItemState extends State<AccountItem> {
           child: ExpansionTile(
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
-            title: accountRowWidget, // Use the new AccountRow widget
+            title: GestureDetector(
+              onDoubleTap: widget.onTap != null
+                  ? () => widget.onTap!(widget.account)
+                  : null,
+              child: accountRowWidget, // Use the new AccountRow widget
+            ),
             children: childrenWithPercentage!.map<Widget>((childAccount) {
               return Padding(
                 // Add padding for child items if desired
                 padding: const EdgeInsets.only(
                     left: 16.0, right: 16.0, bottom: 4.0, top: 0),
                 child: InkWell(
-                  onTap: () => _navigateToDetailPage(context, childAccount),
                   // Child row: always show currency symbol.
                   child: AccountRow(
                     account: childAccount,
                     percentage: childAccount.percentage,
                     showCurrencySymbolInAmount:
                         true, // Children always show currency
+                    onTap: widget.onTap,
                   ),
                 ),
               );
@@ -113,7 +120,8 @@ class _AccountItemState extends State<AccountItem> {
         elevation: 0.0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
         child: InkWell(
-          onTap: () => _navigateToDetailPage(context, widget.account),
+          onTap:
+              widget.onTap != null ? () => widget.onTap!(widget.account) : null,
           child: Padding(
             // Add padding to match ExpansionTile's content
             padding:
@@ -121,28 +129,6 @@ class _AccountItemState extends State<AccountItem> {
             child: accountRowWidget, // Use the new AccountRow widget
           ),
         ),
-      );
-    }
-  }
-
-  void _navigateToDetailPage(BuildContext context, Account account) {
-    // Determine if the account has children to decide the navigation target
-    bool hasChildren = account.children != null && account.children!.isNotEmpty;
-
-    if (hasChildren) {
-      // If account has children, it might be a summary/category type account.
-      // Navigating to 'topAssetsAccountDetail' might be more appropriate if it's designed for such accounts.
-      // Or, if 'accountDetail' is generic enough, it can be used.
-      // For now, sticking to 'accountDetail' as per original _navigateToDetailPage,
-      // but this could be a point of refinement based on page capabilities.
-      context.pushNamed(
-        'topAssetsAccountDetail', // Or consider if 'accountDetail' is always the target for any item tapped in a list
-        extra: {'account': account},
-      );
-    } else {
-      context.pushNamed(
-        'accountDetail',
-        extra: {'account': account},
       );
     }
   }

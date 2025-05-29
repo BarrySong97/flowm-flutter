@@ -372,8 +372,23 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   itemCount: accountsWithPercentage.length, // Use the new list
                   itemBuilder: (context, index) {
                     return AccountItem(
-                        account: accountsWithPercentage[
-                            index]); // Pass account with percentage
+                      account: accountsWithPercentage[
+                          index], // Pass account with percentage
+                      onTap: (account) {
+                        // 实现和treemap相同的导航逻辑
+                        bool hasChildren = account.children != null &&
+                            account.children!.isNotEmpty;
+                        if (hasChildren) {
+                          GoRouter.of(context).pushNamed(
+                              'topAssetsAccountDetail',
+                              extra: {'account': account});
+                        } else {
+                          GoRouter.of(context).pushNamed(
+                              'assetsDetail', // Navigate to assetsDetail if no children
+                              extra: {'account': account});
+                        }
+                      },
+                    );
                   },
                 );
               },
