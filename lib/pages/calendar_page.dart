@@ -142,13 +142,30 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   fontWeight: FontWeight.normal),
             ),
             const SizedBox(width: 10),
-            Container(
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedDay = DateTime.now();
+                  _focusedDay = DateTime.now();
+                  _updateSelectedDayTransactions();
+                  customFormatted1 =
+                      DateFormat('yyyy年MM月').format(DateTime.now());
+                });
+              },
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               child: const Text(
                 '今',
                 style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
+                  color: Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           ],
