@@ -69,7 +69,7 @@ final latestTransactionsProvider = StreamProvider((ref) {
 
       final transactionRepository = ref.watch(transactionRepositoryProvider);
       return transactionRepository.watchLatestTransactions(
-          ledgerId: ledger.ledgerId, limit: 10);
+          ledgerId: ledger.ledgerId, limit: 50);
     },
     loading: () => Stream.value(<TransactionWithAmount>[]),
     error: (_, __) => Stream.value(<TransactionWithAmount>[]),
