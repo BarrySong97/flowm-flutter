@@ -97,21 +97,21 @@ class CalendarDay extends StatelessWidget {
               // Removed conditional SizedBox for balancing single income/expense
 
               // Indicator for 'today' - a small dot below everything if not selected
-              if (isToday && !isSelected)
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ),
+              // if (isToday && !isSelected)
+              //   Expanded(
+              //     child: Align(
+              //       alignment: Alignment.bottomCenter,
+              //       child: Container(
+              //         width: 4,
+              //         height: 4,
+              //         margin: const EdgeInsets.only(bottom: 2),
+              //         decoration: const BoxDecoration(
+              //           color: Colors.red,
+              //           shape: BoxShape.circle,
+              //         ),
+              //       ),
+              //     ),
+              //   ),
             ],
           ),
         ));
