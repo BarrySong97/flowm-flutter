@@ -16,9 +16,13 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class _HomePageState extends ConsumerState<HomePage>
+    with AutomaticKeepAliveClientMixin {
   // 页面列表
   late final List<Widget Function()> _pageBuilders;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -41,6 +45,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用 super.build
     final pageController = ref.watch(pageControllerProvider);
     final currentIndex = ref.watch(currentPageIndexProvider);
 

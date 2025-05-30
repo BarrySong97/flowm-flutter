@@ -20,12 +20,12 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomePage(),
+  static final List<Widget> _widgetOptions = <Widget>[
+    HomePage(key: PageStorageKey('home_page')),
     CalendarPage(),
-    AddPage(),
-    FlowPage(),
-    SettingsPage(),
+    AddPage(key: PageStorageKey('add_page')),
+    FlowPage(key: PageStorageKey('flow_page')),
+    SettingsPage(key: PageStorageKey('settings_page')),
   ];
 
   void _onItemTapped(int index) {
@@ -37,8 +37,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final selectedIndex = ref.watch(mainScreenIndexProvider);
 
     return Scaffold(
-      body: Center(
-        child: _widgetOptions.elementAt(selectedIndex),
+      body: IndexedStack(
+        index: selectedIndex,
+        children: _widgetOptions,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
