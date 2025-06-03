@@ -23,9 +23,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   static final List<Widget> _widgetOptions = <Widget>[
     HomePage(key: PageStorageKey('home_page')),
     CalendarPage(),
-    AddPage(key: PageStorageKey('add_page')),
-    FlowPage(key: PageStorageKey('flow_page')),
-    SettingsPage(key: PageStorageKey('settings_page')),
+    AddPage(),
+    FlowPage(),
+    SettingsPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -37,9 +37,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final selectedIndex = ref.watch(mainScreenIndexProvider);
 
     return Scaffold(
-      body: IndexedStack(
-        index: selectedIndex,
-        children: _widgetOptions,
+      body: Center(
+        child: _widgetOptions.elementAt(selectedIndex),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

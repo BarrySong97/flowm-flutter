@@ -7,6 +7,7 @@ import '../components/home_page/expenses_page.dart';
 import '../components/home_page/income_page.dart';
 import '../components/home_page/liabilities_page.dart';
 import '../components/home_page/page_header.dart';
+import '../components/common/keep_alive_wrapper.dart';
 import '../state/home/page_controller_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -45,7 +46,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // 必须调用 super.build
+    super.build(context);
     final pageController = ref.watch(pageControllerProvider);
     final currentIndex = ref.watch(currentPageIndexProvider);
 
@@ -67,17 +68,18 @@ class _HomePageState extends ConsumerState<HomePage>
                 onTap: _onPageTap,
               ),
               Expanded(
-                // 使用PageView但启用了更好的性能设置
                 child: PageView.builder(
                   controller: pageController,
-                  // 使用适中的物理滚动效果
                   physics: const ClampingScrollPhysics(),
                   itemCount: _pageBuilders.length,
                   itemBuilder: (context, index) {
-                    return _pageBuilders[index]();
+                    return LazyPageWidget(
+                      builder: _pageBuilders[index],
+                      index: index,
+                      controller: pageController,
+                    );
                   },
                   onPageChanged: (index) {
-                    // 当用户滑动页面时更新状态
                     if (index != currentIndex) {
                       ref.read(currentPageIndexProvider.notifier).state = index;
                     }
