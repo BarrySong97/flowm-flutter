@@ -96,11 +96,12 @@ class AssetsOverviewGrid extends ConsumerWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           clipBehavior: Clip.hardEdge,
+          // padding: const EdgeInsets.only(bottom: 0.0),
           child: Column(
             children: [
               // Overview Row
               Padding(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -114,6 +115,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
               // Assets Grid
               GridView.count(
                 shrinkWrap: true,
+                padding: const EdgeInsets.only(top: 16.0),
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
                 mainAxisSpacing: 1,

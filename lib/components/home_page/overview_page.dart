@@ -243,13 +243,13 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                   },
                   loading: () => const Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32.0),
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
                       child: CircularProgressIndicator(),
                     ),
                   ),
                   error: (error, stackTrace) => Center(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
                       child: Text('加载负债失败: $error'),
                     ),
                   ),
@@ -257,13 +257,13 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
               },
               loading: () => const Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
                   child: CircularProgressIndicator(),
                 ),
               ),
               error: (error, stackTrace) => Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32.0),
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
                   child: Text('加载资产失败: $error'),
                 ),
               ),
@@ -272,9 +272,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             // Recent Transactions
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: -20,
               children: [
                 const Padding(
-                  padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
+                  padding: EdgeInsets.only(left: 4.0, bottom: 0.0),
                   child: Text(
                     '最近交易',
                     style: TextStyle(
@@ -324,13 +325,12 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                       ..sort((a, b) => b.compareTo(a));
 
                     return Container(
-                      // transaction list bulder
                       child: ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         separatorBuilder: (context, index) => const ColoredBox(
                             color: Colors.transparent,
-                            child: SizedBox(height: 12)),
+                            child: SizedBox(height: 16)),
                         itemCount: sortedDates.length,
                         itemBuilder: (context, dateIndex) {
                           final date = sortedDates[dateIndex];

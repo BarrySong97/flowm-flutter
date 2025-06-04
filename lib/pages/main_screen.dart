@@ -66,18 +66,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _onItemTapped(int index) {
-    final currentIndex = ref.read(mainScreenIndexProvider);
-
-    if (index == 0 && currentIndex != 0) {
-      _pageController.jumpToPage(index);
-    } else {
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-
+    _pageController.jumpToPage(index);
     ref.read(mainScreenIndexProvider.notifier).state = index;
   }
 
@@ -88,7 +77,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     return Scaffold(
       body: PageView(
         controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
+        physics: NeverScrollableScrollPhysics(),
         children: _pages,
         onPageChanged: (index) {
           if (index != selectedIndex) {

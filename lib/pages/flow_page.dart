@@ -2,6 +2,7 @@ import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math';
 import '../components/common/transaction_list_item.dart';
@@ -101,13 +102,13 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     if (date.year == today.year &&
         date.month == today.month &&
         date.day == today.day) {
-      return 'Today';
+      return '今天';
     } else if (date.year == yesterday.year &&
         date.month == yesterday.month &&
         date.day == yesterday.day) {
-      return 'Yesterday';
+      return '昨天';
     } else {
-      return DateFormat('MMMM d, EEEE').format(date); // e.g., May 8, Thursday
+      return DateFormat('M月d日 EEEE', 'zh_CN').format(date); // 例如: 5月8日 星期四
     }
   }
 
@@ -119,67 +120,113 @@ class _FlowPageState extends ConsumerState<FlowPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 200,
-            backgroundColor: const Color(0xFF4CAF50),
-            pinned: true, // Keep app bar visible
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                color: const Color(0xFF4CAF50), // Match app bar color
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+            child: Row(
+              children: [
+                const Text(
+                  '流水列表',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _buildTransactionList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionList() {
+    if (_isLoading && _transactions.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_transactions.isEmpty && !_isLoading) {
+      return Center(
+        child: Text(
+          'No transactions yet.',
+          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      controller: _scrollController,
+      itemCount: _transactions.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _transactions.length) {
+          return _hasMore
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : const SizedBox.shrink();
+        }
+
+        final transactionWithAmount = _transactions[index];
+        final transaction = transactionWithAmount.transaction;
+        final uiDate = _formatDate(transaction.transactionDate);
+        final previousUiDate = index > 0
+            ? _formatDate(_transactions[index - 1].transaction.transactionDate)
+            : null;
+
+        if (index == 0 || uiDate != previousUiDate) {
+          final dailyOut = _transactions
+              .where((twa) =>
+                  _formatDate(twa.transaction.transactionDate) == uiDate &&
+                  twa.nature == TransactionNature.OUTFLOW)
+              .fold(0.0, (sum, twa) => sum + twa.amount.abs());
+          final dailyIn = _transactions
+              .where((twa) =>
+                  _formatDate(twa.transaction.transactionDate) == uiDate &&
+                  twa.nature == TransactionNature.INFLOW)
+              .fold(0.0, (sum, twa) => sum + twa.amount.abs());
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  index == 0 ? 0 : 16,
+                  16,
+                  8,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '全部类型',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                        IconButton(
-                          icon:
-                              const Icon(Icons.grid_view, color: Colors.white),
-                          onPressed: () {
-                            // TODO: Implement filter action
-                          },
-                        ),
-                      ],
+                    Text(
+                      uiDate,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            // TODO: Implement dynamic date selection
-                            Text(
-                              DateFormat('yyyy年M月').format(DateTime.now()),
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 14),
-                            ),
-                            const Icon(Icons.arrow_drop_down,
-                                color: Colors.white),
-                          ],
+                        Text(
+                          '出 ¥${dailyOut.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
                         ),
-                        // TODO: Calculate and display actual totals
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '总支出¥0.00 ', // Placeholder
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14),
-                              ),
-                              TextSpan(
-                                text: '总入账¥0.00', // Placeholder
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14),
-                              ),
-                            ],
+                        const SizedBox(width: 8),
+                        Text(
+                          '入 ¥${dailyIn.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
                           ),
                         ),
                       ],
@@ -187,118 +234,12 @@ class _FlowPageState extends ConsumerState<FlowPage> {
                   ],
                 ),
               ),
-            ),
-          ),
-          if (_isLoading && _transactions.isEmpty)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_transactions.isEmpty && !_isLoading)
-            SliverFillRemaining(
-              child: Center(
-                child: Text(
-                  'No transactions yet.',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-              ),
-            )
-          else
-            SliverList.builder(
-              itemCount: _transactions.length +
-                  (_hasMore ? 1 : 0), // +1 for loading indicator
-              itemBuilder: (context, index) {
-                if (index == _transactions.length) {
-                  return _hasMore
-                      ? const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      : const SizedBox.shrink(); // No more items
-                }
-
-                final transactionWithAmount = _transactions[index];
-                final transaction = transactionWithAmount.transaction;
-                final uiDate = _formatDate(transaction.transactionDate);
-                final previousUiDate = index > 0
-                    ? _formatDate(
-                        _transactions[index - 1].transaction.transactionDate)
-                    : null;
-
-                // Add date header
-                if (index == 0 || uiDate != previousUiDate) {
-                  // Calculate daily totals accurately using the 'nature' field
-                  final dailyOut = _transactions
-                      .where((twa) =>
-                          _formatDate(twa.transaction.transactionDate) ==
-                              uiDate &&
-                          twa.nature ==
-                              TransactionNature
-                                  .OUTFLOW) // Use nature for outflow
-                      .fold(
-                          0.0,
-                          (sum, twa) =>
-                              sum +
-                              twa.amount
-                                  .abs()); // Use .abs() if amounts are stored signed
-                  final dailyIn = _transactions
-                      .where((twa) =>
-                          _formatDate(twa.transaction.transactionDate) ==
-                              uiDate &&
-                          twa.nature ==
-                              TransactionNature.INFLOW) // Use nature for inflow
-                      .fold(
-                          0.0,
-                          (sum, twa) =>
-                              sum +
-                              twa.amount
-                                  .abs()); // Use .abs() if amounts are stored signed
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              uiDate,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                Text(
-                                  '出 ¥${dailyOut.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '入 ¥${dailyIn.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      _buildTransactionItem(transactionWithAmount),
-                    ],
-                  );
-                }
-                return _buildTransactionItem(transactionWithAmount);
-              },
-            ),
-        ],
-      ),
+              _buildTransactionItem(transactionWithAmount),
+            ],
+          );
+        }
+        return _buildTransactionItem(transactionWithAmount);
+      },
     );
   }
 
