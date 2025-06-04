@@ -12,6 +12,7 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/rendering.dart';
 
 // Provider to fetch current month's expenses
 final currentMonthExpenseProvider = FutureProvider<double>((ref) async {
@@ -87,11 +88,21 @@ final topAssetAccountsProvider =
       ledgerId: selectedLedger.ledgerId);
 });
 
-class OverviewPage extends ConsumerWidget {
+class OverviewPage extends ConsumerStatefulWidget {
   const OverviewPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OverviewPage> createState() => _OverviewPageState();
+}
+
+class _OverviewPageState extends ConsumerState<OverviewPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     // 使用共享的topAssetAccountsProvider
     final topAssetsAsync = ref.watch(topAssetAccountsProvider);
     final monthlyOverviewDataAsync = ref.watch(monthlyOverviewDataProvider);

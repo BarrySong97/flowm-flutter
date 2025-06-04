@@ -19,16 +19,65 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
+class _MainScreenPage extends StatefulWidget {
+  final Widget child;
+
+  const _MainScreenPage({required this.child});
+
+  @override
+  State<_MainScreenPage> createState() => _MainScreenPageState();
+}
+
+class _MainScreenPageState extends State<_MainScreenPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 class _MainScreenState extends ConsumerState<MainScreen> {
-  static final List<Widget> _widgetOptions = <Widget>[
-    HomePage(key: PageStorageKey('home_page')),
+  late final PageController _pageController;
+  final List<Widget> _pages = [
+    _MainScreenPage(child: HomePage(key: PageStorageKey('home_page'))),
     CalendarPage(),
     AddPage(),
     FlowPage(),
     SettingsPage(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(
+      initialPage: ref.read(mainScreenIndexProvider),
+      keepPage: false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _onItemTapped(int index) {
+    final currentIndex = ref.read(mainScreenIndexProvider);
+
+    if (index == 0 && currentIndex != 0) {
+      _pageController.jumpToPage(index);
+    } else {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+
     ref.read(mainScreenIndexProvider.notifier).state = index;
   }
 
@@ -37,8 +86,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final selectedIndex = ref.watch(mainScreenIndexProvider);
 
     return Scaffold(
-      body: Center(
-        child: _widgetOptions.elementAt(selectedIndex),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: _pages,
+        onPageChanged: (index) {
+          if (index != selectedIndex) {
+            ref.read(mainScreenIndexProvider.notifier).state = index;
+          }
+        },
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -53,7 +109,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           selectedIndex: selectedIndex,
           showElevation: false,
           height: 55,
-          onItemSelected: (index) => _onItemTapped(index),
+          onItemSelected: _onItemTapped,
           items: [
             FlashyTabBarItem(
               icon: Icon(

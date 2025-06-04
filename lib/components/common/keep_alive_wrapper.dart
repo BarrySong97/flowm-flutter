@@ -94,12 +94,25 @@ class _LazyPageWidgetState extends State<LazyPageWidget>
       curve: Curves.easeInOut,
     );
 
-    if (widget.index == 0) {
-      _child = widget.builder();
-      _animationController.forward();
+    // 检查是否是当前页面
+    if (widget.controller.initialPage == widget.index ||
+        (widget.controller.hasClients &&
+            widget.controller.page?.round() == widget.index)) {
+      _loadContent();
     }
 
     widget.controller.addListener(_onScroll);
+  }
+
+  void _loadContent() {
+    if (_child != null) return;
+
+    setState(() {
+      _child = KeepAliveWrapper(
+        child: widget.builder(),
+      );
+    });
+    _animationController.forward();
   }
 
   @override
@@ -112,10 +125,7 @@ class _LazyPageWidgetState extends State<LazyPageWidget>
   void _onScroll() {
     final page = widget.controller.page?.round() ?? 0;
     if (page == widget.index && _child == null) {
-      setState(() {
-        _child = widget.builder();
-        _animationController.forward();
-      });
+      _loadContent();
     }
   }
 

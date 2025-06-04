@@ -21,6 +21,8 @@ class _HomePageState extends ConsumerState<HomePage>
     with AutomaticKeepAliveClientMixin {
   // 页面列表
   late final List<Widget Function()> _pageBuilders;
+  // 页面控制器
+  late final PageController _pageController;
 
   @override
   bool get wantKeepAlive => true;
@@ -28,6 +30,11 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
+
+    // 初始化页面控制器
+    _pageController = PageController(
+      initialPage: ref.read(currentPageIndexProvider),
+    );
 
     // 初始化页面构建函数列表
     _pageBuilders = [
@@ -39,56 +46,67 @@ class _HomePageState extends ConsumerState<HomePage>
     ];
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _onPageTap(int index) {
-    // 使用自定义导航方法切换页面
-    navigateToPage(ref, index);
+    // 获取当前页面索引
+    final currentIndex = ref.read(currentPageIndexProvider);
+
+    // 如果是相邻页面切换，使用animateToPage进行平滑切换
+    if ((index - currentIndex).abs() == 1) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // 如果是跨页切换，直接跳转到目标页面
+      _pageController.jumpToPage(index);
+    }
+
+    // 更新当前页面索引
+    ref.read(currentPageIndexProvider.notifier).state = index;
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final pageController = ref.watch(pageControllerProvider);
     final currentIndex = ref.watch(currentPageIndexProvider);
 
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Color.fromARGB(255, 246, 246, 246),
-      statusBarIconBrightness: Brightness.dark,
-    ));
-
     return Scaffold(
-      body: SafeArea(
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF5F6FB),
+      backgroundColor: const Color(0xFFF5F6FB),
+      body: Column(
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top),
+          PageHeader(
+            currentIndex: currentIndex,
+            onTap: _onPageTap,
           ),
-          child: Column(
-            children: [
-              PageHeader(
-                currentIndex: currentIndex,
-                onTap: _onPageTap,
-              ),
-              Expanded(
-                child: PageView.builder(
-                  controller: pageController,
-                  physics: const ClampingScrollPhysics(),
-                  itemCount: _pageBuilders.length,
-                  itemBuilder: (context, index) {
-                    return LazyPageWidget(
-                      builder: _pageBuilders[index],
-                      index: index,
-                      controller: pageController,
-                    );
-                  },
-                  onPageChanged: (index) {
-                    if (index != currentIndex) {
-                      ref.read(currentPageIndexProvider.notifier).state = index;
-                    }
-                  },
-                ),
-              ),
-            ],
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _pageBuilders.length,
+              itemBuilder: (context, index) {
+                return LazyPageWidget(
+                  builder: _pageBuilders[index],
+                  index: index,
+                  controller: _pageController,
+                );
+              },
+              onPageChanged: (index) {
+                // 只在页面真实改变时更新索引
+                if (index != ref.read(currentPageIndexProvider)) {
+                  ref.read(currentPageIndexProvider.notifier).state = index;
+                }
+              },
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
