@@ -272,7 +272,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             // Recent Transactions
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: -20,
+              spacing: 0,
               children: [
                 const Padding(
                   padding: EdgeInsets.only(left: 4.0, bottom: 0.0),

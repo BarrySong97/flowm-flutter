@@ -53,6 +53,7 @@ dependencies:
   syncfusion_flutter_charts: ^29.1.41
   sankey_flutter: ^0.0.1
   custom_sliding_segmented_control: ^1.8.5
+  flutter_layout_grid: ^2.0.8
 
 dev_dependencies:
   flutter_test:
