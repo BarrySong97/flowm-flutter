@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../../utils/transaction_type_map.dart';
 import '../../db/tables/account_table.dart';
+import '../../pages/add_page.dart';
 
 class TransactionDetailBottomSheet extends StatelessWidget {
   final String amount;
@@ -232,7 +234,12 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
                         color: const Color(0xFF007AFF),
                         onTap: () {
                           Navigator.pop(context);
-                          onEdit?.call();
+                          if (transactionId != null) {
+                            final id = int.tryParse(transactionId!);
+                            if (id != null) {
+                              context.push('/add', extra: id);
+                            }
+                          }
                         },
                       ),
                       _buildActionButton(

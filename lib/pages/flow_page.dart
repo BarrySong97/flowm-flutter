@@ -258,6 +258,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: TransactionListItem(
+        transactionId: transaction.transactionId.toString(),
         title: transaction.description ?? '无描述',
         subtitle:
             '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',

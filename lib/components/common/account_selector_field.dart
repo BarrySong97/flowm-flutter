@@ -14,6 +14,7 @@ class AccountSelectorField extends StatelessWidget {
   final bool isFromAccount;
   final AccountType? fromAccountType;
   final AccountType? toAccountType;
+  final bool isEditMode;
 
   const AccountSelectorField({
     super.key,
@@ -26,6 +27,7 @@ class AccountSelectorField extends StatelessWidget {
     this.isFromAccount = false,
     this.fromAccountType,
     this.toAccountType,
+    this.isEditMode = false,
   });
 
   @override
@@ -111,16 +113,25 @@ class AccountSelectorField extends StatelessWidget {
   Widget _buildBalanceText(BuildContext context) {
     if (selectedAccount == null) return const SizedBox.shrink();
 
+    final originalAmount = selectedAccount!.amount;
+
+    if (transactionAmount == 0.0) {
+      return Text(
+        '${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)}',
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.grey[600],
+        ),
+      );
+    }
+
     final balanceChange = getBalanceChange(
       isFromAccount: isFromAccount,
       fromAccountType: fromAccountType,
       toAccountType: toAccountType,
     );
 
-    final originalAmount = selectedAccount!.amount;
-    final newAmount = originalAmount + balanceChange * transactionAmount;
-
-    if (transactionAmount == 0.0) {
+    if (balanceChange == 0) {
       return Text(
         '${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)}',
         style: TextStyle(
@@ -136,13 +147,12 @@ class AccountSelectorField extends StatelessWidget {
     if (balanceChange > 0) {
       operator = '+';
       changeColor = Colors.green;
-    } else if (balanceChange < 0) {
+    } else {
       operator = '-';
       changeColor = Colors.red;
-    } else {
-      operator = '±'; // Should not happen with current logic
-      changeColor = Colors.grey;
     }
+
+    final newAmount = originalAmount + balanceChange * transactionAmount;
 
     return RichText(
       text: TextSpan(
@@ -153,14 +163,15 @@ class AccountSelectorField extends StatelessWidget {
               Theme.of(context).textTheme.bodyMedium?.fontFamily, // 保证字体一致性
         ),
         children: [
+          if (!isEditMode)
+            TextSpan(
+                text:
+                    '余额 ${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)} '),
           TextSpan(
-              text:
-                  '余额 ${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)} '),
-          TextSpan(
-            text: '$operator ${transactionAmount.toStringAsFixed(2)}',
+            text: '$operator ${transactionAmount.abs().toStringAsFixed(2)}',
             style: TextStyle(color: changeColor),
           ),
-          TextSpan(text: ' = ${newAmount.toStringAsFixed(2)}'),
+          if (!isEditMode) TextSpan(text: ' = ${newAmount.toStringAsFixed(2)}'),
         ],
       ),
     );

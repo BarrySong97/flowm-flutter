@@ -567,6 +567,8 @@ class AccountTransactionList extends ConsumerWidget {
                                 horizontal: 0, vertical: 0),
                             child: TransactionListItem(
                               title: transaction.description ?? '无描述',
+                              transactionId:
+                                  transaction.transactionId.toString(),
                               subtitle:
                                   '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
                               amount: formattedAmount,

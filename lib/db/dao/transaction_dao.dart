@@ -37,6 +37,53 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       (select(transactions)..where((t) => t.transactionId.equals(id)))
           .getSingleOrNull();
 
+  // Get transaction with amount by ID
+  Future<TransactionWithAmount?> getTransactionWithAmountById(
+      int transactionId) async {
+    final transaction = await getTransactionById(transactionId);
+    if (transaction == null) {
+      return null;
+    }
+
+    final postingsQuery = select(db.postings).join([
+      innerJoin(
+          db.accounts, db.accounts.accountId.equalsExp(db.postings.accountId)),
+    ])
+      ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+    final postingsWithAccounts = await postingsQuery.get();
+
+    Account? fromAccountObj;
+    Account? toAccountObj;
+    double transactionAmount = 0;
+
+    if (postingsWithAccounts.isNotEmpty) {
+      final firstPosting = postingsWithAccounts.first.readTable(db.postings);
+      transactionAmount = firstPosting.amount.abs();
+    }
+
+    for (final rowData in postingsWithAccounts) {
+      final posting = rowData.readTable(db.postings);
+      final account = rowData.readTable(db.accounts);
+      if (posting.amount < 0) {
+        fromAccountObj = account;
+      } else if (posting.amount > 0) {
+        toAccountObj = account;
+      }
+    }
+
+    final nature = getTransactionNature(
+        fromAccountObj?.accountType, toAccountObj?.accountType);
+
+    return TransactionWithAmount(
+      transaction: transaction,
+      amount: transactionAmount,
+      fromAccount: fromAccountObj,
+      toAccount: toAccountObj,
+      nature: nature,
+    );
+  }
+
   // Watch all transactions (reactive stream)
   Stream<List<Transaction>> watchAllTransactions({int? ledgerId, int? limit}) {
     print('watchAllTransactions: $ledgerId, $limit');

@@ -154,6 +154,56 @@ class TransactionRepository {
       _transactionDao.watchTransactionsWithAmountByDateRange(
           startDate, endDate, ledgerId);
 
+  /// 根据ID获取单个交易及其详情
+  Future<TransactionWithAmount?> getTransactionWithAmountById(
+          int transactionId) =>
+      _transactionDao.getTransactionWithAmountById(transactionId);
+
+  /// 更新包含记账分录的完整交易
+  Future<void> updateTransactionWithPostings({
+    required int transactionId,
+    required int fromAccountId,
+    required int toAccountId,
+    required double amount,
+    required DateTime transactionDate,
+    String? description,
+  }) async {
+    return _transactionDao.db.transaction(() async {
+      // 1. 更新 Transaction 记录
+      await _transactionDao.updateTransaction(TransactionsCompanion(
+        transactionId: Value(transactionId),
+        transactionDate: Value(transactionDate),
+        description: Value(description),
+      ));
+
+      // 2. 找到并更新 Postings
+      // 假设每个交易总有两条posting，一出一入
+      final postings =
+          await (_transactionDao.db.select(_transactionDao.db.postings)
+                ..where((p) => p.transactionId.equals(transactionId)))
+              .get();
+
+      final fromPosting = postings.firstWhere((p) => p.amount < 0);
+      final toPosting = postings.firstWhere((p) => p.amount > 0);
+
+      // 更新 fromAccount 的 Posting
+      await (_transactionDao.db.update(_transactionDao.db.postings)
+            ..where((p) => p.postingId.equals(fromPosting.postingId)))
+          .write(PostingsCompanion(
+        accountId: Value(fromAccountId),
+        amount: Value(-amount),
+      ));
+
+      // 更新 toAccount 的 Posting
+      await (_transactionDao.db.update(_transactionDao.db.postings)
+            ..where((p) => p.postingId.equals(toPosting.postingId)))
+          .write(PostingsCompanion(
+        accountId: Value(toAccountId),
+        amount: Value(amount),
+      ));
+    });
+  }
+
   /// 创建一笔包含记账分录的完整交易
   ///
   /// [fromAccountId] - 资金来源账户ID

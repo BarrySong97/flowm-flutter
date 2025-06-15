@@ -378,6 +378,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
                     return TransactionListItem(
                       title: transaction.description ?? '无描述',
+                      transactionId: transaction.transactionId.toString(),
                       subtitle: subtitle,
                       amount: amountString,
                       type: _mapNatureToTypeString(item.nature),

@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flowm/pages/main_screen.dart'; // Import MainScreen
 import 'package:flowm/pages/expense/top_expense_detail_page.dart';
 import 'package:flowm/pages/assets/top_assets_account_detail_page.dart'; // 引入页面
+import 'package:flowm/pages/add_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -218,6 +219,29 @@ class AppRouter {
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var offsetAnimation = animation.drive(tween);
+
+              return SlideTransition(position: offsetAnimation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/add',
+        name: 'add',
+        pageBuilder: (context, state) {
+          final transactionId = state.extra as int?;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: AddPage(transactionId: transactionId),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              const begin = Offset(0.0, 1.0);
               const end = Offset.zero;
               const curve = Curves.easeInOut;
 

@@ -6,11 +6,14 @@ import 'package:flowm/components/common/account_selector_field.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
-import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/db/tables/account_table.dart' hide Accounts;
 import 'package:flowm/state/transaction/transaction_repository.dart';
+import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
+import 'package:flowm/db/app_database.dart' as db;
 
 class AddPage extends ConsumerStatefulWidget {
-  const AddPage({super.key});
+  final int? transactionId;
+  const AddPage({super.key, this.transactionId});
 
   @override
   ConsumerState<AddPage> createState() => _AddPageState();
@@ -24,6 +27,8 @@ class _AddPageState extends ConsumerState<AddPage>
   final List<String> _tabs = TransactionType.getAllDisplayNames();
   final TextEditingController _noteController = TextEditingController();
   String _currentDate = DateTime.now().toString().split(' ')[0];
+
+  bool _isEditMode = false;
 
   // 新增的账户选择状态
   Account? _fromAccount;
@@ -39,6 +44,11 @@ class _AddPageState extends ConsumerState<AddPage>
         setState(() {});
       }
     });
+
+    if (widget.transactionId != null) {
+      _isEditMode = true;
+      _loadTransactionData();
+    }
   }
 
   @override
@@ -46,6 +56,41 @@ class _AddPageState extends ConsumerState<AddPage>
     _tabController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTransactionData() async {
+    final transaction = await ref
+        .read(transactionRepositoryProvider)
+        .getTransactionWithAmountById(widget.transactionId!);
+
+    if (transaction != null) {
+      final db.Account? dbFromAccount = transaction.fromAccount;
+      final db.Account? dbToAccount = transaction.toAccount;
+
+      setState(() {
+        amount = transaction.amount.toStringAsFixed(2);
+        _noteController.text = transaction.transaction.description ?? '';
+        _currentDate =
+            transaction.transaction.transactionDate.toString().split(' ')[0];
+        if (dbFromAccount != null) {
+          _fromAccount = Account(
+            id: dbFromAccount.accountId,
+            name: dbFromAccount.accountName,
+            amount: 0,
+            type: dbFromAccount.accountType,
+          );
+        }
+        if (dbToAccount != null) {
+          _toAccount = Account(
+            id: dbToAccount.accountId,
+            name: dbToAccount.accountName,
+            amount: 0,
+            type: dbToAccount.accountType,
+          );
+        }
+        _transactionFlowType = _calculateTransactionFlowType();
+      });
+    }
   }
 
   void _swapAccounts() {
@@ -326,25 +371,49 @@ class _AddPageState extends ConsumerState<AddPage>
     }
 
     try {
-      await ref
-          .read(transactionRepositoryProvider)
-          .createTransactionWithPostings(
-            fromAccountId: _fromAccount!.id,
-            toAccountId: _toAccount!.id,
-            amount: transactionAmount,
-            transactionDate: DateTime.parse(_currentDate),
-            description: _noteController.text,
-          );
+      if (_isEditMode) {
+        // 更新逻辑
+        await ref
+            .read(transactionRepositoryProvider)
+            .updateTransactionWithPostings(
+              transactionId: widget.transactionId!,
+              fromAccountId: _fromAccount!.id,
+              toAccountId: _toAccount!.id,
+              amount: transactionAmount,
+              transactionDate: DateTime.parse(_currentDate),
+              description: _noteController.text,
+            );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('交易已更新'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _clearForm();
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } else {
+        // 创建逻辑
+        await ref
+            .read(transactionRepositoryProvider)
+            .createTransactionWithPostings(
+              fromAccountId: _fromAccount!.id,
+              toAccountId: _toAccount!.id,
+              amount: transactionAmount,
+              transactionDate: DateTime.parse(_currentDate),
+              description: _noteController.text,
+            );
 
-      // 显示成功消息并返回
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('交易已保存'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _clearForm();
-      // Navigator.of(context).pop();
+        // 显示成功消息并返回
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('交易已保存'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _clearForm();
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -359,6 +428,20 @@ class _AddPageState extends ConsumerState<AddPage>
   Widget build(BuildContext context) {
     final transactionAmountValue = double.tryParse(amount) ?? 0.0;
     return Scaffold(
+      appBar: _isEditMode
+          ? AppBar(
+              backgroundColor: Colors.white,
+              title: const Text(
+                '编辑模式',
+                style: TextStyle(color: Colors.black87, fontSize: 18),
+              ),
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.black87),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              elevation: 0,
+            )
+          : null,
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
@@ -433,6 +516,7 @@ class _AddPageState extends ConsumerState<AddPage>
                       isFromAccount: true,
                       fromAccountType: _fromAccount?.type,
                       toAccountType: _toAccount?.type,
+                      isEditMode: _isEditMode,
                     ),
 
                     const SizedBox(height: 20),
@@ -489,6 +573,7 @@ class _AddPageState extends ConsumerState<AddPage>
                       isFromAccount: false,
                       fromAccountType: _fromAccount?.type,
                       toAccountType: _toAccount?.type,
+                      isEditMode: _isEditMode,
                     ),
 
                     const Spacer(),

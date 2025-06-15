@@ -881,6 +881,8 @@ class AccountTransactionList extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 0, vertical: 0),
                             child: TransactionListItem(
+                              transactionId:
+                                  transaction.transactionId.toString(),
                               title: transaction.description ?? '无描述',
                               subtitle:
                                   '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
