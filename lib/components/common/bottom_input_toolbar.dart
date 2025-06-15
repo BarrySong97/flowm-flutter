@@ -15,14 +15,14 @@ class BottomInputToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -30,31 +30,77 @@ class BottomInputToolbar extends StatelessWidget {
         children: [
           // 备注输入框
           Expanded(
-            child: TextField(
-              controller: noteController,
-              decoration: const InputDecoration(
-                hintText: '添加备注',
-                border: OutlineInputBorder(
-                  borderSide: BorderSide.none,
+            child: Container(
+              height: 44,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: TextField(
+                controller: noteController,
+                decoration: InputDecoration(
+                  hintText: '添加备注',
+                  hintStyle: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 12),
           // 日期按钮
-          TextButton(
-            onPressed: onDateTap,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+          Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: Colors.blue[200]!,
+                width: 1,
+              ),
             ),
-            child: Text(
-              date,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onDateTap,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 16,
+                        color: Colors.blue[600],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        date,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

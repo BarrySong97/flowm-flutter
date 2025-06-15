@@ -385,7 +385,7 @@ class AssetsDetailBody extends StatelessWidget {
       height: 45,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -418,7 +418,7 @@ class AssetsDetailBody extends StatelessWidget {
         decoration: BoxDecoration(
           color:
               isSelected ? Theme.of(context).primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Center(
           child: Text(

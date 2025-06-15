@@ -16,7 +16,7 @@ class NumberKeypad extends StatelessWidget {
   }) : super(key: key);
 
   Widget _buildKeypadButton(String value,
-      {bool isRed = false, IconData? icon}) {
+      {bool isRed = false, bool isOperation = false, IconData? icon}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -28,13 +28,19 @@ class NumberKeypad extends StatelessWidget {
           height: 60,
           alignment: Alignment.center,
           child: icon != null
-              ? Icon(icon, size: 24, color: isRed ? Colors.red : Colors.black87)
+              ? Icon(icon,
+                  size: 24,
+                  color: isRed
+                      ? Colors.red
+                      : (isOperation ? Colors.blue : Colors.black87))
               : Text(
                   value,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: isRed ? Colors.red : Colors.black87,
+                    color: isRed
+                        ? Colors.red
+                        : (isOperation ? Colors.blue : Colors.black87),
                   ),
                 ),
         ),
@@ -52,12 +58,12 @@ class NumberKeypad extends StatelessWidget {
       ),
       child: LayoutGrid(
         columnGap: 2,
-        rowGap: 0,
+        rowGap: 2,
         areas: '''
           1 2 3 b
           4 5 6 +
           7 8 9 -
-          0 0 p s 
+          0 d = s 
         ''',
         // A number of extension methods are provided for concise track sizing
         columnSizes: [1.0.fr, 1.0.fr, 1.0.fr, 1.0.fr],
@@ -68,26 +74,31 @@ class NumberKeypad extends StatelessWidget {
           1.0.fr,
         ],
         children: [
-          // Column 1
+          // Row 1
           gridArea('1').containing(_buildKeypadButton('1')),
-          gridArea('4').containing(_buildKeypadButton('4')),
-          gridArea('7').containing(_buildKeypadButton('7')),
-          gridArea('0').containing(_buildKeypadButton('0')),
-          // Column 2
           gridArea('2').containing(_buildKeypadButton('2')),
-          gridArea('5').containing(_buildKeypadButton('5')),
-          gridArea('8').containing(_buildKeypadButton('8')),
-          gridArea('9').containing(_buildKeypadButton('.')),
-          // Column 3
           gridArea('3').containing(_buildKeypadButton('3')),
+          gridArea('b').containing(_buildKeypadButton('⌫',
+              icon: Icons.backspace_outlined, isRed: true)),
+
+          // Row 2
+          gridArea('4').containing(_buildKeypadButton('4')),
+          gridArea('5').containing(_buildKeypadButton('5')),
           gridArea('6').containing(_buildKeypadButton('6')),
+          gridArea('+').containing(
+              _buildKeypadButton('+', icon: Icons.add, isOperation: true)),
+
+          // Row 3
+          gridArea('7').containing(_buildKeypadButton('7')),
+          gridArea('8').containing(_buildKeypadButton('8')),
           gridArea('9').containing(_buildKeypadButton('9')),
-          gridArea('p').containing(_buildKeypadButton('.')),
-          // column 4
-          gridArea('b').containing(
-              _buildKeypadButton('backspace', icon: Icons.backspace_outlined)),
-          gridArea('+').containing(_buildKeypadButton('+', icon: Icons.add)),
-          gridArea('-').containing(_buildKeypadButton('-', icon: Icons.remove)),
+          gridArea('-').containing(
+              _buildKeypadButton('-', icon: Icons.remove, isOperation: true)),
+
+          // Row 4
+          gridArea('0').containing(_buildKeypadButton('0')),
+          gridArea('d').containing(_buildKeypadButton('.')),
+          gridArea('=').containing(_buildKeypadButton('=', isOperation: true)),
           gridArea('s').containing(_buildKeypadButton('确定')),
         ],
       ),

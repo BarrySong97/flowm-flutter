@@ -17,74 +17,6 @@ class SettingsPage extends StatelessWidget {
           child: Column(
             spacing: 12,
             children: [
-              // Profile card
-              SettingsProfileCard(
-                username: 'BarrySong4Real',
-                daysCount: '1545',
-                recordsCount: '9',
-              ),
-
-              // Membership upgrade card
-              SettingsMembershipCard(
-                onUpgradePressed: () {
-                  // Handle upgrade button press
-                },
-              ),
-
-              // Features grid
-              SettingsFeatureGrid(
-                items: [
-                  SettingsFeatureItem(
-                    icon: Icons.auto_awesome,
-                    title: '自动记账',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.date_range,
-                    title: '周期记账',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.list_alt,
-                    title: '愿望清单',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.tag,
-                    title: '分类关键词',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.book,
-                    title: '账本管理',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.label,
-                    title: '标签管理',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.category,
-                    title: '分类管理',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                  SettingsFeatureItem(
-                    icon: Icons.more_horiz,
-                    title: '更多设置',
-                    iconColor: Colors.teal,
-                    onTap: () {},
-                  ),
-                ],
-              ),
-
               // Data management section
               SettingsDataSection(
                 title: '数据管理',
@@ -110,13 +42,24 @@ class SettingsPage extends StatelessWidget {
                     onTap: () {},
                   ),
                   SettingsDataItem(
-                    icon: Icons.backup,
-                    title: '数据备份',
+                    icon: Icons.import_export,
+                    title: '导入/导出',
+                    onTap: () {},
+                  ),
+                ],
+              ),
+              SettingsDataSection(
+                title: '关于',
+                items: [
+                  SettingsDataItem(
+                    icon: Icons.cloud_sync,
+                    title: '关于我们',
+                    subtitle: '版本号：1.0.0',
                     onTap: () {},
                   ),
                   SettingsDataItem(
-                    icon: Icons.import_export,
-                    title: '导入/导出',
+                    icon: Icons.help_outline,
+                    title: '使用说明',
                     onTap: () {},
                   ),
                 ],

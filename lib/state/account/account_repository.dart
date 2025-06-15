@@ -45,6 +45,46 @@ final uiAccountsProvider =
   return repository.getAssetsAccountTree(ledgerId: selectedLedger?.ledgerId);
 });
 
+/// 提供资产账户树
+final assetsAccountTreeProvider =
+    FutureProvider<List<account_ui.Account>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getAssetsAccountTree(ledgerId: selectedLedger?.ledgerId);
+});
+
+/// 提供负债账户树
+final liabilityAccountTreeProvider =
+    FutureProvider<List<account_ui.Account>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getLiabilityAccountTree(ledgerId: selectedLedger?.ledgerId);
+});
+
+/// 提供费用账户树
+final expenseAccountTreeProvider =
+    FutureProvider<List<account_ui.Account>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getExpenseAccountTree(ledgerId: selectedLedger?.ledgerId);
+});
+
+/// 提供收入账户树
+final incomeAccountTreeProvider =
+    FutureProvider<List<account_ui.Account>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getIncomeAccountTree(ledgerId: selectedLedger?.ledgerId);
+});
+
+/// 提供权益账户树
+final equityAccountTreeProvider =
+    FutureProvider<List<account_ui.Account>>((ref) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  return repository.getEquityAccountTree(ledgerId: selectedLedger?.ledgerId);
+});
+
 /// 年度资产趋势数据提供者，用于绘制资产变化曲线图
 final yearlyAssetTrendProvider =
     FutureProvider<List<AssetHistoryData>>((ref) async {
@@ -181,7 +221,92 @@ class AccountRepository {
     }
   }
 
-  // 递归将AccountWithChildren转换为UI格式的Account并计算余额
+  /// 获取负债账户树
+  Future<List<account_ui.Account>> getLiabilityAccountTree(
+      {int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final liabilityAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.LIABILITY)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(liabilityAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取费用账户树
+  Future<List<account_ui.Account>> getExpenseAccountTree(
+      {int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final expenseAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.EXPENSE)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(expenseAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取收入账户树
+  Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final incomeAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.INCOME)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(incomeAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取权益账户树
+  Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final equityAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.EQUITY)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(equityAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
+  List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
+      List<AccountWithChildren> accounts) {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    final List<account_ui.Account> results = [];
+
+    for (final acc in accounts) {
+      List<account_ui.Account>? uiChildren;
+
+      // 如果有子账户，递归处理子账户
+      if (acc.children.isNotEmpty) {
+        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
+      }
+
+      // 创建UI需要的Account对象，金额设为0
+      results.add(account_ui.Account(
+        id: acc.account.accountId,
+        name: acc.account.accountName,
+        amount: 0.0, // 不计算余额，设为0
+        children: uiChildren,
+        currencySymbol: '¥',
+        icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
+      ));
+    }
+
+    return results;
+  }
+
+  // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
   Future<List<account_ui.Account>> _convertAccountsToUIFormat(
       List<AccountWithChildren> accounts) async {
     if (accounts.isEmpty) {
@@ -222,6 +347,24 @@ class AccountRepository {
     }
 
     return results;
+  }
+
+  // 根据账户类型获取对应的图标
+  IconData _getAccountIcon(AccountType accountType) {
+    switch (accountType) {
+      case AccountType.ASSET:
+        return Icons.account_balance_wallet;
+      case AccountType.LIABILITY:
+        return Icons.credit_card;
+      case AccountType.EXPENSE:
+        return Icons.trending_down;
+      case AccountType.INCOME:
+        return Icons.trending_up;
+      case AccountType.EQUITY:
+        return Icons.pie_chart;
+      default:
+        return Icons.account_balance;
+    }
   }
 
   /// 根据账户类型获取账户

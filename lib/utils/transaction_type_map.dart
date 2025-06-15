@@ -1,5 +1,26 @@
 import '../db/tables/account_table.dart';
 
+// 交易类型枚举
+enum TransactionType {
+  CUSTOM('自定义'),
+  EXPENSE('支出'),
+  INCOME('收入'),
+  ASSET_TRANSFER('资产转移'),
+  DEBT_REPAYMENT('偿还债务'),
+  LOAN_RECEIVED('获得贷款'),
+  PERSONAL_INVESTMENT('个人投入'),
+  PERSONAL_WITHDRAWAL('个人提取'),
+  EXPENSE_REFUND('费用退款'),
+  LOAN_EXPENSE('贷款支出');
+
+  const TransactionType(this.displayName);
+  final String displayName;
+
+  static List<String> getAllDisplayNames() {
+    return TransactionType.values.map((e) => e.displayName).toList();
+  }
+}
+
 // Function to determine transaction flow type based on from and to account types.
 // The returned strings are in Chinese.
 String getTransactionFlowType(
@@ -7,50 +28,56 @@ String getTransactionFlowType(
   // Case 1: Asset -> Expense (e.g., paying rent from bank account)
   if (fromAccountType == AccountType.ASSET &&
       toAccountType == AccountType.EXPENSE) {
-    return '支出';
+    return TransactionType.EXPENSE.displayName;
   }
   // Case 2: Income -> Asset (e.g., salary credited to bank account)
   if (fromAccountType == AccountType.INCOME &&
       toAccountType == AccountType.ASSET) {
-    return '收入';
+    return TransactionType.INCOME.displayName;
   }
   // Case 3: Liability -> Expense (e.g., an expense paid by increasing a liability, like using a credit card or a loan for an expense)
   if (fromAccountType == AccountType.LIABILITY &&
       toAccountType == AccountType.EXPENSE) {
-    return '贷款支出';
+    return TransactionType.LOAN_EXPENSE.displayName;
   }
 
   // Additional common transaction types
   // Asset transfers
   if (fromAccountType == AccountType.ASSET &&
       toAccountType == AccountType.ASSET) {
-    return '资产转移'; // e.g., moving cash from wallet to bank
+    return TransactionType
+        .ASSET_TRANSFER.displayName; // e.g., moving cash from wallet to bank
   }
 
   // Debt related
   if (fromAccountType == AccountType.ASSET &&
       toAccountType == AccountType.LIABILITY) {
-    return '偿还债务'; // e.g., paying off a loan from bank account
+    return TransactionType.DEBT_REPAYMENT
+        .displayName; // e.g., paying off a loan from bank account
   }
   if (fromAccountType == AccountType.LIABILITY &&
       toAccountType == AccountType.ASSET) {
-    return '获得贷款'; // e.g., loan amount credited to bank account
+    return TransactionType.LOAN_RECEIVED
+        .displayName; // e.g., loan amount credited to bank account
   }
 
   // Equity related
   if (fromAccountType == AccountType.EQUITY &&
       toAccountType == AccountType.ASSET) {
-    return '股东投入'; // e.g., owner invests capital into the business bank account
+    return TransactionType.PERSONAL_INVESTMENT
+        .displayName; // e.g., owner invests capital into the business bank account
   }
   if (fromAccountType == AccountType.ASSET &&
       toAccountType == AccountType.EQUITY) {
-    return '股东提取'; // e.g., owner withdraws cash from the business
+    return TransactionType.PERSONAL_WITHDRAWAL
+        .displayName; // e.g., owner withdraws cash from the business
   }
 
   // Expense refund
   if (fromAccountType == AccountType.EXPENSE &&
       toAccountType == AccountType.ASSET) {
-    return '费用退款'; // e.g., a refunded expense credited to bank account
+    return TransactionType.EXPENSE_REFUND
+        .displayName; // e.g., a refunded expense credited to bank account
   }
 
   // Fallback for unhandled combinations
