@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/common/bottom_input_toolbar.dart';
 import 'package:flowm/components/common/number_keypad.dart';
 import 'package:flowm/components/common/account_selector_field.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/state/transaction/transaction_repository.dart';
 
-class AddPage extends StatefulWidget {
+class AddPage extends ConsumerStatefulWidget {
   const AddPage({super.key});
 
   @override
-  State<AddPage> createState() => _AddPageState();
+  ConsumerState<AddPage> createState() => _AddPageState();
 }
 
-class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
+class _AddPageState extends ConsumerState<AddPage>
+    with SingleTickerProviderStateMixin {
   String amount = "0.00";
   String _currentExpression = ""; // 存储当前的运算表达式
   late TabController _tabController;
@@ -24,6 +28,7 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
   // 新增的账户选择状态
   Account? _fromAccount;
   Account? _toAccount;
+  String _transactionFlowType = '';
 
   @override
   void initState() {
@@ -43,12 +48,80 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  void _swapAccounts() {
+    setState(() {
+      final tempAccount = _fromAccount;
+      _fromAccount = _toAccount;
+      _toAccount = tempAccount;
+      _transactionFlowType = _calculateTransactionFlowType();
+    });
+  }
+
+  String _calculateTransactionFlowType() {
+    if (_fromAccount != null && _toAccount != null) {
+      return getTransactionFlowType(
+        _fromAccount!.type,
+        _toAccount!.type,
+      );
+    }
+    return '';
+  }
+
   void _handleDateTap() {
     showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: Colors.blue,
+            colorScheme: const ColorScheme.light(primary: Colors.blue),
+            buttonTheme:
+                const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            datePickerTheme: DatePickerThemeData(
+              dividerColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              headerBackgroundColor: Colors.blue[600],
+              headerForegroundColor: Colors.white,
+              dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
+                if (states.contains(MaterialState.selected)) {
+                  return Colors.blue[400];
+                }
+                return Colors.transparent;
+              }),
+              dayForegroundColor: MaterialStateProperty.resolveWith((states) {
+                if (states.contains(MaterialState.disabled)) {
+                  return Colors.grey[400];
+                }
+                if (states.contains(MaterialState.selected)) {
+                  return Colors.white;
+                }
+                return Colors.black87;
+              }),
+              dayOverlayColor: MaterialStateProperty.resolveWith((states) {
+                if (states.contains(MaterialState.selected)) {
+                  return Colors.blue[400];
+                }
+                if (states.contains(MaterialState.hovered) ||
+                    states.contains(MaterialState.pressed)) {
+                  return Colors.blue[100];
+                }
+                return Colors.transparent;
+              }),
+              dayShape: MaterialStateProperty.resolveWith((states) {
+                return RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                );
+              }),
+            ),
+          ),
+          child: child!,
+        );
+      },
     ).then((selectedDate) {
       if (selectedDate != null) {
         setState(() {
@@ -197,7 +270,19 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
     }
   }
 
-  void _saveTransaction() {
+  void _clearForm() {
+    setState(() {
+      amount = "0.00";
+      _currentExpression = "";
+      _noteController.clear();
+      _fromAccount = null;
+      _toAccount = null;
+      _transactionFlowType = '';
+      _currentDate = DateTime.now().toString().split(' ')[0];
+    });
+  }
+
+  void _saveTransaction() async {
     // TODO: 实现保存逻辑
     if (_fromAccount == null || _toAccount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +294,18 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
       return;
     }
 
-    if (amount == "0.00" || amount.isEmpty) {
+    if (_fromAccount!.id == _toAccount!.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('"从账户"和"到账户"不能相同'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final transactionAmount = double.tryParse(amount);
+    if (transactionAmount == null || transactionAmount == 0.0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('请输入有效金额'),
@@ -219,18 +315,49 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
       return;
     }
 
-    // 显示成功消息并返回
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('交易已保存'),
-        backgroundColor: Colors.green,
-      ),
-    );
-    Navigator.of(context).pop();
+    if (_noteController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('备注不能为空'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await ref
+          .read(transactionRepositoryProvider)
+          .createTransactionWithPostings(
+            fromAccountId: _fromAccount!.id,
+            toAccountId: _toAccount!.id,
+            amount: transactionAmount,
+            transactionDate: DateTime.parse(_currentDate),
+            description: _noteController.text,
+          );
+
+      // 显示成功消息并返回
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('交易已保存'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _clearForm();
+      // Navigator.of(context).pop();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('保存失败: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final transactionAmountValue = double.tryParse(amount) ?? 0.0;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -292,22 +419,50 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
                       selectedAccount: _fromAccount,
                       onAccountChanged: (account) {
                         setState(() {
+                          if (account != null && _toAccount?.id == account.id) {
+                            _toAccount = null;
+                          }
                           _fromAccount = account;
+                          _transactionFlowType =
+                              _calculateTransactionFlowType();
                         });
                       },
                       hintText: '选择资金来源',
                       defaultAccountType: AccountSelectorType.asset,
+                      transactionAmount: transactionAmountValue,
+                      isFromAccount: true,
+                      fromAccountType: _fromAccount?.type,
+                      toAccountType: _toAccount?.type,
                     ),
 
                     const SizedBox(height: 20),
 
                     // 转账箭头
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Icon(
-                        Icons.arrow_downward,
-                        color: Colors.grey[400],
-                        size: 24,
+                    GestureDetector(
+                      onTap: _swapAccounts,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.swap_vert,
+                              color: Colors.grey[400],
+                              size: 28,
+                            ),
+                            if (_transactionFlowType.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                _transactionFlowType,
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
 
@@ -319,11 +474,21 @@ class _AddPageState extends State<AddPage> with SingleTickerProviderStateMixin {
                       selectedAccount: _toAccount,
                       onAccountChanged: (account) {
                         setState(() {
+                          if (account != null &&
+                              _fromAccount?.id == account.id) {
+                            _fromAccount = null;
+                          }
                           _toAccount = account;
+                          _transactionFlowType =
+                              _calculateTransactionFlowType();
                         });
                       },
                       hintText: '选择资金去向',
                       defaultAccountType: AccountSelectorType.expense,
+                      transactionAmount: transactionAmountValue,
+                      isFromAccount: false,
+                      fromAccountType: _fromAccount?.type,
+                      toAccountType: _toAccount?.type,
                     ),
 
                     const Spacer(),

@@ -64,6 +64,7 @@ class _TopAssetsAccountDetailPageState
               return Account(
                 id: account.id,
                 name: account.name,
+                type: account.type,
                 amount: account.amount,
                 icon: account.icon,
                 children: account

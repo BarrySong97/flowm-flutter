@@ -296,6 +296,7 @@ class AccountRepository {
       results.add(account_ui.Account(
         id: acc.account.accountId,
         name: acc.account.accountName,
+        type: acc.account.accountType,
         amount: 0.0, // 不计算余额，设为0
         children: uiChildren,
         currencySymbol: '¥',
@@ -340,6 +341,7 @@ class AccountRepository {
       results.add(account_ui.Account(
         id: acc.account.accountId,
         name: acc.account.accountName,
+        type: acc.account.accountType,
         amount: totalAmountForUI, // 使用新计算的总金额
         children: uiChildren, // 传递已经处理过的UI子账户列表
         currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
@@ -593,23 +595,37 @@ class AccountRepository {
   Future<double> getExpenseInPeriod(
       int ledgerId, DateTime start, DateTime end) async {
     try {
-      // 获取所有与该账本相关的资产账户
-      final assetAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final assetAccountsList = assetAccounts
-          .where((account) => account.accountType == AccountType.ASSET)
+      // 获取所有与该账本相关的费用账户
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final expenseAccountIds = allAccounts
+          .where((account) => account.accountType == AccountType.EXPENSE)
+          .map((acc) => acc.accountId)
           .toList();
 
-      if (assetAccountsList.isEmpty) return 0.0;
-
-      // 计算资产账户在此期间的支出（负值交易）
-      double totalExpense = 0.0;
-      for (final account in assetAccountsList) {
-        final accountExpense =
-            await _getAccountExpenseInPeriod(account.accountId, start, end);
-        totalExpense += accountExpense;
+      if (expenseAccountIds.isEmpty) {
+        return 0.0;
       }
-      return totalExpense;
+
+      // 计算费用账户在此期间的总金额。
+      // 在复式记账中，费用账户的增加通常记录为借方（正值）。
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT SUM(p.amount) as total
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN (${expenseAccountIds.map((_) => '?').join(',')})
+        AND t.transaction_date BETWEEN ? AND ?
+        ''',
+        variables: [
+          ...expenseAccountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).getSingle();
+
+      return result.read<double?>('total') ?? 0.0;
     } catch (e) {
+      print('[AccountRepository] Error in getExpenseInPeriod: $e');
       return 0.0;
     }
   }
@@ -618,75 +634,39 @@ class AccountRepository {
   Future<double> getIncomeInPeriod(
       int ledgerId, DateTime start, DateTime end) async {
     try {
-      // 获取所有与该账本相关的资产账户
-      final assetAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final assetAccountsList = assetAccounts
-          .where((account) => account.accountType == AccountType.ASSET)
+      // 获取所有与该账本相关的收入账户
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final incomeAccountIds = allAccounts
+          .where((account) => account.accountType == AccountType.INCOME)
+          .map((acc) => acc.accountId)
           .toList();
 
-      if (assetAccountsList.isEmpty) return 0.0;
-
-      // 计算资产账户在此期间的收入（正值交易）
-      double totalIncome = 0.0;
-      for (final account in assetAccountsList) {
-        final accountIncome =
-            await _getAccountIncomeInPeriod(account.accountId, start, end);
-        totalIncome += accountIncome;
+      if (incomeAccountIds.isEmpty) {
+        return 0.0;
       }
-      return totalIncome;
-    } catch (e) {
-      return 0.0;
-    }
-  }
 
-  /// 获取账户指定时间段内的支出
-  Future<double> _getAccountExpenseInPeriod(
-      int accountId, DateTime start, DateTime end) async {
-    try {
+      // 计算收入账户在此期间的总金额。
+      // 在复式记账中，收入账户的增加通常记录为贷方（负值）。
+      // 因此，我们需要对总和取反以得到正数的收入值。
       final result = await _accountDao.customSelect(
         '''
-        SELECT SUM(p.amount) as expense
+        SELECT SUM(p.amount) as total
         FROM postings p
         JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id = ? 
+        WHERE p.account_id IN (${incomeAccountIds.map((_) => '?').join(',')})
         AND t.transaction_date BETWEEN ? AND ?
-        AND p.amount < 0
         ''',
         variables: [
-          Variable.withInt(accountId),
+          ...incomeAccountIds.map((id) => Variable.withInt(id)),
           Variable.withDateTime(start),
           Variable.withDateTime(end),
         ],
       ).getSingle();
 
-      return (result.read<double?>('expense') ?? 0.0).abs(); // 转为正值
+      // 收入是贷方，金额为负，所以取反
+      return -(result.read<double?>('total') ?? 0.0);
     } catch (e) {
-      return 0.0;
-    }
-  }
-
-  /// 获取账户指定时间段内的收入
-  Future<double> _getAccountIncomeInPeriod(
-      int accountId, DateTime start, DateTime end) async {
-    try {
-      final result = await _accountDao.customSelect(
-        '''
-        SELECT SUM(p.amount) as income
-        FROM postings p
-        JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id = ? 
-        AND t.transaction_date BETWEEN ? AND ?
-        AND p.amount > 0
-        ''',
-        variables: [
-          Variable.withInt(accountId),
-          Variable.withDateTime(start),
-          Variable.withDateTime(end),
-        ],
-      ).getSingle();
-
-      return result.read<double?>('income') ?? 0.0;
-    } catch (e) {
+      print('[AccountRepository] Error in getIncomeInPeriod: $e');
       return 0.0;
     }
   }

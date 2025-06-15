@@ -153,4 +153,48 @@ class TransactionRepository {
           DateTime startDate, DateTime endDate, int? ledgerId) =>
       _transactionDao.watchTransactionsWithAmountByDateRange(
           startDate, endDate, ledgerId);
+
+  /// 创建一笔包含记账分录的完整交易
+  ///
+  /// [fromAccountId] - 资金来源账户ID
+  /// [toAccountId] - 资金去向账户ID
+  /// [amount] - 交易金额 (正数)
+  /// [transactionDate] - 交易日期
+  /// [description] - 交易描述
+  Future<void> createTransactionWithPostings({
+    required int fromAccountId,
+    required int toAccountId,
+    required double amount,
+    required DateTime transactionDate,
+    String? description,
+  }) async {
+    return _transactionDao.db.transaction(() async {
+      // 1. 创建 Transaction 记录
+      final transactionId = await _transactionDao.insertTransaction(
+        TransactionsCompanion.insert(
+          transactionDate: transactionDate,
+          description: Value(description),
+        ),
+      );
+
+      // 2. 创建两条 Posting 记录
+      // fromAccount 的 Posting (资金减少)
+      await _transactionDao.db.postings.insertOne(
+        PostingsCompanion.insert(
+          transactionId: transactionId,
+          accountId: fromAccountId,
+          amount: -amount, // 金额为负
+        ),
+      );
+
+      // toAccount 的 Posting (资金增加)
+      await _transactionDao.db.postings.insertOne(
+        PostingsCompanion.insert(
+          transactionId: transactionId,
+          accountId: toAccountId,
+          amount: amount, // 金额为正
+        ),
+      );
+    });
+  }
 }

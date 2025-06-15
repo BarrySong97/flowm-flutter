@@ -61,6 +61,7 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
           id: child.id,
           name: child.name,
           amount: child.amount,
+          type: child.type,
           icon: child.icon,
           children:
               child.children, // Children of children are not processed here

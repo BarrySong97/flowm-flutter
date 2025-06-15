@@ -151,3 +151,35 @@ TransactionNature getTransactionNature(
   // Default to OTHER if no specific rule matches
   return TransactionNature.OTHER;
 }
+
+double getBalanceChange({
+  required bool isFromAccount,
+  AccountType? fromAccountType,
+  AccountType? toAccountType,
+}) {
+  if (isFromAccount) {
+    if (fromAccountType == null) return 0;
+    // Account is being Credited (source of funds)
+    switch (fromAccountType) {
+      case AccountType.ASSET:
+      case AccountType.EXPENSE:
+        return -1; // Balance decreases
+      case AccountType.LIABILITY:
+      case AccountType.EQUITY:
+      case AccountType.INCOME:
+        return 1; // Balance increases
+    }
+  } else {
+    if (toAccountType == null) return 0;
+    // Account is being Debited (destination of funds)
+    switch (toAccountType) {
+      case AccountType.ASSET:
+      case AccountType.EXPENSE:
+        return 1; // Balance increases
+      case AccountType.LIABILITY:
+      case AccountType.EQUITY:
+      case AccountType.INCOME:
+        return -1; // Balance decreases
+    }
+  }
+}

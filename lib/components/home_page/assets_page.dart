@@ -357,6 +357,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     id: account.id,
                     name: account.name,
                     amount: account.amount,
+                    type: account.type,
                     icon: account.icon,
                     children: account
                         .children, // Children percentages are handled within AccountItem

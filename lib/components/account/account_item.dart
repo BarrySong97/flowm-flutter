@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/account/account_row.dart'; // Import the new AccountRow
+import 'package:flowm/db/tables/account_table.dart';
 
 // Data model for an account
 class Account {
   final int id;
   final String name;
   final double amount;
+  final AccountType type;
   final IconData?
       icon; // Icon for the account (e.g., for child items like "保险")
   final List<Account>? children; // Sub-accounts
@@ -17,6 +19,7 @@ class Account {
     required this.id,
     required this.name,
     required this.amount,
+    required this.type,
     this.icon,
     this.children,
     this.currencySymbol = '', // Default to no symbol, explicitly set if needed
@@ -60,6 +63,7 @@ class _AccountItemState extends State<AccountItem> {
           id: child.id,
           name: child.name,
           amount: child.amount,
+          type: child.type,
           icon: child.icon,
           children:
               child.children, // Children of children are not processed here
@@ -156,40 +160,52 @@ class _AccountItemState extends State<AccountItem> {
 //
 // class MyAccountsPage extends StatelessWidget {
 //   final Account investmentAccount = Account(
+//     id: 1,
 //     name: '投资理财',
 //     amount: 0.00,
+//     type: AccountType.ASSET,
 //     currencySymbol: '¥', // Base currency, though not shown for parent itself
 //     children: [
 //       Account(
+//         id: 2,
 //         name: '保险',
 //         amount: 0.00,
+//         type: AccountType.ASSET,
 //         icon: Icons.shield,
 //         currencySymbol: '¥'
 //       ),
 //       Account(
+//         id: 3,
 //         name: '基金',
 //         amount: 1500.75,
+//         type: AccountType.ASSET,
 //         icon: Icons.trending_up,
 //         currencySymbol: '¥'
 //       ),
 //       Account(
+//         id: 4,
 //         name: '零钱通', // Child without icon
 //         amount: 200.50,
+//         type: AccountType.ASSET,
 //         currencySymbol: '¥'
 //       )
 //     ],
 //   );
 //
 //   final Account singleSavingsAccount = Account(
+//     id: 5,
 //     name: '活期存款',
 //     amount: 10250.55,
+//     type: AccountType.ASSET,
 //     icon: Icons.account_balance,
 //     currencySymbol: '¥'
 //   );
 //
 //   final Account simpleDebtAccount = Account(
+//     id: 6,
 //     name: '信用卡账单',
 //     amount: -500.00,
+//     type: AccountType.LIABILITY,
 //     currencySymbol: '¥'
 //   );
 //
@@ -212,8 +228,10 @@ class _AccountItemState extends State<AccountItem> {
 //           // Example of a single item that is conceptually a parent but has no children currently
 //           AccountItem(
 //             account: Account(
+//               id: 7,
 //               name: '股票账户',
 //               amount: 12345.67,
+//               type: AccountType.ASSET,
 //               children: [], // Has the potential for children
 //               currencySymbol: '¥'
 //             )
@@ -221,8 +239,10 @@ class _AccountItemState extends State<AccountItem> {
 //           // Example of a very simple single item
 //            AccountItem(
 //             account: Account(
+//               id: 8,
 //               name: '现金',
 //               amount: 300.00,
+//               type: AccountType.ASSET,
 //               currencySymbol: '¥'
 //             )
 //           ),

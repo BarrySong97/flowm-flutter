@@ -65,6 +65,7 @@ class _TopAssetsAccountDetailPageState
                 name: account.name,
                 amount: account.amount,
                 icon: account.icon,
+                type: account.type,
                 children: account
                     .children, // Children percentages are handled within AccountItem
                 currencySymbol: account.currencySymbol,

@@ -251,6 +251,7 @@ class LiabilitiesRepository {
         id: acc.account.accountId,
         name: acc.account.accountName,
         amount: totalAmountForUI,
+        type: acc.account.accountType,
         children: uiChildren,
         currencySymbol: '¥',
       ));
