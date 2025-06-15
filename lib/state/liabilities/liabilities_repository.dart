@@ -29,52 +29,55 @@ final liabilitiesAccountTransactionsProvider = StreamProvider.family<
 
 /// 顶级负债账户提供者，缓存获取的负债账户数据
 final topLiabilityAccountsProvider =
-    FutureProvider<List<AccountWithBalance>>((ref) async {
+    StreamProvider<List<AccountWithBalance>>((ref) async* {
   final repository = ref.watch(liabilitiesRepositoryProvider);
-
-  // 先尝试获取当前选中的账本
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+
   if (selectedLedger != null) {
-    // 如果有选中的账本，根据账本获取负债账户
-    return repository.getTopLiabilityAccountsByLedger(
+    yield* repository.watchTopLiabilityAccountsByLedger(
         ledgerId: selectedLedger.ledgerId);
   } else {
-    // 如果没有选中的账本，使用原来的方法获取所有负债账户
-    return repository.getTopLiabilityAccounts();
+    yield []; // Or handle as an error, but yielding an empty list is safer
   }
 });
 
 /// 提供UI负债账户列表，与AccountItem组件兼容
 final uiLiabilityAccountsProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
+    StreamProvider<List<account_ui.Account>>((ref) async* {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getLiabilitiesAccountTree(
-      ledgerId: selectedLedger?.ledgerId);
+  if (selectedLedger != null) {
+    yield* repository.watchLiabilityAccountTree(
+        ledgerId: selectedLedger.ledgerId);
+  } else {
+    yield [];
+  }
 });
 
 /// 年度负债趋势数据提供者，用于绘制负债变化曲线图
 final yearlyLiabilityTrendProvider =
-    FutureProvider<List<LiabilityHistoryData>>((ref) async {
+    StreamProvider<List<LiabilityHistoryData>>((ref) async* {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    return [];
+    yield [];
+    return;
   }
 
-  return repository.getYearlyLiabilityHistory(
+  yield* repository.watchYearlyLiabilityHistory(
       ledgerId: selectedLedger.ledgerId);
 });
 
-final liabilityTrendProviderByTimeRange = FutureProvider.family<
+final liabilityTrendProviderByTimeRange = StreamProvider.family<
     List<LiabilityHistoryData>,
-    ({int? accountId, TimeRange timeRange})>((ref, params) async {
+    ({int? accountId, TimeRange timeRange})>((ref, params) async* {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    return [];
+    yield [];
+    return;
   }
 
   DateTime endDate = DateTime.now();
@@ -103,7 +106,7 @@ final liabilityTrendProviderByTimeRange = FutureProvider.family<
       break;
   }
 
-  return repository.getLiabilityHistoryByTimeRange(
+  yield* repository.watchLiabilityHistoryByTimeRange(
     startDate,
     endDate,
     ledgerId: selectedLedger.ledgerId,
@@ -112,14 +115,15 @@ final liabilityTrendProviderByTimeRange = FutureProvider.family<
 });
 // 基于日期范围的负债趋势提供者
 final liabilityTrendProviderByDateRange =
-    FutureProvider.family<List<LiabilityHistoryData>, int?>(
-        (ref, accountId) async {
+    StreamProvider.family<List<LiabilityHistoryData>, int?>(
+        (ref, accountId) async* {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    return [];
+    yield [];
+    return;
   }
 
   DateTime endDate = DateTime.now();
@@ -144,7 +148,7 @@ final liabilityTrendProviderByDateRange =
       break;
   }
 
-  return repository.getLiabilityHistoryByTimeRange(
+  yield* repository.watchLiabilityHistoryByTimeRange(
     startDate,
     endDate,
     ledgerId: selectedLedger.ledgerId,
@@ -218,6 +222,7 @@ class LiabilitiesRepository {
       final result = await _convertAccountsToUIFormat(liabilityAccounts);
       return result;
     } catch (e) {
+      print('[LiabilitiesRepository] Error in getLiabilitiesAccountTree: $e');
       return [];
     }
   }
@@ -232,8 +237,9 @@ class LiabilitiesRepository {
     final List<account_ui.Account> results = [];
 
     for (final acc in accounts) {
+      // 负债账户的余额通常是负数或零。UI上我们通常希望显示为正数。
       final double directBalance =
-          (await _accountDao.getAccountBalance(acc.account.accountId)).abs();
+          (await _accountDao.getAccountBalance(acc.account.accountId));
 
       double childrensTotalAmount = 0.0;
       List<account_ui.Account>? uiChildren;
@@ -250,14 +256,32 @@ class LiabilitiesRepository {
       results.add(account_ui.Account(
         id: acc.account.accountId,
         name: acc.account.accountName,
-        amount: totalAmountForUI,
         type: acc.account.accountType,
+        amount: totalAmountForUI.abs(), // 使用绝对值确保UI上显示为正数
         children: uiChildren,
         currencySymbol: '¥',
+        icon: _getAccountIcon(acc.account.accountType),
       ));
     }
 
     return results;
+  }
+
+  IconData _getAccountIcon(AccountType accountType) {
+    switch (accountType) {
+      case AccountType.ASSET:
+        return Icons.account_balance_wallet;
+      case AccountType.LIABILITY:
+        return Icons.credit_card;
+      case AccountType.EXPENSE:
+        return Icons.trending_down;
+      case AccountType.INCOME:
+        return Icons.trending_up;
+      case AccountType.EQUITY:
+        return Icons.pie_chart;
+      default:
+        return Icons.account_balance;
+    }
   }
 
   /// 获取所有叶子负债账户（按余额降序排序）
@@ -373,7 +397,7 @@ class LiabilitiesRepository {
               await _getAccountBalanceAtDate(account.accountId, currentDate);
         }
         history.add(LiabilityHistoryData(
-            date: currentDate, totalLiabilities: dailyTotalLiabilities));
+            date: currentDate, totalLiabilities: dailyTotalLiabilities.abs()));
       }
       return history;
     } catch (e, s) {
@@ -464,12 +488,11 @@ class LiabilitiesRepository {
 
       final List<AccountWithBalance> accountsWithBalance = [];
       for (final account in liabilityAccounts) {
-        final balance =
-            (await _accountDao.getAccountBalance(account.accountId)).abs();
+        final balance = await _accountDao.getAccountBalance(account.accountId);
         accountsWithBalance.add(
           AccountWithBalance(
             account: account,
-            balance: balance,
+            balance: balance.abs(), // 使用绝对值
           ),
         );
       }
@@ -479,10 +502,9 @@ class LiabilitiesRepository {
       return limit != null
           ? accountsWithBalance.take(limit).toList()
           : accountsWithBalance;
-    } catch (e, s) {
+    } catch (e) {
       print(
           '[LiabilitiesRepository] Error in getTopLiabilityAccountsByLedger: $e');
-      print('[LiabilitiesRepository] Stacktrace: $s');
       return [];
     }
   }
@@ -910,6 +932,53 @@ class LiabilitiesRepository {
       nodes: nodes,
       links: links,
     );
+  }
+
+  Stream<List<AccountWithBalance>> watchTopLiabilityAccountsByLedger(
+      {int? limit, required int ledgerId}) {
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((_) async {
+      final accounts = await getTopLiabilityAccountsByLedger(
+          ledgerId: ledgerId, limit: limit);
+      return accounts;
+    });
+  }
+
+  Stream<List<LiabilityHistoryData>> watchYearlyLiabilityHistory(
+      {required int ledgerId}) {
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((_) => getYearlyLiabilityHistory(ledgerId: ledgerId));
+  }
+
+  Stream<List<LiabilityHistoryData>> watchLiabilityHistoryByTimeRange(
+      DateTime start, DateTime end,
+      {required int ledgerId, int? accountId}) {
+    return _transactionDao.watchAllTransactions(ledgerId: ledgerId).asyncMap(
+        (_) => getLiabilityHistoryByTimeRange(start, end,
+            ledgerId: ledgerId, accountId: accountId));
+  }
+
+  Stream<List<account_ui.Account>> watchLiabilityAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value([]);
+    }
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((_) async {
+      try {
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
+        final liabilityAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.LIABILITY)
+            .toList();
+        final result = await _convertAccountsToUIFormat(liabilityAccounts);
+        return result;
+      } catch (e) {
+        print('[LiabilitiesRepository] Error in watchLiabilityAccountTree: $e');
+        return [];
+      }
+    });
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import '../../db/app_database.dart';
 import '../../db/dao/account_dao.dart';
+import '../../db/dao/transaction_dao.dart';
 import '../../db/tables/account_table.dart';
 import '../../components/account/account_item.dart' as account_ui;
 import '../../components/common/time_range_selector.dart';
@@ -16,97 +17,127 @@ final selectedDateRangeProvider =
 /// 账户仓库提供者，用于封装账户相关的数据库操作
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
-  return AccountRepository(accountDao);
+  final transactionDao = ref.watch(transactionDaoProvider);
+  return AccountRepository(accountDao, transactionDao);
 });
 
-/// 顶级资产账户提供者，缓存获取的资产账户数据
-/// 这个提供者会缓存getTopAssetAccounts的结果，避免重复请求
+/// 顶级资产账户提供者，改为 Stream 形式以支持响应式更新
 final topAssetAccountsProvider =
-    FutureProvider<List<AccountWithBalance>>((ref) async {
+    StreamProvider<List<AccountWithBalance>>((ref) async* {
   final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
 
-  // 先尝试获取当前选中的账本
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  if (selectedLedger != null) {
+  if (ledger != null) {
     // 如果有选中的账本，根据账本获取资产账户
-    return repository.getTopAssetAccountsByLedger(
-        ledgerId: selectedLedger.ledgerId);
+    yield* repository.watchTopAssetAccountsByLedger(ledgerId: ledger.ledgerId);
   } else {
-    // 如果没有选中的账本，使用原来的方法获取所有资产账户
-    return repository.getTopAssetAccounts();
+    // 如果没有选中的账本，返回空列表
+    yield [];
   }
 });
 
-/// 提供UI账户列表，与AccountItem组件兼容
+/// 提供UI账户列表，改为 Stream 形式以支持响应式更新
 final uiAccountsProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
+    StreamProvider<List<account_ui.Account>>((ref) async* {
   final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getAssetsAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
+  final ledger = await ref.watch(selectedLedgerProvider.future);
 
-/// 提供资产账户树
-final assetsAccountTreeProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getAssetsAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
-
-/// 提供负债账户树
-final liabilityAccountTreeProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getLiabilityAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
-
-/// 提供费用账户树
-final expenseAccountTreeProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getExpenseAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
-
-/// 提供收入账户树
-final incomeAccountTreeProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getIncomeAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
-
-/// 提供权益账户树
-final equityAccountTreeProvider =
-    FutureProvider<List<account_ui.Account>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  return repository.getEquityAccountTree(ledgerId: selectedLedger?.ledgerId);
-});
-
-/// 年度资产趋势数据提供者，用于绘制资产变化曲线图
-final yearlyAssetTrendProvider =
-    FutureProvider<List<AssetHistoryData>>((ref) async {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-
-  if (selectedLedger == null) {
-    return [];
+  if (ledger != null) {
+    yield* repository.watchAssetsAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
   }
-
-  return repository.getYearlyAssetHistory(ledgerId: selectedLedger.ledgerId);
 });
 
-// Renamed and modified provider that fetches asset trend data based on selectedDateRangeProvider
+/// 提供资产账户树，改为 Stream 形式
+final assetsAccountTreeProvider =
+    StreamProvider<List<account_ui.Account>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchAssetsAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+/// 提供负债账户树，改为 Stream 形式
+final liabilityAccountTreeProvider =
+    StreamProvider<List<account_ui.Account>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchLiabilityAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+/// 提供费用账户树，改为 Stream 形式
+final expenseAccountTreeProvider =
+    StreamProvider<List<account_ui.Account>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchExpenseAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+/// 提供收入账户树，改为 Stream 形式
+final incomeAccountTreeProvider =
+    StreamProvider<List<account_ui.Account>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchIncomeAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+/// 提供权益账户树，改为 Stream 形式
+final equityAccountTreeProvider =
+    StreamProvider<List<account_ui.Account>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchEquityAccountTree(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+/// 年度资产趋势数据提供者，改为 Stream 形式
+final yearlyAssetTrendProvider =
+    StreamProvider<List<AssetHistoryData>>((ref) async* {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    yield* repository.watchYearlyAssetHistory(ledgerId: ledger.ledgerId);
+  } else {
+    yield [];
+  }
+});
+
+// 基于selectedDateRangeProvider的资产趋势数据提供者，改为 Stream 形式
 final assetTrendProviderByDateRange =
-    FutureProvider.family<List<AssetHistoryData>, int?>((ref, accountId) async {
+    StreamProvider.family<List<AssetHistoryData>, int?>(
+        (ref, accountId) async* {
   final repository = ref.watch(accountRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
 
-  if (selectedLedger == null) {
-    return [];
+  if (ledger == null) {
+    yield [];
+    return;
   }
 
   DateTime endDate = DateTime.now();
@@ -117,8 +148,7 @@ final assetTrendProviderByDateRange =
       startDate = DateTime(endDate.year, 1, 1);
       break;
     case '60days':
-      startDate =
-          endDate.subtract(const Duration(days: 59)); // 59 + today = 60 days
+      startDate = endDate.subtract(const Duration(days: 59));
       break;
     case '30days':
       startDate = endDate.subtract(const Duration(days: 29));
@@ -127,28 +157,29 @@ final assetTrendProviderByDateRange =
       startDate = endDate.subtract(const Duration(days: 14));
       break;
     case 'month':
-    default: // Default to 'month'
+    default:
       startDate = DateTime(endDate.year, endDate.month, 1);
       break;
   }
 
-  return repository.getAssetHistoryByTimeRange(
+  yield* repository.watchAssetHistoryByTimeRange(
     startDate,
     endDate,
-    ledgerId: selectedLedger.ledgerId,
+    ledgerId: ledger.ledgerId,
     accountId: accountId,
   );
 });
 
-// 基于TimeRange类型的资产趋势数据提供者
-final assetTrendProviderByTimeRange = FutureProvider.family<
+// 基于TimeRange类型的资产趋势数据提供者，改为 Stream 形式
+final assetTrendProviderByTimeRange = StreamProvider.family<
     List<AssetHistoryData>,
-    ({int? accountId, TimeRange timeRange})>((ref, params) async {
+    ({int? accountId, TimeRange timeRange})>((ref, params) async* {
   final repository = ref.watch(accountRepositoryProvider);
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
 
-  if (selectedLedger == null) {
-    return [];
+  if (ledger == null) {
+    yield [];
+    return;
   }
 
   DateTime endDate = DateTime.now();
@@ -156,7 +187,6 @@ final assetTrendProviderByTimeRange = FutureProvider.family<
 
   switch (params.timeRange) {
     case TimeRange.all:
-      // 获取所有历史数据，从一年前开始
       startDate = DateTime(endDate.year - 1, endDate.month, endDate.day);
       break;
     case TimeRange.thisYear:
@@ -177,10 +207,10 @@ final assetTrendProviderByTimeRange = FutureProvider.family<
       break;
   }
 
-  return repository.getAssetHistoryByTimeRange(
+  yield* repository.watchAssetHistoryByTimeRange(
     startDate,
     endDate,
-    ledgerId: selectedLedger.ledgerId,
+    ledgerId: ledger.ledgerId,
     accountId: params.accountId,
   );
 });
@@ -192,8 +222,9 @@ final assetTrendProviderByTimeRange = FutureProvider.family<
 /// 封装与账户相关的所有数据库操作，提供更高级别的业务逻辑方法
 class AccountRepository {
   final AccountDao _accountDao;
+  final TransactionDao _transactionDao;
 
-  AccountRepository(this._accountDao);
+  AccountRepository(this._accountDao, this._transactionDao);
 
   /// 获取所有账户
   Future<List<Account>> getAllAccounts() => _accountDao.getAllAccounts();
@@ -201,177 +232,142 @@ class AccountRepository {
   /// 监听所有账户（响应式流）
   Stream<List<Account>> watchAllAccounts() => _accountDao.watchAllAccounts();
 
-  /// 获取UI展示所需的账户树
-  /// 将数据库中的账户转换为UI组件所需的格式
-  Future<List<account_ui.Account>> getAssetsAccountTree({int? ledgerId}) async {
-    try {
-      // 获取账户树，先构建完整的层级关系
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
-
-      // 只保留资产类型的账户
-      final assetAccounts = accountTree
-          .where((acc) => acc.account.accountType == AccountType.ASSET)
-          .toList();
-
-      // 递归转换为UI需要的Account格式
-      final result = await _convertAccountsToUIFormat(assetAccounts);
-      return result;
-    } catch (e) {
-      return []; // 发生错误时返回空列表
-    }
-  }
-
-  /// 获取负债账户树
-  Future<List<account_ui.Account>> getLiabilityAccountTree(
-      {int? ledgerId}) async {
-    try {
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
-      final liabilityAccounts = accountTree
-          .where((acc) => acc.account.accountType == AccountType.LIABILITY)
-          .toList();
-      return _convertAccountsToUIFormatWithoutBalance(liabilityAccounts);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// 获取费用账户树
-  Future<List<account_ui.Account>> getExpenseAccountTree(
-      {int? ledgerId}) async {
-    try {
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
-      final expenseAccounts = accountTree
-          .where((acc) => acc.account.accountType == AccountType.EXPENSE)
-          .toList();
-      return _convertAccountsToUIFormatWithoutBalance(expenseAccounts);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// 获取收入账户树
-  Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId}) async {
-    try {
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
-      final incomeAccounts = accountTree
-          .where((acc) => acc.account.accountType == AccountType.INCOME)
-          .toList();
-      return _convertAccountsToUIFormatWithoutBalance(incomeAccounts);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// 获取权益账户树
-  Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId}) async {
-    try {
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
-      final equityAccounts = accountTree
-          .where((acc) => acc.account.accountType == AccountType.EQUITY)
-          .toList();
-      return _convertAccountsToUIFormatWithoutBalance(equityAccounts);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
-  List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
-      List<AccountWithChildren> accounts) {
-    if (accounts.isEmpty) {
-      return [];
+  /// 监听UI展示所需的资产账户树
+  Stream<List<account_ui.Account>> watchAssetsAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value(<account_ui.Account>[]);
     }
 
-    final List<account_ui.Account> results = [];
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((_) async {
+      try {
+        // 构建完整的层级关系
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
 
-    for (final acc in accounts) {
-      List<account_ui.Account>? uiChildren;
+        // 只保留资产类型的账户
+        final assetAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.ASSET)
+            .toList();
 
-      // 如果有子账户，递归处理子账户
-      if (acc.children.isNotEmpty) {
-        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
+        // 递归转换为UI需要的Account格式
+        return await _convertAccountsToUIFormat(assetAccounts);
+      } catch (e) {
+        print('[AccountRepository] Error in watchAssetsAccountTree: $e');
+        return <account_ui.Account>[]; // 发生错误时返回空列表
       }
-
-      // 创建UI需要的Account对象，金额设为0
-      results.add(account_ui.Account(
-        id: acc.account.accountId,
-        name: acc.account.accountName,
-        type: acc.account.accountType,
-        amount: 0.0, // 不计算余额，设为0
-        children: uiChildren,
-        currencySymbol: '¥',
-        icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
-      ));
-    }
-
-    return results;
+    });
   }
 
-  // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
-  Future<List<account_ui.Account>> _convertAccountsToUIFormat(
-      List<AccountWithChildren> accounts) async {
-    if (accounts.isEmpty) {
-      return [];
+  /// 监听负债账户树
+  Stream<List<account_ui.Account>> watchLiabilityAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value(<account_ui.Account>[]);
     }
 
-    final List<account_ui.Account> results = [];
-
-    for (final acc in accounts) {
-      // 1. 获取当前账户自身的直接余额
-      // 我们假设 _accountDao.getAccountBalance 返回的是该账户所有直接记账的总和。
-      final double directBalance =
-          await _accountDao.getAccountBalance(acc.account.accountId);
-
-      double childrensTotalAmount = 0.0;
-      List<account_ui.Account>? uiChildren;
-
-      // 2. 如果有子账户，递归处理子账户并累加其UI显示的金额
-      if (acc.children.isNotEmpty) {
-        uiChildren = await _convertAccountsToUIFormat(acc.children);
-        for (final childUiAccount in uiChildren) {
-          // childUiAccount.amount 已经是经过递归计算的完整余额（自身+其子项）
-          childrensTotalAmount += childUiAccount.amount;
-        }
+    return _accountDao
+        .watchAccountsByLedgerId(ledgerId)
+        .asyncMap((accounts) async {
+      try {
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
+        final liabilityAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.LIABILITY)
+            .toList();
+        return _convertAccountsToUIFormatWithoutBalance(liabilityAccounts);
+      } catch (e) {
+        return <account_ui.Account>[];
       }
-
-      // 3. 当前账户在UI上显示的总金额 = 自身直接余额 + 子账户UI显示金额总和
-      final double totalAmountForUI = directBalance + childrensTotalAmount;
-
-      // 创建UI需要的Account对象
-      results.add(account_ui.Account(
-        id: acc.account.accountId,
-        name: acc.account.accountName,
-        type: acc.account.accountType,
-        amount: totalAmountForUI, // 使用新计算的总金额
-        children: uiChildren, // 传递已经处理过的UI子账户列表
-        currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
-      ));
-    }
-
-    return results;
+    });
   }
 
-  // 根据账户类型获取对应的图标
-  IconData _getAccountIcon(AccountType accountType) {
-    switch (accountType) {
-      case AccountType.ASSET:
-        return Icons.account_balance_wallet;
-      case AccountType.LIABILITY:
-        return Icons.credit_card;
-      case AccountType.EXPENSE:
-        return Icons.trending_down;
-      case AccountType.INCOME:
-        return Icons.trending_up;
-      case AccountType.EQUITY:
-        return Icons.pie_chart;
-      default:
-        return Icons.account_balance;
+  /// 监听费用账户树
+  Stream<List<account_ui.Account>> watchExpenseAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value(<account_ui.Account>[]);
     }
+
+    return _accountDao
+        .watchAccountsByLedgerId(ledgerId)
+        .asyncMap((accounts) async {
+      try {
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
+        final expenseAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.EXPENSE)
+            .toList();
+        return _convertAccountsToUIFormatWithoutBalance(expenseAccounts);
+      } catch (e) {
+        return <account_ui.Account>[];
+      }
+    });
   }
 
-  /// 根据账户类型获取账户
-  Stream<List<Account>> watchAccountsByType(AccountType type) =>
-      _accountDao.watchAccountsByType(type);
+  /// 监听收入账户树
+  Stream<List<account_ui.Account>> watchIncomeAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value(<account_ui.Account>[]);
+    }
+
+    return _accountDao
+        .watchAccountsByLedgerId(ledgerId)
+        .asyncMap((accounts) async {
+      try {
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
+        final incomeAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.INCOME)
+            .toList();
+        return _convertAccountsToUIFormatWithoutBalance(incomeAccounts);
+      } catch (e) {
+        return <account_ui.Account>[];
+      }
+    });
+  }
+
+  /// 监听权益账户树
+  Stream<List<account_ui.Account>> watchEquityAccountTree({int? ledgerId}) {
+    if (ledgerId == null) {
+      return Stream.value(<account_ui.Account>[]);
+    }
+
+    return _accountDao
+        .watchAccountsByLedgerId(ledgerId)
+        .asyncMap((accounts) async {
+      try {
+        final accountTree = await getAccountTree(ledgerId: ledgerId);
+        final equityAccounts = accountTree
+            .where((acc) => acc.account.accountType == AccountType.EQUITY)
+            .toList();
+        return _convertAccountsToUIFormatWithoutBalance(equityAccounts);
+      } catch (e) {
+        return <account_ui.Account>[];
+      }
+    });
+  }
+
+  /// 监听年度资产历史数据
+  Stream<List<AssetHistoryData>> watchYearlyAssetHistory(
+      {required int ledgerId}) {
+    // 监听所有相关的交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      final now = DateTime.now();
+      final oneYearAgo = now.subtract(const Duration(days: 365));
+      return getAssetHistoryByTime(oneYearAgo, now, ledgerId: ledgerId);
+    });
+  }
+
+  /// 监听指定时间段内的资产历史数据
+  Stream<List<AssetHistoryData>> watchAssetHistoryByTimeRange(
+      DateTime start, DateTime end,
+      {required int ledgerId, int? accountId}) {
+    // 监听所有相关的交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      return getAssetHistoryByTime(start, end,
+          ledgerId: ledgerId, accountId: accountId);
+    });
+  }
 
   /// 获取账户详情
   Future<Account?> getAccountById(int id) => _accountDao.getAccountById(id);
@@ -624,6 +620,172 @@ class AccountRepository {
     return AccountWithChildren(account: root, children: children);
   }
 
+  /// 获取指定时间段内的支出总额（Stream版本）
+  Stream<double> watchExpenseInPeriod(
+      int ledgerId, DateTime start, DateTime end) {
+    // 监听指定账本的所有交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      try {
+        // 获取所有与该账本相关的费用账户
+        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+        final expenseAccountIds = allAccounts
+            .where((account) => account.accountType == AccountType.EXPENSE)
+            .map((acc) => acc.accountId)
+            .toList();
+
+        if (expenseAccountIds.isEmpty) {
+          return 0.0;
+        }
+
+        // 计算费用账户在此期间的总金额
+        final result = await _accountDao.customSelect(
+          '''
+          SELECT SUM(p.amount) as total
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id IN (${expenseAccountIds.map((_) => '?').join(',')})
+          AND t.transaction_date BETWEEN ? AND ?
+          ''',
+          variables: [
+            ...expenseAccountIds.map((id) => Variable.withInt(id)),
+            Variable.withDateTime(start),
+            Variable.withDateTime(end),
+          ],
+        ).getSingle();
+
+        return result.read<double?>('total') ?? 0.0;
+      } catch (e) {
+        print('[AccountRepository] Error in watchExpenseInPeriod: $e');
+        return 0.0;
+      }
+    });
+  }
+
+  /// 获取指定时间段内的收入总额（Stream版本）
+  Stream<double> watchIncomeInPeriod(
+      int ledgerId, DateTime start, DateTime end) {
+    // 监听指定账本的所有交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      try {
+        // 获取所有与该账本相关的收入账户
+        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+        final incomeAccountIds = allAccounts
+            .where((account) => account.accountType == AccountType.INCOME)
+            .map((acc) => acc.accountId)
+            .toList();
+
+        if (incomeAccountIds.isEmpty) {
+          return 0.0;
+        }
+
+        // 计算收入账户在此期间的总金额
+        final result = await _accountDao.customSelect(
+          '''
+          SELECT SUM(p.amount) as total
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id IN (${incomeAccountIds.map((_) => '?').join(',')})
+          AND t.transaction_date BETWEEN ? AND ?
+          ''',
+          variables: [
+            ...incomeAccountIds.map((id) => Variable.withInt(id)),
+            Variable.withDateTime(start),
+            Variable.withDateTime(end),
+          ],
+        ).getSingle();
+
+        // 收入是贷方，金额为负，所以取反
+        return -(result.read<double?>('total') ?? 0.0);
+      } catch (e) {
+        print('[AccountRepository] Error in watchIncomeInPeriod: $e');
+        return 0.0;
+      }
+    });
+  }
+
+  /// 获取总负债（考虑特定账本）（Stream版本）
+  Stream<double> watchTotalLiabilitiesByLedger(int ledgerId) {
+    // 监听指定账本的所有交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      try {
+        // 获取所有与该账本相关的负债账户
+        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+        final liabilityAccountsList = allAccounts
+            .where((account) => account.accountType == AccountType.LIABILITY)
+            .toList();
+
+        if (liabilityAccountsList.isEmpty) return 0.0;
+
+        double totalLiabilities = 0.0;
+        for (final account in liabilityAccountsList) {
+          final balance =
+              await _accountDao.getAccountBalance(account.accountId);
+          totalLiabilities += balance;
+        }
+
+        return totalLiabilities;
+      } catch (e) {
+        print('[AccountRepository] Error in watchTotalLiabilitiesByLedger: $e');
+        return 0.0;
+      }
+    });
+  }
+
+  /// 获取顶级资产账户（考虑特定账本）（Stream版本）
+  Stream<List<AccountWithBalance>> watchTopAssetAccountsByLedger(
+      {int? limit, required int ledgerId}) {
+    // 监听指定账本的所有交易变化
+    return _transactionDao
+        .watchAllTransactions(ledgerId: ledgerId)
+        .asyncMap((transactions) async {
+      try {
+        // 获取所有与该账本相关的活跃资产账户
+        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+        final assetAccounts = allAccounts
+            .where((account) =>
+                account.accountType == AccountType.ASSET && account.isActive)
+            .toList();
+
+        if (assetAccounts.isEmpty) {
+          print(
+              '[AccountRepository] watchTopAssetAccountsByLedger: No active asset accounts found in ledger $ledgerId.');
+          return <AccountWithBalance>[];
+        }
+
+        // 计算每个资产账户的余额
+        final List<AccountWithBalance> accountsWithBalance = [];
+        for (final account in assetAccounts) {
+          final balance =
+              await _accountDao.getAccountBalance(account.accountId);
+          accountsWithBalance.add(
+            AccountWithBalance(
+              account: account,
+              balance: balance,
+            ),
+          );
+        }
+
+        // 按余额降序排序
+        accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
+
+        // 如果指定了limit，则返回前limit个
+        return limit != null
+            ? accountsWithBalance.take(limit).toList()
+            : accountsWithBalance;
+      } catch (e, s) {
+        print('[AccountRepository] Error in watchTopAssetAccountsByLedger: $e');
+        print('[AccountRepository] Stacktrace: $s');
+        return <AccountWithBalance>[];
+      }
+    });
+  }
+
   /// 获取指定时间段内的支出总额
   Future<double> getExpenseInPeriod(
       int ledgerId, DateTime start, DateTime end) async {
@@ -773,6 +935,178 @@ class AccountRepository {
     } catch (e, s) {
       print('[AccountRepository] Error in getTopAssetAccountsByLedger: $e');
       print('[AccountRepository] Stacktrace: $s');
+      return [];
+    }
+  }
+
+  // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
+  List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
+      List<AccountWithChildren> accounts) {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    final List<account_ui.Account> results = [];
+
+    for (final acc in accounts) {
+      List<account_ui.Account>? uiChildren;
+
+      // 如果有子账户，递归处理子账户
+      if (acc.children.isNotEmpty) {
+        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
+      }
+
+      // 创建UI需要的Account对象，金额设为0
+      results.add(account_ui.Account(
+        id: acc.account.accountId,
+        name: acc.account.accountName,
+        type: acc.account.accountType,
+        amount: 0.0, // 不计算余额，设为0
+        children: uiChildren,
+        currencySymbol: '¥',
+        icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
+      ));
+    }
+
+    return results;
+  }
+
+  // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
+  Future<List<account_ui.Account>> _convertAccountsToUIFormat(
+      List<AccountWithChildren> accounts) async {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    final List<account_ui.Account> results = [];
+
+    for (final acc in accounts) {
+      // 1. 获取当前账户自身的直接余额
+      // 我们假设 _accountDao.getAccountBalance 返回的是该账户所有直接记账的总和。
+      final double directBalance =
+          await _accountDao.getAccountBalance(acc.account.accountId);
+
+      double childrensTotalAmount = 0.0;
+      List<account_ui.Account>? uiChildren;
+
+      // 2. 如果有子账户，递归处理子账户并累加其UI显示的金额
+      if (acc.children.isNotEmpty) {
+        uiChildren = await _convertAccountsToUIFormat(acc.children);
+        for (final childUiAccount in uiChildren) {
+          // childUiAccount.amount 已经是经过递归计算的完整余额（自身+其子项）
+          childrensTotalAmount += childUiAccount.amount;
+        }
+      }
+
+      // 3. 当前账户在UI上显示的总金额 = 自身直接余额 + 子账户UI显示金额总和
+      final double totalAmountForUI = directBalance + childrensTotalAmount;
+
+      // 创建UI需要的Account对象
+      results.add(account_ui.Account(
+        id: acc.account.accountId,
+        name: acc.account.accountName,
+        type: acc.account.accountType,
+        amount: totalAmountForUI, // 使用新计算的总金额
+        children: uiChildren, // 传递已经处理过的UI子账户列表
+        currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
+      ));
+    }
+
+    return results;
+  }
+
+  // 根据账户类型获取对应的图标
+  IconData _getAccountIcon(AccountType accountType) {
+    switch (accountType) {
+      case AccountType.ASSET:
+        return Icons.account_balance_wallet;
+      case AccountType.LIABILITY:
+        return Icons.credit_card;
+      case AccountType.EXPENSE:
+        return Icons.trending_down;
+      case AccountType.INCOME:
+        return Icons.trending_up;
+      case AccountType.EQUITY:
+        return Icons.pie_chart;
+      default:
+        return Icons.account_balance;
+    }
+  }
+
+  /// 根据账户类型获取账户
+  Stream<List<Account>> watchAccountsByType(AccountType type) =>
+      _accountDao.watchAccountsByType(type);
+
+  /// 获取UI展示所需的账户树
+  /// 将数据库中的账户转换为UI组件所需的格式
+  Future<List<account_ui.Account>> getAssetsAccountTree({int? ledgerId}) async {
+    try {
+      // 获取账户树，先构建完整的层级关系
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+
+      // 只保留资产类型的账户
+      final assetAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.ASSET)
+          .toList();
+
+      // 递归转换为UI需要的Account格式
+      final result = await _convertAccountsToUIFormat(assetAccounts);
+      return result;
+    } catch (e) {
+      return []; // 发生错误时返回空列表
+    }
+  }
+
+  /// 获取负债账户树
+  Future<List<account_ui.Account>> getLiabilityAccountTree(
+      {int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final liabilityAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.LIABILITY)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(liabilityAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取费用账户树
+  Future<List<account_ui.Account>> getExpenseAccountTree(
+      {int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final expenseAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.EXPENSE)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(expenseAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取收入账户树
+  Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final incomeAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.INCOME)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(incomeAccounts);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 获取权益账户树
+  Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId}) async {
+    try {
+      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final equityAccounts = accountTree
+          .where((acc) => acc.account.accountType == AccountType.EQUITY)
+          .toList();
+      return _convertAccountsToUIFormatWithoutBalance(equityAccounts);
+    } catch (e) {
       return [];
     }
   }

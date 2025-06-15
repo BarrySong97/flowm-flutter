@@ -15,50 +15,90 @@ import 'package:intl/intl.dart';
 import 'package:flutter/rendering.dart';
 
 // Provider to fetch current month's expenses
-final currentMonthExpenseProvider = FutureProvider<double>((ref) async {
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  if (selectedLedger == null) return 0.0;
+final currentMonthExpenseProvider = StreamProvider<double>((ref) {
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) return Stream.value(0.0);
 
-  final now = DateTime.now();
-  final startOfMonth = DateTime(now.year, now.month, 1);
-  final endOfMonth = DateTime(now.year, now.month + 1, 0);
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
-  final repository = ref.watch(accountRepositoryProvider);
-  return repository.getExpenseInPeriod(
-      selectedLedger.ledgerId, startOfMonth, endOfMonth);
+      final repository = ref.watch(accountRepositoryProvider);
+      return repository.watchExpenseInPeriod(
+          ledger.ledgerId, startOfMonth, endOfMonth);
+    },
+    loading: () => Stream.value(0.0),
+    error: (_, __) => Stream.value(0.0),
+  );
 });
 
 // Provider to fetch current month's income
-final currentMonthIncomeProvider = FutureProvider<double>((ref) async {
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  if (selectedLedger == null) return 0.0;
+final currentMonthIncomeProvider = StreamProvider<double>((ref) {
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) return Stream.value(0.0);
 
-  final now = DateTime.now();
-  final startOfMonth = DateTime(now.year, now.month, 1);
-  final endOfMonth = DateTime(now.year, now.month + 1, 0);
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
-  final repository = ref.watch(accountRepositoryProvider);
-  return repository.getIncomeInPeriod(
-      selectedLedger.ledgerId, startOfMonth, endOfMonth);
+      final repository = ref.watch(accountRepositoryProvider);
+      return repository.watchIncomeInPeriod(
+          ledger.ledgerId, startOfMonth, endOfMonth);
+    },
+    loading: () => Stream.value(0.0),
+    error: (_, __) => Stream.value(0.0),
+  );
 });
 
 // Provider to fetch total liabilities
-final totalLiabilitiesProvider = FutureProvider<double>((ref) async {
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  if (selectedLedger == null) return 0.0;
+final totalLiabilitiesProvider = StreamProvider<double>((ref) {
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) return Stream.value(0.0);
 
-  final repository = ref.watch(accountRepositoryProvider);
-  return repository.getTotalLiabilitiesByLedger(selectedLedger.ledgerId);
+      final repository = ref.watch(accountRepositoryProvider);
+      return repository.watchTotalLiabilitiesByLedger(ledger.ledgerId);
+    },
+    loading: () => Stream.value(0.0),
+    error: (_, __) => Stream.value(0.0),
+  );
 });
 
 // Provider for combined monthly overview data (expense, income, balance)
 final monthlyOverviewDataProvider =
-    FutureProvider<({double expense, double income, double balance})>(
-        (ref) async {
-  final expense = await ref.watch(currentMonthExpenseProvider.future);
-  final income = await ref.watch(currentMonthIncomeProvider.future);
-  final balance = income - expense;
-  return (expense: expense, income: income, balance: balance);
+    StreamProvider<({double expense, double income, double balance})>((ref) {
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) {
+        return Stream.value((expense: 0.0, income: 0.0, balance: 0.0));
+      }
+
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      final repository = ref.watch(accountRepositoryProvider);
+      final expenseStream = repository.watchExpenseInPeriod(
+          ledger.ledgerId, startOfMonth, endOfMonth);
+      final incomeStream = repository.watchIncomeInPeriod(
+          ledger.ledgerId, startOfMonth, endOfMonth);
+
+      // 使用 combineLatest 合并两个 Stream
+      return expenseStream.asyncMap((expense) async {
+        final income = await incomeStream.first;
+        final balance = income - expense;
+        return (expense: expense, income: income, balance: balance);
+      });
+    },
+    loading: () => Stream.value((expense: 0.0, income: 0.0, balance: 0.0)),
+    error: (_, __) => Stream.value((expense: 0.0, income: 0.0, balance: 0.0)),
+  );
 });
 
 // Provider to fetch latest transactions
@@ -79,13 +119,19 @@ final latestTransactionsProvider = StreamProvider((ref) {
 
 // 为当前页面提供账户资产信息
 final topAssetAccountsProvider =
-    FutureProvider<List<AccountWithBalance>>((ref) async {
-  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  if (selectedLedger == null) return [];
+    StreamProvider<List<AccountWithBalance>>((ref) {
+  final selectedLedger = ref.watch(selectedLedgerProvider);
+  return selectedLedger.when(
+    data: (ledger) {
+      if (ledger == null) return Stream.value(<AccountWithBalance>[]);
 
-  final repository = ref.watch(accountRepositoryProvider);
-  return repository.getTopAssetAccountsByLedger(
-      ledgerId: selectedLedger.ledgerId);
+      final repository = ref.watch(accountRepositoryProvider);
+      return repository.watchTopAssetAccountsByLedger(
+          ledgerId: ledger.ledgerId);
+    },
+    loading: () => Stream.value(<AccountWithBalance>[]),
+    error: (_, __) => Stream.value(<AccountWithBalance>[]),
+  );
 });
 
 class OverviewPage extends ConsumerStatefulWidget {
