@@ -533,6 +533,39 @@ class AccountRepository {
     ));
   }
 
+  /// 创建一个新账户，并自动处理 fullPath
+  Future<int> addNewAccount({
+    required String name,
+    required AccountType type,
+    required int ledgerId,
+    int? parentId,
+  }) async {
+    String fullPath;
+    String parentPath = '';
+
+    if (parentId != null) {
+      // 通过 parentId 查找父账户
+      final parentAccount = await _accountDao.getAccountById(parentId);
+      if (parentAccount != null) {
+        // 如果父账户存在，使用其 fullPath 作为新路径的前缀
+        parentPath = parentAccount.fullPath;
+      }
+    }
+
+    // 如果父路径为空（即没有父账户或父账户未找到），新账户的 fullPath 就是其名称
+    // 否则，路径是 "父路径:新账户名"
+    fullPath = parentPath.isEmpty ? name : '$parentPath:$name';
+
+    // 调用底层的 createAccount 方法来插入新账户到数据库
+    return createAccount(
+      name: name,
+      fullPath: fullPath,
+      type: type,
+      ledgerId: ledgerId,
+      parentId: parentId,
+    );
+  }
+
   /// 更新账户
   Future<bool> updateAccount({
     required int id,

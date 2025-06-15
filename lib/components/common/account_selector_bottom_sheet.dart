@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/account/account_item.dart';
+import 'package:flowm/components/common/account_creation_bottom_sheet.dart';
 import 'package:flowm/components/common/account_selector_item.dart';
 import 'package:flowm/state/account/account_repository.dart';
 
@@ -12,11 +13,17 @@ enum AccountSelectorType {
   equity,
 }
 
+enum SelectableAccount {
+  all,
+  leafOnly,
+}
+
 class AccountSelectorBottomSheet extends ConsumerStatefulWidget {
   final String title;
   final Account? selectedAccount;
   final Function(Account) onAccountSelected;
   final AccountSelectorType? defaultAccountType;
+  final SelectableAccount selectableAccount;
 
   const AccountSelectorBottomSheet({
     super.key,
@@ -24,6 +31,7 @@ class AccountSelectorBottomSheet extends ConsumerStatefulWidget {
     this.selectedAccount,
     required this.onAccountSelected,
     this.defaultAccountType,
+    this.selectableAccount = SelectableAccount.all,
   });
 
   static Future<Account?> show(
@@ -31,6 +39,7 @@ class AccountSelectorBottomSheet extends ConsumerStatefulWidget {
     required String title,
     Account? selectedAccount,
     AccountSelectorType? defaultAccountType,
+    SelectableAccount selectableAccount = SelectableAccount.all,
   }) {
     return showModalBottomSheet<Account>(
       context: context,
@@ -42,6 +51,7 @@ class AccountSelectorBottomSheet extends ConsumerStatefulWidget {
         title: title,
         selectedAccount: selectedAccount,
         defaultAccountType: defaultAccountType,
+        selectableAccount: selectableAccount,
         onAccountSelected: (account) {
           Navigator.of(context).pop(account);
         },
@@ -241,6 +251,36 @@ class _AccountSelectorBottomSheetState
             ),
           ),
 
+          // Title and Add Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline,
+                      color: Colors.blue, size: 28),
+                  onPressed: () async {
+                    final currentAccountType =
+                        _accountTypes[_tabController.index];
+                    await AccountCreationBottomSheet.show(
+                      context,
+                      defaultAccountType: currentAccountType,
+                    );
+                  },
+                  tooltip: '创建新账户',
+                ),
+              ],
+            ),
+          ),
+
           // Tab Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -354,6 +394,11 @@ class _AccountSelectorBottomSheetState
         shouldAutoExpand: shouldAutoExpand,
         selectedAccount: widget.selectedAccount, // 传递选中账户用于子账户选中状态判断
         onTap: (selectedAccount) {
+          if (widget.selectableAccount == SelectableAccount.leafOnly &&
+              hasChildren) {
+            // 如果只允许选择叶子节点，且当前是父节点，则不响应点击
+            return;
+          }
           widget.onAccountSelected(selectedAccount);
         },
       );
