@@ -14,6 +14,14 @@ import '../ledger/ledger_repository.dart';
 final selectedDateRangeProvider =
     StateProvider<String>((ref) => 'month'); // Default to 'month'
 
+/// 删除账户结果枚举
+enum DeleteAccountResult {
+  success,
+  hasChildAccounts,
+  hasRelatedTransactions,
+  error,
+}
+
 /// 账户仓库提供者，用于封装账户相关的数据库操作
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
@@ -632,17 +640,34 @@ class AccountRepository {
   }
 
   /// 删除账户
-  Future<bool> deleteAccount(int id) async {
-    // 检查是否有子账户
-    final children = await _accountDao.getChildAccounts(id);
-    if (children.isNotEmpty) {
-      // 如果有子账户，不允许删除
-      return false;
-    }
+  Future<DeleteAccountResult> deleteAccount(int id) async {
+    try {
+      // 检查是否有子账户
+      final children = await _accountDao.getChildAccounts(id);
+      if (children.isNotEmpty) {
+        return DeleteAccountResult.hasChildAccounts;
+      }
 
-    // 没有子账户，执行删除
-    final result = await _accountDao.deleteAccount(id);
-    return result > 0;
+      // 检查是否有关联的posting记录
+      final relatedPostings = await _accountDao.customSelect(
+        'SELECT COUNT(*) as count FROM postings WHERE account_id = ?',
+        variables: [Variable.withInt(id)],
+      ).getSingle();
+
+      final postingCount = relatedPostings.read<int>('count');
+      if (postingCount > 0) {
+        return DeleteAccountResult.hasRelatedTransactions;
+      }
+
+      // 没有子账户和关联的posting，执行删除
+      final result = await _accountDao.deleteAccount(id);
+      return result > 0
+          ? DeleteAccountResult.success
+          : DeleteAccountResult.error;
+    } catch (e) {
+      print('删除账户失败: $e');
+      return DeleteAccountResult.error;
+    }
   }
 
   /// 获取账户树

@@ -8,6 +8,7 @@ import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/common/parent_account_selector_bottom_sheet.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/utils/snackbar_utils.dart';
 
 class AccountUpdateBottomSheet extends ConsumerStatefulWidget {
   final Account accountToUpdate;
@@ -164,9 +165,7 @@ class _AccountUpdateBottomSheetState
           // 延迟显示 snackbar 避免被遮挡
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('错误：未选择任何账本')),
-              );
+              SnackBarUtils.showOverlayError(context, '错误：未选择任何账本');
             }
           });
         }
@@ -202,12 +201,7 @@ class _AccountUpdateBottomSheetState
           // 延迟显示成功消息避免被遮挡
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('账户更新成功'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              SnackBarUtils.showOverlaySuccess(context, '账户更新成功');
             }
           });
         }
@@ -220,12 +214,7 @@ class _AccountUpdateBottomSheetState
           // 延迟显示错误消息避免被遮挡
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('更新账户失败: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              SnackBarUtils.showOverlayError(context, '更新账户失败: $e');
             }
           });
         }
@@ -263,63 +252,82 @@ class _AccountUpdateBottomSheetState
             .read(accountRepositoryProvider)
             .deleteAccount(widget.accountToUpdate.id);
 
-        if (result) {
-          print('账户删除成功');
+        String message;
+        Color backgroundColor;
+        bool success = false;
 
-          // 刷新所有账户相关的provider
-          ref.invalidate(assetsAccountTreeProvider);
-          ref.invalidate(liabilityAccountTreeProvider);
-          ref.invalidate(expenseAccountTreeProvider);
-          ref.invalidate(incomeAccountTreeProvider);
-          ref.invalidate(equityAccountTreeProvider);
+        switch (result) {
+          case DeleteAccountResult.success:
+            message = '账户删除成功';
+            backgroundColor = Colors.green;
+            success = true;
+            print('账户删除成功');
 
-          if (mounted) {
-            Navigator.of(context).pop(true); // Success
-            // 延迟显示成功消息避免被遮挡
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('账户删除成功'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            });
+            // 刷新所有账户相关的provider
+            ref.invalidate(assetsAccountTreeProvider);
+            ref.invalidate(liabilityAccountTreeProvider);
+            ref.invalidate(expenseAccountTreeProvider);
+            ref.invalidate(incomeAccountTreeProvider);
+            ref.invalidate(equityAccountTreeProvider);
+            break;
+
+          case DeleteAccountResult.hasChildAccounts:
+            message = '删除失败：该账户有子账户，请先删除子账户';
+            backgroundColor = Colors.orange;
+            print('删除失败：该账户可能有子账户');
+            break;
+
+          case DeleteAccountResult.hasRelatedTransactions:
+            message = '删除失败：该账户有相关交易记录，请先删除相关的交易记录再删除账户';
+            backgroundColor = Colors.orange;
+            print('删除失败：该账户有相关的交易记录');
+            break;
+
+          case DeleteAccountResult.error:
+          default:
+            message = '删除账户失败：未知错误';
+            backgroundColor = Colors.red;
+            print('删除账户失败：未知错误');
+            break;
+        }
+
+        if (mounted) {
+          print('准备显示消息: $message');
+
+          // 先显示消息，再关闭bottom sheet
+          switch (result) {
+            case DeleteAccountResult.success:
+              SnackBarUtils.showOverlaySuccess(context, message);
+              break;
+            case DeleteAccountResult.hasChildAccounts:
+            case DeleteAccountResult.hasRelatedTransactions:
+              SnackBarUtils.showOverlayWarning(context, message);
+              break;
+            case DeleteAccountResult.error:
+            default:
+              SnackBarUtils.showOverlayError(context, message);
+              break;
           }
-        } else {
-          print('删除失败：该账户可能有子账户');
 
-          if (mounted) {
-            Navigator.of(context).pop(false);
-            // 延迟显示错误消息避免被遮挡
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('删除失败：该账户可能有子账户'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-            });
-          }
+          // 延迟关闭bottom sheet，让消息先显示
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              Navigator.of(context).pop(success);
+            }
+          });
         }
       } catch (e, stackTrace) {
         print('删除账户失败: $e');
         print('堆栈跟踪: $stackTrace');
 
         if (mounted) {
-          Navigator.of(context).pop(false);
-          // 延迟显示错误消息避免被遮挡
-          Future.delayed(const Duration(milliseconds: 300), () {
+          print('显示异常错误消息: 删除账户失败: $e');
+          SnackBarUtils.showOverlayError(context, '删除账户失败: $e');
+
+          // 延迟关闭bottom sheet
+          Future.delayed(const Duration(milliseconds: 100), () {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('删除账户失败: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              Navigator.of(context).pop(false);
             }
           });
         }

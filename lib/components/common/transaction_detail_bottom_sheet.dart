@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../db/tables/account_table.dart';
 import '../../state/transaction/transaction_repository.dart';
+import 'package:flowm/utils/snackbar_utils.dart';
 
 class TransactionDetailBottomSheet extends ConsumerWidget {
   final String amount;
@@ -112,12 +113,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     if (transactionId == null) {
       Navigator.pop(context);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('无法删除：交易ID为空'),
-            backgroundColor: Color(0xFFFF3B30),
-          ),
-        );
+        SnackBarUtils.showOverlayError(context, '无法删除：交易ID为空');
       }
       return;
     }
@@ -152,25 +148,14 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
                 await transactionRepository.deleteTransactionWithPostings(id);
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('交易删除成功'),
-                      backgroundColor: Color(0xFF34C759),
-                    ),
-                  );
+                  SnackBarUtils.showOverlaySuccess(context, '交易删除成功');
                 }
 
                 // 调用回调函数通知父组件
-
                 onDelete?.call();
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('删除失败: $e'),
-                      backgroundColor: const Color(0xFFFF3B30),
-                    ),
-                  );
+                  SnackBarUtils.showOverlayError(context, '删除失败: $e');
                 }
               }
             },

@@ -7,6 +7,9 @@ import 'package:flowm/components/common/parent_account_selector_bottom_sheet.dar
 import 'package:flowm/db/app_database.dart' as db;
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/components/home_page/expenses_page.dart';
+import 'package:flowm/components/home_page/income_page.dart';
+import 'package:flowm/utils/snackbar_utils.dart';
 
 class AccountCreationBottomSheet extends ConsumerStatefulWidget {
   final AccountSelectorType defaultAccountType;
@@ -102,9 +105,7 @@ class _AccountCreationBottomSheetState
       final selectedLedger = await ref.read(selectedLedgerProvider.future);
       if (selectedLedger == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('错误：未选择任何账本')),
-          );
+          SnackBarUtils.showOverlayError(context, '错误：未选择任何账本');
         }
         return;
       }
@@ -126,12 +127,16 @@ class _AccountCreationBottomSheetState
 
         if (mounted) {
           Navigator.of(context).pop(true); // Success
+          // 延迟显示成功消息
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              SnackBarUtils.showOverlaySuccess(context, '账户创建成功');
+            }
+          });
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('创建账户失败: $e')),
-          );
+          SnackBarUtils.showOverlayError(context, '创建账户失败: $e');
         }
       }
     }
