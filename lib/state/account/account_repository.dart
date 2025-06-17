@@ -562,6 +562,60 @@ class AccountRepository {
     );
   }
 
+  /// 更新一个现有账户，并处理路径更新
+  Future<void> editAccount({
+    required int accountId,
+    required String name,
+    required AccountType type,
+    required int ledgerId,
+    int? parentId,
+  }) async {
+    String newFullPath;
+    String parentPath = '';
+
+    if (parentId != null) {
+      final parentAccount = await _accountDao.getAccountById(parentId);
+      if (parentAccount != null) {
+        parentPath = parentAccount.fullPath;
+      }
+    }
+
+    newFullPath = parentPath.isEmpty ? name : '$parentPath:$name';
+
+    await _accountDao.updateAccount(AccountsCompanion(
+      accountId: Value(accountId),
+      accountName: Value(name),
+      fullPath: Value(newFullPath),
+      accountType: Value(type),
+      ledgerId: Value(ledgerId),
+      parentAccountId: Value(parentId),
+    ));
+
+    // After updating, we might need to update the full path of all children
+    final children = await _accountDao.getChildAccounts(accountId);
+    for (final child in children) {
+      await _updateChildPaths(child, newFullPath, ledgerId);
+    }
+  }
+
+  // Helper method to recursively update child paths
+  Future<void> _updateChildPaths(
+      Account parent, String parentNewPath, int ledgerId) async {
+    final children = await _accountDao.getChildAccounts(parent.accountId);
+    for (final child in children) {
+      final newChildPath = '$parentNewPath:${child.accountName}';
+      await _accountDao.updateAccount(
+        AccountsCompanion(
+          accountId: Value(child.accountId),
+          fullPath: Value(newChildPath),
+          ledgerId: Value(ledgerId),
+        ),
+      );
+      // Recursively update grandchildren
+      await _updateChildPaths(child, newChildPath, ledgerId);
+    }
+  }
+
   /// 更新账户
   Future<bool> updateAccount({
     required int id,

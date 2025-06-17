@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flowm/components/account/account_item.dart';
+import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class AccountSelectorItem extends StatefulWidget {
   final Account account;
@@ -40,6 +41,14 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
     }
   }
 
+  // 处理长按事件，弹出更新账户的 Bottom Sheet
+  void _handleLongPress(Account account) async {
+    await AccountUpdateBottomSheet.show(
+      context,
+      accountToUpdate: account,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     bool hasChildren =
@@ -78,6 +87,7 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
       showCurrencySymbolInAmount: !hasChildren,
       isSelected: hasChildren ? false : widget.isSelected, // 有子账户的父账户永远不显示为选中状态
       isLeafNode: !hasChildren, // 传入是否为叶子节点
+      onLongPress: () => _handleLongPress(widget.account), // 添加长按回调
     );
 
     if (hasChildren) {
@@ -124,6 +134,7 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
                   onTap: !childHasChildren && widget.onTap != null
                       ? () => widget.onTap!(childAccount)
                       : null, // 只有叶子节点才能被点击
+                  onLongPress: () => _handleLongPress(childAccount), // 添加长按功能
                   borderRadius: BorderRadius.circular(6.0),
                   child: _AccountSelectorRow(
                     account: childAccount,
@@ -154,6 +165,7 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
         child: InkWell(
           onTap:
               widget.onTap != null ? () => widget.onTap!(widget.account) : null,
+          onLongPress: () => _handleLongPress(widget.account), // 添加长按功能
           borderRadius: BorderRadius.circular(8.0),
           child: _AccountSelectorRow(
             account: widget.account,
@@ -174,6 +186,7 @@ class _AccountSelectorRow extends StatelessWidget {
   final bool showCurrencySymbolInAmount;
   final bool isSelected;
   final bool isLeafNode;
+  final VoidCallback? onLongPress; // 添加长按回调参数
 
   const _AccountSelectorRow({
     Key? key,
@@ -182,6 +195,7 @@ class _AccountSelectorRow extends StatelessWidget {
     required this.showCurrencySymbolInAmount,
     this.isSelected = false,
     this.isLeafNode = true,
+    this.onLongPress, // 添加长按回调参数
   }) : super(key: key);
 
   @override
@@ -215,7 +229,7 @@ class _AccountSelectorRow extends StatelessWidget {
       displayedAmount = account.amount.toStringAsFixed(2);
     }
 
-    return Padding(
+    Widget content = Padding(
       padding: const EdgeInsets.symmetric(
           vertical: 12.0, horizontal: 16.0), // 统一在这里添加padding
       child: Row(
@@ -287,5 +301,15 @@ class _AccountSelectorRow extends StatelessWidget {
         ],
       ),
     );
+
+    // 如果有长按回调，则包装在 GestureDetector 中
+    if (onLongPress != null) {
+      return GestureDetector(
+        onLongPress: onLongPress,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }
