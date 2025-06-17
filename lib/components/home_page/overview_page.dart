@@ -12,6 +12,7 @@ import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:home_widget/home_widget.dart';
 
 // Provider to fetch current month's expenses
 final currentMonthExpenseProvider = StreamProvider<double>((ref) {
@@ -146,8 +147,36 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    // 第一次加载时主动更新
+    _updateWidget(ref.read(monthlyOverviewDataProvider));
+  }
+
+  void _updateWidget(
+      AsyncValue<({double balance, double expense, double income})> data) {
+    data.whenData((value) {
+      debugPrint(
+          '[HomeWidget] Updating data: expense=${value.expense}, income=${value.income}, balance=${value.balance}');
+      HomeWidget.setAppGroupId('group.flowm');
+      HomeWidget.saveWidgetData<double>('expense', value.expense);
+      HomeWidget.saveWidgetData<double>('income', value.income);
+      HomeWidget.saveWidgetData<double>('balance', value.balance);
+      final result =
+          HomeWidget.updateWidget(name: 'FlowmWidget', iOSName: 'FlowmWidget');
+      result.then((value) => debugPrint('[HomeWidget] Update result: $value'));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    // Listen to the monthly overview data and update the home widget
+    ref.listen(monthlyOverviewDataProvider, (previous, next) {
+      _updateWidget(next);
+    });
+
     // 使用共享的topAssetAccountsProvider
     final topAssetsAsync = ref.watch(topAssetAccountsProvider);
     final monthlyOverviewDataAsync = ref.watch(monthlyOverviewDataProvider);
