@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../utils/transaction_type_map.dart';
 import '../../db/tables/account_table.dart';
-import '../../pages/add_page.dart';
+import '../../state/transaction/transaction_repository.dart';
 
-class TransactionDetailBottomSheet extends StatelessWidget {
+class TransactionDetailBottomSheet extends ConsumerWidget {
   final String amount;
   final String subtitle; // 包含 "fromAccount -> toAccount" 格式的字符串
   final String date;
@@ -109,30 +108,25 @@ class TransactionDetailBottomSheet extends StatelessWidget {
     }
   }
 
-  void _handleCopy(BuildContext context) {
-    final accountNames = _parseAccountNames();
-    final details = '''
-转账金额: $amount
-转出账户: ${accountNames['fromAccount']}
-转入账户: ${accountNames['toAccount']}
-记账日期: $date
-${description != null ? '备注: $description' : ''}
-${transactionId != null ? '交易ID: $transactionId' : ''}
-''';
+  void _handleDelete(BuildContext context, WidgetRef ref) async {
+    if (transactionId == null) {
+      Navigator.pop(context);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('无法删除：交易ID为空'),
+            backgroundColor: Color(0xFFFF3B30),
+          ),
+        );
+      }
+      return;
+    }
 
-    Clipboard.setData(ClipboardData(text: details));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('交易详情已复制到剪贴板'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    // 在widget销毁前获取repository引用
+    final transactionRepository = ref.read(transactionRepositoryProvider);
 
-    onCopy?.call();
-  }
-
-  void _handleDelete(BuildContext context) {
     Navigator.pop(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -150,9 +144,35 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              onDelete?.call();
+
+              try {
+                final id = int.parse(transactionId!);
+                await transactionRepository.deleteTransactionWithPostings(id);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('交易删除成功'),
+                      backgroundColor: Color(0xFF34C759),
+                    ),
+                  );
+                }
+
+                // 调用回调函数通知父组件
+
+                onDelete?.call();
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('删除失败: $e'),
+                      backgroundColor: const Color(0xFFFF3B30),
+                    ),
+                  );
+                }
+              }
             },
             child: const Text(
               '删除',
@@ -165,7 +185,7 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final accountNames = _parseAccountNames();
 
     return Container(
@@ -192,6 +212,7 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
+                spacing: 32,
                 children: [
                   // 金额显示
                   Text(
@@ -204,54 +225,60 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
                           : const Color(0xFF34C759),
                     ),
                   ),
-                  const SizedBox(height: 32),
 
-                  // 账户详情列表
-                  _buildAccountDetailItem(
-                    accountName: accountNames['fromAccount']!,
-                    amountChange: _getAccountAmountChange(true),
-                    isFromAccount: true,
-                  ),
-                  _buildAccountDetailItem(
-                    accountName: accountNames['toAccount']!,
-                    amountChange: _getAccountAmountChange(false),
-                    isFromAccount: false,
-                  ),
-                  _buildDetailItem(
-                    label: '记账日期',
-                    value: date,
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // 操作按钮
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  // 账户详情和记账日期
+                  Column(
+                    spacing: 20,
                     children: [
-                      _buildActionButton(
-                        icon: Icons.edit_outlined,
-                        label: '编辑',
-                        color: const Color(0xFF007AFF),
-                        onTap: () {
-                          Navigator.pop(context);
-                          if (transactionId != null) {
-                            final id = int.tryParse(transactionId!);
-                            if (id != null) {
-                              context.push('/add', extra: id);
-                            }
-                          }
-                        },
+                      _buildAccountDetailItem(
+                        accountName: accountNames['fromAccount']!,
+                        amountChange: _getAccountAmountChange(true),
+                        isFromAccount: true,
                       ),
-                      _buildActionButton(
-                        icon: Icons.delete_outline,
-                        label: '删除',
-                        color: const Color(0xFFFF3B30),
-                        onTap: () => _handleDelete(context),
+                      _buildAccountDetailItem(
+                        accountName: accountNames['toAccount']!,
+                        amountChange: _getAccountAmountChange(false),
+                        isFromAccount: false,
+                      ),
+                      _buildDetailItem(
+                        label: '记账日期',
+                        value: date,
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  // 操作按钮
+                  Column(
+                    spacing: 20,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildActionButton(
+                            icon: Icons.edit_outlined,
+                            label: '编辑',
+                            color: const Color(0xFF007AFF),
+                            onTap: () {
+                              Navigator.pop(context);
+                              if (transactionId != null) {
+                                final id = int.tryParse(transactionId!);
+                                if (id != null) {
+                                  context.push('/add', extra: id);
+                                }
+                              }
+                            },
+                          ),
+                          _buildActionButton(
+                            icon: Icons.delete_outline,
+                            label: '删除',
+                            color: const Color(0xFFFF3B30),
+                            onTap: () => _handleDelete(context, ref),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 0), // 占位符，保持最后的间距
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -276,6 +303,7 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
         children: [
           Expanded(
             child: Column(
+              spacing: 4,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -285,7 +313,6 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
                     color: Color(0xFF999999),
                   ),
                 ),
-                const SizedBox(height: 4),
                 Text(
                   accountName,
                   style: const TextStyle(
@@ -351,13 +378,14 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
     return GestureDetector(
       onTap: onTap,
       child: Column(
+        spacing: 8,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
@@ -366,7 +394,6 @@ ${transactionId != null ? '交易ID: $transactionId' : ''}
               size: 24,
             ),
           ),
-          const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(

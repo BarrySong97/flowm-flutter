@@ -69,6 +69,20 @@ class TransactionRepository {
   Future<int> deleteTransaction(int id) =>
       _transactionDao.deleteTransaction(id);
 
+  /// 删除交易及其相关的分录
+  ///
+  /// 这个方法会在一个事务中删除指定交易ID的所有分录记录以及交易本身
+  Future<void> deleteTransactionWithPostings(int transactionId) async {
+    return _transactionDao.db.transaction(() async {
+      // 1. 首先删除所有相关的分录（posting）
+      await _transactionDao.db.postingDao
+          .deletePostingsByTransactionId(transactionId);
+
+      // 2. 然后删除交易记录
+      await _transactionDao.deleteTransaction(transactionId);
+    });
+  }
+
   /// 复制交易
   Future<int> duplicateTransaction(Transaction transaction) {
     return _transactionDao.insertTransaction(TransactionsCompanion.insert(

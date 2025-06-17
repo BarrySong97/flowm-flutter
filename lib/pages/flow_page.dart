@@ -270,6 +270,11 @@ class _FlowPageState extends ConsumerState<FlowPage> {
             ? const Color(0xFF007AFF) // Blue for expense
             : const Color(0xFF34C759), // Green for income
         isExpense: isExpense,
+        transactionDate: transaction.transactionDate,
+        fromAccountType: transactionWithAmount.fromAccount?.accountType,
+        toAccountType: transactionWithAmount.toAccount?.accountType,
+        transactionAmount: totalAmount.abs(),
+        onDelete: _onTransactionDeleted,
       ),
     );
   }
@@ -291,6 +296,16 @@ class _FlowPageState extends ConsumerState<FlowPage> {
       return const Color(0xFFFF5722);
     }
     return const Color(0xFF9E9E9E); // Default
+  }
+
+  // 刷新交易列表
+  Future<void> _refreshTransactions() async {
+    await _fetchTransactions(isLoadMore: false);
+  }
+
+  // 删除交易后的回调
+  void _onTransactionDeleted() {
+    _refreshTransactions();
   }
 }
 
