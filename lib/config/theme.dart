@@ -104,13 +104,6 @@ class AppTheme {
       ),
 
       // 卡片主题
-      cardTheme: CardTheme(
-        color: cardColor,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ),
 
       // 底部导航栏主题
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(

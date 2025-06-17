@@ -1,4 +1,3 @@
-import 'package:flowm/components/overview/stat_card.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/components/overview/monthly_overview_card.dart';
 import 'package:flowm/components/overview/assets_overview_grid.dart';
@@ -9,10 +8,10 @@ import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/rendering.dart';
 
 // Provider to fetch current month's expenses
 final currentMonthExpenseProvider = StreamProvider<double>((ref) {
@@ -211,11 +210,12 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
 
                     // Create AssetItems from top accounts
                     final assetItems = topAccounts.map((accountWithBalance) {
-                      // 格式化余额
-                      final formatter =
-                          NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                      // 格式化余额 - 小于6位数(100,000)时不格式化
                       final formattedBalance =
-                          formatter.format(accountWithBalance.balance);
+                          NumberFormatUtils.smartFormatCurrency(
+                              accountWithBalance.balance,
+                              useWan: true,
+                              minFormatThreshold: 10000000);
 
                       // 计算该账户余额占总资产的百分比
                       final percentValue = totalAssets > 0
@@ -271,14 +271,19 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                       }
                     }
 
-                    // 格式化总资产、总负债和净资产
-                    final formatter =
-                        NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
-                    final formattedTotalAssets = formatter.format(totalAssets);
+                    // 格式化总资产、总负债和净资产 - 小于6位数时不格式化
+                    final formattedTotalAssets =
+                        NumberFormatUtils.smartFormatCurrency(totalAssets,
+                            useWan: true, minFormatThreshold: 100000);
                     final formattedTotalLiabilities =
-                        formatter.format(totalLiabilitiesValue.abs());
+                        NumberFormatUtils.smartFormatCurrency(
+                            totalLiabilitiesValue.abs(),
+                            useWan: true,
+                            minFormatThreshold: 100000);
                     final netAssets = totalAssets + totalLiabilitiesValue;
-                    final formattedNetAssets = formatter.format(netAssets);
+                    final formattedNetAssets =
+                        NumberFormatUtils.smartFormatCurrency(netAssets,
+                            useWan: true, minFormatThreshold: 100000);
 
                     return AssetsOverviewGrid(
                       assets: assetItems,
@@ -414,10 +419,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16.0, vertical: 12.0),
-                                  child: Row(
-                                    // Changed to Row to accommodate totals
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    spacing: 4,
                                     children: [
                                       Text(
                                         formattedDate,
@@ -429,6 +434,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                       ),
                                       Row(
                                         // Row for income and expense totals
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
                                             '出 $formattedDailyOut',
