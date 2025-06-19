@@ -6,87 +6,90 @@
     android:background="@drawable/widget_background"
     android:orientation="vertical"
     android:padding="16dp">
-        <!-- Header -->
-        <TextView
-        android:id="@+id/widget_current_month"
+    <!-- Header -->
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="本月概览"
         android:textColor="#888888"
         android:textSize="16sp"
         android:layout_marginBottom="16dp" />
-        <!-- Income and Expense Row -->
-        <LinearLayout
+    <!-- Income and Expense Row -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginBottom="16dp">
-                <!-- Income -->
-                <LinearLayout
+        <!-- Income -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
-                        <TextView
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="收入"
                 android:textColor="#333333"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
-                        <TextView
-                android:id="@+id/widget_income_amount"
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="¥31,603.64"
                 android:textColor="#4CAF50"
                 android:textSize="16sp"
                 android:textStyle="bold" />
-                </LinearLayout>
-                <!-- Expense -->
-                <LinearLayout
+        </LinearLayout>
+        <!-- Expense -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
-                        <TextView
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="支出"
                 android:textColor="#333333"
                 android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
-                        <TextView
-                android:id="@+id/widget_expense_amount"
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="¥10,258.00"
                 android:textColor="#F44336"
                 android:textSize="16sp"
                 android:textStyle="bold" />
-                </LinearLayout>
         </LinearLayout>
-        <!-- Balance -->
-        <LinearLayout
+    </LinearLayout>
+    <!-- Balance -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:layout_marginBottom="16dp">
-                <TextView
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="结余"
             android:textColor="#333333"
             android:textSize="14sp"
             android:layout_marginBottom="4dp" />
-                <TextView
-            android:id="@+id/widget_balance_amount"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="¥21,345.64"
             android:textColor="#333333"
             android:textSize="20sp"
             android:textStyle="bold" />
-        </LinearLayout>
-        <!-- Flowm Brand -->
+    </LinearLayout>
+    <!-- Flowm Brand -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Flowm"
+        android:textColor="#888888"
+        android:textSize="12sp"
+        android:gravity="end" />
 </LinearLayout>

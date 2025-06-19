@@ -26,12 +26,17 @@ class FlowmWidget : HomeWidgetProvider() {
                 val income = (widgetData.all["income"]?.toString())?.toDoubleOrNull() ?: 0.0
                 val balance = (widgetData.all["balance"]?.toString())?.toDoubleOrNull() ?: 0.0
 
-                // 格式化金额
+                // 获取当前月份
+                val calendar = Calendar.getInstance()
+                val currentMonth = calendar.get(Calendar.MONTH) + 1 // Calendar.MONTH 从0开始，所以要+1
+                setTextViewText(R.id.widget_current_month, "${currentMonth}月")
+
+                // 格式化金额，使用更简洁的格式
                 val formatter = NumberFormat.getCurrencyInstance(Locale.CHINA)
                 
                 // 设置文本
-                setTextViewText(R.id.widget_expense_amount, formatter.format(expense))
                 setTextViewText(R.id.widget_income_amount, formatter.format(income))
+                setTextViewText(R.id.widget_expense_amount, formatter.format(expense))
                 setTextViewText(R.id.widget_balance_amount, formatter.format(balance))
 
                 // 设置点击事件，打开应用
