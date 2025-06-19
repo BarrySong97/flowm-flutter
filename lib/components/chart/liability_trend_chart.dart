@@ -29,7 +29,7 @@ class LiabilityTrendChart extends StatelessWidget {
 
           return SfCartesianChart(
             plotAreaBorderWidth: 0,
-            margin: EdgeInsets.zero,
+            margin: const EdgeInsets.only(top: 12),
             primaryXAxis: CategoryAxis(
               isVisible: false,
               majorGridLines: const MajorGridLines(width: 0),
@@ -58,18 +58,8 @@ class LiabilityTrendChart extends StatelessWidget {
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
               axisLine: const AxisLine(width: 0),
               majorTickLines: const MajorTickLines(size: 0),
-              minimum: liabilityData.isEmpty
-                  ? null
-                  : liabilityData
-                          .map((e) => e.totalLiabilities)
-                          .reduce((a, b) => a < b ? a : b) *
-                      0.95,
-              maximum: liabilityData.isEmpty
-                  ? null
-                  : liabilityData
-                          .map((e) => e.totalLiabilities)
-                          .reduce((a, b) => a > b ? a : b) *
-                      1.01,
+              minimum: null,
+              maximum: null,
               desiredIntervals: 1,
             ),
             series: <CartesianSeries>[
@@ -78,7 +68,8 @@ class LiabilityTrendChart extends StatelessWidget {
                 dataSource: liabilityData,
                 xValueMapper: (data, _) => data.formattedDate,
                 yValueMapper: (data, _) => data.totalLiabilities,
-                splineType: SplineType.natural,
+                splineType: SplineType.cardinal,
+                cardinalSplineTension: 0.5,
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -97,6 +88,8 @@ class LiabilityTrendChart extends StatelessWidget {
                 yValueMapper: (data, _) => data.totalLiabilities,
                 color: primaryColor,
                 width: 2,
+                splineType: SplineType.cardinal,
+                cardinalSplineTension: 0.5,
                 markerSettings: const MarkerSettings(isVisible: false),
               ),
             ],

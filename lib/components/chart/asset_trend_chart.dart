@@ -30,7 +30,7 @@ class AssetTrendChart extends StatelessWidget {
 
           return SfCartesianChart(
             plotAreaBorderWidth: 0,
-            margin: EdgeInsets.zero,
+            margin: const EdgeInsets.only(top: 12), // 只在顶部加边距，防止曲线被截断
             primaryXAxis: CategoryAxis(
               isVisible: false,
               majorGridLines: const MajorGridLines(width: 0),
@@ -63,20 +63,9 @@ class AssetTrendChart extends StatelessWidget {
               labelStyle: const TextStyle(color: Colors.black54, fontSize: 12),
               axisLine: const AxisLine(width: 0),
               majorTickLines: const MajorTickLines(size: 0),
-              // Set min/max based on data to guide the axis range.
-              // assetData.isEmpty check is important to avoid error on reduce.
-              minimum: assetData.isEmpty
-                  ? null
-                  : assetData
-                          .map((e) => e.totalAssets)
-                          .reduce((a, b) => a < b ? a : b) *
-                      0.95,
-              maximum: assetData.isEmpty
-                  ? null
-                  : assetData
-                          .map((e) => e.totalAssets)
-                          .reduce((a, b) => a > b ? a : b) *
-                      1.01,
+              // 调整Y轴范围，确保数据点准确对应
+              minimum: null, // 让图表自动计算最小值
+              maximum: null, // 让图表自动计算最大值
               desiredIntervals:
                   1, // This should result in labels at the effective min and max of the axis.
               // The custom axisLabelFormatter is removed as desiredIntervals: 1 and numberFormat should suffice.
@@ -87,7 +76,8 @@ class AssetTrendChart extends StatelessWidget {
                 dataSource: assetData,
                 xValueMapper: (data, _) => data.formattedDate,
                 yValueMapper: (data, _) => data.totalAssets,
-                splineType: SplineType.natural,
+                splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
+                cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -106,8 +96,10 @@ class AssetTrendChart extends StatelessWidget {
                 yValueMapper: (data, _) => data.totalAssets,
                 color: primaryColor,
                 width: 2,
+                splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
+                cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
                 markerSettings:
-                    const MarkerSettings(isVisible: false), // Hide markers
+                    const MarkerSettings(isVisible: false), // 隐藏数据点标记
               ),
             ],
             trackballBehavior: TrackballBehavior(
