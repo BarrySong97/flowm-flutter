@@ -4,11 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/common/parent_account_selector_bottom_sheet.dart';
-import 'package:flowm/db/app_database.dart' as db;
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
-import 'package:flowm/components/home_page/expenses_page.dart';
-import 'package:flowm/components/home_page/income_page.dart';
 import 'package:flowm/utils/snackbar_utils.dart';
 
 class AccountCreationBottomSheet extends ConsumerStatefulWidget {
@@ -108,6 +105,21 @@ class _AccountCreationBottomSheetState
           SnackBarUtils.showOverlayError(context, '错误：未选择任何账本');
         }
         return;
+      }
+
+      // 检查账户层级限制：如果选择的父账户还有父账户，则不能创建
+      if (_selectedParentAccount != null) {
+        final parentAccount = await ref
+            .read(accountRepositoryProvider)
+            .getAccountById(_selectedParentAccount!.id);
+
+        if (parentAccount != null && parentAccount.parentAccountId != null) {
+          if (mounted) {
+            SnackBarUtils.showOverlayError(
+                context, '不能创建账户：所选父账户已经是子账户，只支持两级账户层级');
+          }
+          return;
+        }
       }
 
       try {
