@@ -6,14 +6,11 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flowm/components/calendar/calendar_day.dart';
-import 'package:flowm/models/transaction_model.dart' hide Transaction;
-import '../../db/app_database.dart';
 import '../../db/dao/transaction_dao.dart';
 import '../../state/transaction/transaction_repository.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import '../../utils/transaction_type_map.dart';
 import '../../utils/transaction_utils.dart';
-import 'package:flutter/rendering.dart';
 
 // Provider to get daily income and expense summary for a specific month
 final monthlyCalendarSummaryProvider = StreamProvider.autoDispose
@@ -137,7 +134,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
         ),
         title: Row(
           children: [

@@ -559,7 +559,7 @@ class _AddPageState extends ConsumerState<AddPage>
           children: [
             // 金额显示区域
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -628,8 +628,7 @@ class _AddPageState extends ConsumerState<AddPage>
                       toAccountType: _toAccount?.type,
                       isEditMode: _isEditMode,
                     ),
-
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
 
                     // 转账箭头
                     GestureDetector(
@@ -659,8 +658,6 @@ class _AddPageState extends ConsumerState<AddPage>
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 12),
 
                     // 到账户选择器
                     AccountSelectorField(
