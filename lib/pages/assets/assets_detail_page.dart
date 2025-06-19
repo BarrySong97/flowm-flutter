@@ -613,6 +613,29 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
 
                 final sankeyData = snapshot.data!;
 
+                // 动态计算sankey图表的尺寸
+                final containerWidth =
+                    MediaQuery.of(context).size.width; // 减去左右padding
+                final availableWidth = containerWidth - 64; // 减去容器内部padding
+
+                // 根据nodes数量计算高度
+                final nodeCount = sankeyData.nodes.length;
+                final linkCount = sankeyData.links.length;
+
+                // 基础高度：每个node至少需要40像素高度，最小200，最大800
+                double calculatedHeight = (nodeCount * 40).toDouble();
+                calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
+
+                // 如果links很多，适当增加高度
+                if (linkCount > 10) {
+                  calculatedHeight += (linkCount - 10) * 20;
+                  calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
+                }
+
+                // 宽度使用容器可用宽度的90%，最小250，最大400
+                double calculatedWidth = availableWidth;
+                calculatedWidth = calculatedWidth.clamp(250.0, 400.0);
+
                 // 创建 SankeyDataSet
                 final sankeyDataSet = SankeyDataSet(
                   nodes: sankeyData.nodes,
@@ -621,10 +644,10 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
 
                 // 生成布局
                 final sankey = generateSankeyLayout(
-                  width: 300,
-                  height: 200,
+                  width: calculatedWidth,
+                  height: calculatedHeight,
                   nodeWidth: 12,
-                  nodePadding: 20,
+                  nodePadding: nodeCount > 10 ? 15 : 20, // 节点多时减少间距
                 );
                 sankeyDataSet.layout(sankey);
 
@@ -636,7 +659,7 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
                     print('点击了节点: $nodeId');
                     // 这里可以添加节点点击的处理逻辑
                   },
-                  size: Size(350, 200),
+                  size: Size(calculatedWidth, calculatedHeight),
                 );
               },
             ),
