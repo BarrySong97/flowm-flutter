@@ -41,7 +41,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
+          spacing: 16,
           children: [
             // 总资产区域
             Container(
@@ -349,6 +349,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   final accountListWidget = ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsetsGeometry.only(top: 0),
                     itemCount:
                         accountsWithPercentage.length, // Use the new list
                     itemBuilder: (context, index) {
@@ -374,7 +375,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   );
 
                   return Column(
-                    spacing: 12,
+                    spacing: 16,
                     children: [
                       Container(
                         height: _drilledDownAccountName == null

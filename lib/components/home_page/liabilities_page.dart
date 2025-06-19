@@ -345,6 +345,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
 
                     final accountListWidget = ListView.builder(
                       shrinkWrap: true,
+                      padding: const EdgeInsets.only(top: 0),
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: accountsWithPercentage.length,
                       itemBuilder: (context, index) {

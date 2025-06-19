@@ -69,6 +69,7 @@ class AppTheme {
         ),
       ),
 
+      cardTheme: CardThemeData(color: Colors.white),
       // 文本主题
       textTheme: const TextTheme(
         displayLarge: TextStyle(
