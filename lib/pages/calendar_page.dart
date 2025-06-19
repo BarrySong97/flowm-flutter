@@ -130,6 +130,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FB),
       appBar: AppBar(
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
