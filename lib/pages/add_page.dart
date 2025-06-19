@@ -6,10 +6,11 @@ import 'package:flowm/components/common/account_selector_field.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
-import 'package:flowm/db/tables/account_table.dart' hide Accounts;
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
+import 'package:flowm/state/add_page_params_provider.dart';
+import 'package:flowm/state/account/account_repository.dart';
 
 class AddPage extends ConsumerStatefulWidget {
   final int? transactionId;
@@ -48,6 +49,11 @@ class _AddPageState extends ConsumerState<AddPage>
     if (widget.transactionId != null) {
       _isEditMode = true;
       _loadTransactionData();
+    } else {
+      // 如果不是编辑模式，检查是否有深度链接参数
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadDeepLinkParams();
+      });
     }
   }
 
@@ -90,6 +96,102 @@ class _AddPageState extends ConsumerState<AddPage>
         }
         _transactionFlowType = _calculateTransactionFlowType();
       });
+    }
+  }
+
+  /// 加载深度链接参数
+  Future<void> _loadDeepLinkParams() async {
+    final params = ref.read(addPageParamsProvider);
+    if (params == null || params.isEmpty) return;
+
+    try {
+      debugPrint('[AddPage] 开始加载深度链接参数: $params');
+
+      // 设置金额
+      if (params.amount != null) {
+        setState(() {
+          amount = params.amount!.toStringAsFixed(2);
+        });
+      }
+
+      // 设置备注
+      if (params.description != null) {
+        setState(() {
+          _noteController.text = params.description!;
+        });
+      }
+
+      // 设置日期
+      if (params.date != null) {
+        try {
+          final dateTime = DateTime.parse(params.date!);
+          setState(() {
+            _currentDate = dateTime.toString().split(' ')[0];
+          });
+        } catch (e) {
+          debugPrint('[AddPage] 日期解析失败: ${params.date}, 错误: $e');
+        }
+      }
+
+      // 获取所有账户
+      final accounts =
+          await ref.read(accountRepositoryProvider).getAllAccounts();
+
+      // 设置从账户
+      if (params.fromAccountId != null) {
+        final fromAccount = accounts.firstWhere(
+          (account) => account.accountId == params.fromAccountId,
+          orElse: () => throw Exception('找不到指定的从账户'),
+        );
+        // 查询账户的真实余额
+        final fromAccountBalance = await ref
+            .read(accountRepositoryProvider)
+            .getAccountBalance(fromAccount.accountId);
+        setState(() {
+          _fromAccount = Account(
+            id: fromAccount.accountId,
+            name: fromAccount.accountName,
+            amount: fromAccountBalance,
+            type: fromAccount.accountType,
+          );
+        });
+      }
+
+      // 设置到账户
+      if (params.toAccountId != null) {
+        final toAccount = accounts.firstWhere(
+          (account) => account.accountId == params.toAccountId,
+          orElse: () => throw Exception('找不到指定的到账户'),
+        );
+        // 查询账户的真实余额
+        final toAccountBalance = await ref
+            .read(accountRepositoryProvider)
+            .getAccountBalance(toAccount.accountId);
+        setState(() {
+          _toAccount = Account(
+            id: toAccount.accountId,
+            name: toAccount.accountName,
+            amount: toAccountBalance,
+            type: toAccount.accountType,
+          );
+          _transactionFlowType = _calculateTransactionFlowType();
+        });
+      }
+
+      // 清空参数，避免重复使用
+      ref.read(addPageParamsProvider.notifier).state = null;
+
+      debugPrint('[AddPage] 深度链接参数加载完成');
+    } catch (e) {
+      debugPrint('[AddPage] 加载深度链接参数失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('加载深度链接参数失败: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -427,6 +529,14 @@ class _AddPageState extends ConsumerState<AddPage>
   @override
   Widget build(BuildContext context) {
     final transactionAmountValue = double.tryParse(amount) ?? 0.0;
+
+    // 监听深度链接参数变化
+    ref.listen(addPageParamsProvider, (previous, next) {
+      if (next != null && !next.isEmpty && !_isEditMode) {
+        debugPrint('[AddPage] 检测到新的深度链接参数: $next');
+        _loadDeepLinkParams();
+      }
+    });
     return Scaffold(
       appBar: _isEditMode
           ? AppBar(

@@ -8,6 +8,12 @@ import 'package:flowm/pages/calendar_page.dart';
 import 'package:flowm/pages/flow_page.dart';
 import 'package:flowm/pages/settings_page.dart';
 import 'package:flashy_tab_bar2/flashy_tab_bar2.dart';
+import 'package:uni_links/uni_links.dart';
+import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flowm/utils/snackbar_utils.dart';
+import 'package:flowm/state/add_page_params_provider.dart';
 
 // Provider for MainScreen's selected tab index
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -42,6 +48,7 @@ class _MainScreenPageState extends State<_MainScreenPage>
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   late final PageController _pageController;
+  StreamSubscription? _linkSubscription;
   final List<Widget> _pages = [
     _MainScreenPage(child: HomePage(key: PageStorageKey('home_page'))),
     CalendarPage(),
@@ -57,12 +64,130 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       initialPage: ref.read(mainScreenIndexProvider),
       keepPage: false,
     );
+
+    // 初始化深度链接监听
+    _initUniLinks();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  /// 初始化uni_links深度链接监听
+  void _initUniLinks() async {
+    try {
+      // 监听应用正在运行时的深度链接
+      _linkSubscription = linkStream.listen((String? uri) {
+        if (uri != null) {
+          _handleIncomingLink(uri);
+        }
+      }, onError: (err) {
+        debugPrint('[UniLinks] 深度链接监听错误: $err');
+      });
+
+      // 处理应用启动时的初始链接
+      final String? initialLink = await getInitialLink();
+      if (initialLink != null) {
+        _handleIncomingLink(initialLink);
+      }
+    } on PlatformException catch (e) {
+      debugPrint('[UniLinks] 初始化失败: $e');
+    }
+  }
+
+  /// 处理传入的深度链接
+  void _handleIncomingLink(String uri) {
+    try {
+      final Uri parsedUri = Uri.parse(uri);
+      debugPrint('[UniLinks] 收到深度链接: $uri');
+
+      // 解析路径和参数
+      final String path = parsedUri.path;
+      final Map<String, String> queryParams = parsedUri.queryParameters;
+
+      // 根据路径和参数执行相应操作
+      _processLinkData(path, queryParams);
+    } catch (e) {
+      debugPrint('[UniLinks] 解析深度链接失败: $e');
+      SnackBarUtils.showError(context, '深度链接格式错误');
+    }
+  }
+
+  /// 处理链接数据并执行相应操作
+  void _processLinkData(String path, Map<String, String> queryParams) {
+    // 打印所有参数供调试
+    debugPrint('[UniLinks] 路径: $path');
+    debugPrint('[UniLinks] 查询参数: $queryParams');
+
+    // 根据路径导航到不同页面
+    switch (path) {
+      case '/home':
+      case '/':
+        _navigateToTab(0, queryParams);
+        break;
+      case '/calendar':
+        _navigateToTab(1, queryParams);
+        break;
+      case '/add':
+        _navigateToTab(2, queryParams);
+        break;
+      case '/flow':
+      case '/transactions':
+        _navigateToTab(3, queryParams);
+        break;
+      case '/settings':
+        _navigateToTab(4, queryParams);
+        break;
+      default:
+        // 如果路径不匹配，显示参数信息
+        _showLinkInfo(path, queryParams);
+        break;
+    }
+  }
+
+  /// 导航到指定标签页并处理参数
+  void _navigateToTab(int tabIndex, Map<String, String> queryParams) {
+    // 如果是添加页面并且有参数，设置参数到Provider
+    if (tabIndex == 2 && queryParams.isNotEmpty) {
+      final params = AddPageParams.fromMap(queryParams);
+      ref.read(addPageParamsProvider.notifier).state = params;
+      debugPrint('[UniLinks] 设置AddPage参数: $params');
+    }
+
+    // 切换到指定标签页
+    _onItemTapped(tabIndex);
+
+    // 如果有参数，显示给用户
+    if (queryParams.isNotEmpty && tabIndex != 2) {
+      _showParametersInfo(queryParams);
+    }
+  }
+
+  /// 显示链接信息
+  void _showLinkInfo(String path, Map<String, String> queryParams) {
+    String message = '收到深度链接\n路径: $path';
+
+    if (queryParams.isNotEmpty) {
+      message += '\n参数:';
+      queryParams.forEach((key, value) {
+        message += '\n$key: $value';
+      });
+    }
+
+    SnackBarUtils.showInfo(context, message);
+  }
+
+  /// 显示参数信息
+  void _showParametersInfo(Map<String, String> queryParams) {
+    String message = '收到参数:';
+    queryParams.forEach((key, value) {
+      message += '\n$key: $value';
+    });
+
+    SnackBarUtils.showInfo(context, message);
   }
 
   void _onItemTapped(int index) {

@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:home_widget/home_widget.dart';
+import 'dart:convert';
 import '../../db/app_database.dart';
 import '../../db/dao/account_dao.dart';
 import '../../db/dao/transaction_dao.dart';
@@ -236,6 +239,10 @@ class AccountRepository {
 
   /// 获取所有账户
   Future<List<Account>> getAllAccounts() => _accountDao.getAllAccounts();
+
+  /// 获取账户余额
+  Future<double> getAccountBalance(int accountId) =>
+      _accountDao.getAccountBalance(accountId);
 
   /// 监听所有账户（响应式流）
   Stream<List<Account>> watchAllAccounts() => _accountDao.watchAllAccounts();
@@ -517,6 +524,131 @@ class AccountRepository {
     }
   }
 
+  /// 更新 App Group 账户数据
+  Future<void> _updateHomeWidgetAccountData(int ledgerId) async {
+    try {
+      // 获取四种类型的账户（不包括 EQUITY）
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+
+      final assetAccounts = allAccounts
+          .where((account) => account.accountType == AccountType.ASSET)
+          .map((acc) => {
+                'id': acc.accountId,
+                'name': acc.accountName,
+                'fullPath': acc.fullPath
+              })
+          .toList();
+
+      final liabilityAccounts = allAccounts
+          .where((account) => account.accountType == AccountType.LIABILITY)
+          .map((acc) => {
+                'id': acc.accountId,
+                'name': acc.accountName,
+                'fullPath': acc.fullPath
+              })
+          .toList();
+
+      final incomeAccounts = allAccounts
+          .where((account) => account.accountType == AccountType.INCOME)
+          .map((acc) => {
+                'id': acc.accountId,
+                'name': acc.accountName,
+                'fullPath': acc.fullPath
+              })
+          .toList();
+
+      final expenseAccounts = allAccounts
+          .where((account) => account.accountType == AccountType.EXPENSE)
+          .map((acc) => {
+                'id': acc.accountId,
+                'name': acc.accountName,
+                'fullPath': acc.fullPath
+              })
+          .toList();
+
+      debugPrint(
+          '[AppGroup] Updating account data: assets=${assetAccounts.length}, liabilities=${liabilityAccounts.length}, income=${incomeAccounts.length}, expense=${expenseAccounts.length}');
+
+      // 为了Shortcut访问，保存JSON格式的数据
+      final Map<String, dynamic> accountData = {
+        'assetAccounts': assetAccounts,
+        'liabilityAccounts': liabilityAccounts,
+        'incomeAccounts': incomeAccounts,
+        'expenseAccounts': expenseAccounts,
+        'lastUpdated': DateTime.now().toIso8601String(),
+        'ledgerId': ledgerId,
+      };
+
+      // 使用平台通道直接写入到 App Group UserDefaults
+      // const platform = MethodChannel('com.flowm.app_group');
+
+      try {
+        // await platform.invokeMethod('saveToAppGroup', {
+        //   'groupId': 'group.flowm',
+        //   'data': {
+        //     'accountDataJson': jsonEncode(accountData),
+        //     'assetAccounts': jsonEncode(assetAccounts),
+        //     'liabilityAccounts': jsonEncode(liabilityAccounts),
+        //     'incomeAccounts': jsonEncode(incomeAccounts),
+        //     'expenseAccounts': jsonEncode(expenseAccounts),
+        //     'ledgerId': ledgerId,
+        //     'lastUpdated': DateTime.now().toIso8601String(),
+        //   }
+        // });
+
+        HomeWidget.setAppGroupId('group.flowm');
+        await HomeWidget.saveWidgetData<String>(
+            'accountDataJson', jsonEncode(accountData));
+
+        debugPrint(
+            '[AppGroup] Account data saved successfully via platform channel');
+      } catch (e) {
+        debugPrint('[AppGroup] Error saving via platform channel: $e');
+
+        // 作为备选方案，仍然尝试使用 HomeWidget（虽然可能不被 Intent 访问到）
+        HomeWidget.setAppGroupId('group.flowm');
+        await HomeWidget.saveWidgetData<String>(
+            'accountDataJson', jsonEncode(accountData));
+        debugPrint('[AppGroup] Fallback: saved via HomeWidget');
+      }
+    } catch (e) {
+      debugPrint('[AppGroup] Error updating account data: $e');
+    }
+  }
+
+  /// 更新 App Group 账户数据（公共方法）
+  Future<void> updateHomeWidgetAccountData(int ledgerId) async {
+    await _updateHomeWidgetAccountData(ledgerId);
+  }
+
+  /// 测试 App Group 数据写入
+  Future<void> testAppGroupDataWrite(int ledgerId) async {
+    try {
+      debugPrint('[AccountRepository] Testing App Group data write...');
+
+      // 创建测试数据
+      final testData = {
+        'test': 'Hello from Flutter',
+        'timestamp': DateTime.now().toIso8601String(),
+        'ledgerId': ledgerId,
+      };
+
+      const platform = MethodChannel('com.flowm.app_group');
+
+      await platform.invokeMethod('saveToAppGroup', {
+        'groupId': 'group.flowm',
+        'data': testData,
+      });
+
+      debugPrint('[AccountRepository] Test data written successfully');
+
+      // 然后写入真正的账户数据
+      await _updateHomeWidgetAccountData(ledgerId);
+    } catch (e) {
+      debugPrint('[AccountRepository] Test failed: $e');
+    }
+  }
+
   /// 创建新账户
   Future<int> createAccount({
     required String name,
@@ -525,8 +657,8 @@ class AccountRepository {
     required int ledgerId,
     int? parentId,
     bool isActive = true,
-  }) {
-    return _accountDao.insertAccount(AccountsCompanion.insert(
+  }) async {
+    final accountId = await _accountDao.insertAccount(AccountsCompanion.insert(
       accountName: name,
       fullPath: fullPath,
       accountType: type,
@@ -535,6 +667,11 @@ class AccountRepository {
           parentId == null ? const Value.absent() : Value(parentId),
       isActive: Value(isActive),
     ));
+
+    // 创建账户后更新 App Group 数据
+    _updateHomeWidgetAccountData(ledgerId);
+
+    return accountId;
   }
 
   /// 创建一个新账户，并自动处理 fullPath
@@ -561,13 +698,16 @@ class AccountRepository {
     fullPath = parentPath.isEmpty ? name : '$parentPath:$name';
 
     // 调用底层的 createAccount 方法来插入新账户到数据库
-    return createAccount(
+    final accountId = await createAccount(
       name: name,
       fullPath: fullPath,
       type: type,
       ledgerId: ledgerId,
       parentId: parentId,
     );
+
+    // createAccount 已经会更新 Home Widget，这里不需要重复调用
+    return accountId;
   }
 
   /// 更新一个现有账户，并处理路径更新
@@ -604,6 +744,9 @@ class AccountRepository {
     for (final child in children) {
       await _updateChildPaths(child, newFullPath, ledgerId);
     }
+
+    // 更新账户后更新 App Group 数据
+    _updateHomeWidgetAccountData(ledgerId);
   }
 
   // Helper method to recursively update child paths
@@ -630,18 +773,31 @@ class AccountRepository {
     String? name,
     AccountType? type,
     bool? isActive,
-  }) {
-    return _accountDao.updateAccount(AccountsCompanion(
+  }) async {
+    final result = await _accountDao.updateAccount(AccountsCompanion(
       accountId: Value(id),
       accountName: name != null ? Value(name) : const Value.absent(),
       accountType: type != null ? Value(type) : const Value.absent(),
       isActive: isActive != null ? Value(isActive) : const Value.absent(),
     ));
+
+    // 获取账户的 ledgerId 以更新 App Group 数据
+    if (result) {
+      final account = await _accountDao.getAccountById(id);
+      if (account != null) {
+        _updateHomeWidgetAccountData(account.ledgerId);
+      }
+    }
+
+    return result;
   }
 
   /// 删除账户
   Future<DeleteAccountResult> deleteAccount(int id) async {
     try {
+      // 获取账户信息用于后续更新 App Group
+      final account = await _accountDao.getAccountById(id);
+
       // 检查是否有子账户
       final children = await _accountDao.getChildAccounts(id);
       if (children.isNotEmpty) {
@@ -661,9 +817,15 @@ class AccountRepository {
 
       // 没有子账户和关联的posting，执行删除
       final result = await _accountDao.deleteAccount(id);
-      return result > 0
-          ? DeleteAccountResult.success
-          : DeleteAccountResult.error;
+      if (result > 0) {
+        // 删除成功后更新 App Group 数据
+        if (account != null) {
+          _updateHomeWidgetAccountData(account.ledgerId);
+        }
+        return DeleteAccountResult.success;
+      } else {
+        return DeleteAccountResult.error;
+      }
     } catch (e) {
       print('删除账户失败: $e');
       return DeleteAccountResult.error;
@@ -1188,6 +1350,25 @@ class AccountRepository {
     } catch (e) {
       return [];
     }
+  }
+
+  /// 获取用于生成AI提示词的账户列表
+  Future<Map<AccountType, List<Account>>> getAccountsForAIPrompt(
+      int ledgerId) async {
+    final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+    final Map<AccountType, List<Account>> accountsMap = {
+      AccountType.ASSET: [],
+      AccountType.LIABILITY: [],
+      AccountType.INCOME: [],
+      AccountType.EXPENSE: [],
+    };
+
+    for (final account in allAccounts) {
+      if (accountsMap.containsKey(account.accountType)) {
+        accountsMap[account.accountType]!.add(account);
+      }
+    }
+    return accountsMap;
   }
 }
 

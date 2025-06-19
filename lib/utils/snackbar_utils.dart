@@ -42,8 +42,7 @@ class SnackBarUtils {
           SnackBar(
             content: Text(message),
             backgroundColor: backgroundColor ?? Colors.red,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(bottom: 100),
+            behavior: SnackBarBehavior.fixed,
             duration: Duration(seconds: durationSeconds ?? 3),
           ),
         );
@@ -72,8 +71,6 @@ class SnackBarUtils {
     String message, {
     Color? backgroundColor,
     int? durationSeconds,
-    bool isFloating = true,
-    double bottomMargin = 100,
   }) {
     // 使用根上下文的ScaffoldMessenger
     ScaffoldMessenger.of(context).removeCurrentSnackBar();
@@ -81,9 +78,7 @@ class SnackBarUtils {
       SnackBar(
         content: Text(message),
         backgroundColor: backgroundColor ?? Colors.red,
-        behavior:
-            isFloating ? SnackBarBehavior.floating : SnackBarBehavior.fixed,
-        margin: isFloating ? EdgeInsets.only(bottom: bottomMargin) : null,
+        behavior: SnackBarBehavior.fixed,
         duration: Duration(
           seconds: durationSeconds ?? (message.contains('交易记录') ? 4 : 2),
         ),

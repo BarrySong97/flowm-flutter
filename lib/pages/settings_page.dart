@@ -1,14 +1,22 @@
+import 'package:flowm/db/tables/account_table.dart';
 import 'package:flutter/material.dart';
 import 'package:flowm/components/settings/settings_profile_card.dart';
 import 'package:flowm/components/settings/settings_membership_card.dart';
 import 'package:flowm/components/settings/settings_feature_grid.dart';
 import 'package:flowm/components/settings/settings_data_section.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flowm/db/app_database.dart';
+import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/utils/snackbar_utils.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
       body: SafeArea(
@@ -61,6 +69,17 @@ class SettingsPage extends StatelessWidget {
                     icon: Icons.help_outline,
                     title: '使用说明',
                     onTap: () {},
+                  ),
+                ],
+              ),
+              SettingsDataSection(
+                title: '快捷指令',
+                items: [
+                  SettingsDataItem(
+                    icon: Icons.shortcut,
+                    title: 'AI记账指令',
+                    subtitle: '点击下载AI记账快捷指令',
+                    onTap: () => {},
                   ),
                 ],
               ),

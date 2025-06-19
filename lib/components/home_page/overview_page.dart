@@ -151,6 +151,22 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     super.initState();
     // 第一次加载时主动更新
     _updateWidget(ref.read(monthlyOverviewDataProvider));
+    // 第一次加载时更新账户数据到 Home Widget
+    _updateAccountDataWidget();
+  }
+
+  void _updateAccountDataWidget() async {
+    try {
+      final selectedLedger = await ref.read(selectedLedgerProvider.future);
+      if (selectedLedger == null) return;
+      debugPrint('save account data');
+
+      final accountRepository = ref.read(accountRepositoryProvider);
+      await accountRepository
+          .updateHomeWidgetAccountData(selectedLedger.ledgerId);
+    } catch (e) {
+      debugPrint('[HomeWidget] Error updating initial account data: $e');
+    }
   }
 
   void _updateWidget(
