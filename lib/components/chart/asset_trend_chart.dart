@@ -83,7 +83,7 @@ class AssetTrendChart extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     gradientColor.withOpacity(1.0), // 顶部颜色更深
-                    gradientColor.withOpacity(0.0), // 底部完全透明
+                    gradientColor.withOpacity(0.4), // 底部颜色加深
                   ],
                 ),
                 borderColor: primaryColor,
