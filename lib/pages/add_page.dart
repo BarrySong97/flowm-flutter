@@ -538,6 +538,7 @@ class _AddPageState extends ConsumerState<AddPage>
       }
     });
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FB),
       appBar: _isEditMode
           ? AppBar(
               backgroundColor: Colors.white,
