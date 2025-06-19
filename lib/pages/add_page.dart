@@ -553,7 +553,6 @@ class _AddPageState extends ConsumerState<AddPage>
               elevation: 0,
             )
           : null,
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
