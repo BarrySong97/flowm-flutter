@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'app.dart';
 import 'db/app_database.dart';
 import 'state/database/database_provider.dart';
+import 'utils/status_bar_utils.dart';
 
 void main() async {
   // 确保Flutter绑定初始化
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 统一设置状态栏样式 - 全局生效
+  StatusBarUtils.setStandardStyle();
 
   // 初始化数据库
   final database = AppDatabase();

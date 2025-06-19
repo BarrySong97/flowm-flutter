@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/status_bar_utils.dart';
 
 class AppTheme {
   // Primary colors
@@ -46,15 +47,11 @@ class AppTheme {
       cardColor: cardColor,
 
       // AppBar主题
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.dark,
-        ),
+        systemOverlayStyle: StatusBarUtils.standardStyle,
       ),
 
       // 按钮主题

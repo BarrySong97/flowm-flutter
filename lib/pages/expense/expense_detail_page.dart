@@ -88,13 +88,6 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            Brightness.light, // Or Brightness.dark based on AppBar color
-      ),
-    );
   }
 
   void _onScroll() {

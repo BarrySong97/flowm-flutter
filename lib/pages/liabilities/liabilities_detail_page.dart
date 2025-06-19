@@ -39,13 +39,6 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
       setState(() {});
     });
     _scrollController.addListener(_onScroll);
-    // Set status bar color to transparent
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-    );
   }
 
   void _onScroll() {
