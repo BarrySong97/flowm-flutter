@@ -369,6 +369,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 0,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Padding(
                   padding: EdgeInsets.only(left: 4.0, bottom: 0.0),
@@ -390,7 +391,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8.0),
                         ),
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 0),
                         child: const Center(
                           child: Text('暂无交易记录'),
                         ),
@@ -421,9 +423,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                       ..sort((a, b) => b.compareTo(a));
 
                     return Container(
+                      padding: const EdgeInsets.only(top: 0),
                       child: ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.only(top: 16),
                         separatorBuilder: (context, index) => const ColoredBox(
                             color: Colors.transparent,
                             child: SizedBox(height: 16)),
@@ -460,6 +464,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.start,
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -504,6 +509,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                 ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
+                                  padding: EdgeInsets.only(top: 0),
                                   itemCount: transactionsOnDate.length,
                                   itemBuilder: (context, transactionIndex) {
                                     final transactionWithAmount =

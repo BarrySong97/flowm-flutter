@@ -1,17 +1,13 @@
 import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/home_page.dart';
-import 'package:flowm/pages/transactions_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/home_page/overview_page.dart';
 import 'package:flowm/pages/calendar_page.dart';
 import 'package:flowm/pages/flow_page.dart';
 import 'package:flowm/pages/settings_page.dart';
 import 'package:flashy_tab_bar2/flashy_tab_bar2.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'dart:async';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flowm/utils/snackbar_utils.dart';
 import 'package:flowm/state/add_page_params_provider.dart';
 
@@ -49,6 +45,7 @@ class _MainScreenPageState extends State<_MainScreenPage>
 class _MainScreenState extends ConsumerState<MainScreen> {
   late final PageController _pageController;
   StreamSubscription? _linkSubscription;
+  late AppLinks _appLinks;
   final List<Widget> _pages = [
     _MainScreenPage(child: HomePage(key: PageStorageKey('home_page'))),
     CalendarPage(),
@@ -65,8 +62,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       keepPage: false,
     );
 
-    // 初始化深度链接监听
-    _initUniLinks();
+    // 初始化app_links深度链接监听
+    _initAppLinks();
   }
 
   @override
@@ -76,25 +73,25 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     super.dispose();
   }
 
-  /// 初始化uni_links深度链接监听
-  void _initUniLinks() async {
+  /// 初始化app_links深度链接监听
+  void _initAppLinks() async {
     try {
+      _appLinks = AppLinks();
+
       // 监听应用正在运行时的深度链接
-      _linkSubscription = linkStream.listen((String? uri) {
-        if (uri != null) {
-          _handleIncomingLink(uri);
-        }
+      _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) {
+        _handleIncomingLink(uri.toString());
       }, onError: (err) {
-        debugPrint('[UniLinks] 深度链接监听错误: $err');
+        debugPrint('[AppLinks] 深度链接监听错误: $err');
       });
 
       // 处理应用启动时的初始链接
-      final String? initialLink = await getInitialLink();
+      final Uri? initialLink = await _appLinks.getInitialLink();
       if (initialLink != null) {
-        _handleIncomingLink(initialLink);
+        _handleIncomingLink(initialLink.toString());
       }
-    } on PlatformException catch (e) {
-      debugPrint('[UniLinks] 初始化失败: $e');
+    } catch (e) {
+      debugPrint('[AppLinks] 初始化失败: $e');
     }
   }
 
@@ -102,7 +99,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void _handleIncomingLink(String uri) {
     try {
       final Uri parsedUri = Uri.parse(uri);
-      debugPrint('[UniLinks] 收到深度链接: $uri');
+      debugPrint('[AppLinks] 收到深度链接: $uri');
 
       // 解析路径和参数
       final String path = parsedUri.path;
@@ -111,7 +108,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       // 根据路径和参数执行相应操作
       _processLinkData(path, queryParams);
     } catch (e) {
-      debugPrint('[UniLinks] 解析深度链接失败: $e');
+      debugPrint('[AppLinks] 解析深度链接失败: $e');
       SnackBarUtils.showError(context, '深度链接格式错误');
     }
   }
@@ -119,8 +116,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   /// 处理链接数据并执行相应操作
   void _processLinkData(String path, Map<String, String> queryParams) {
     // 打印所有参数供调试
-    debugPrint('[UniLinks] 路径: $path');
-    debugPrint('[UniLinks] 查询参数: $queryParams');
+    debugPrint('[AppLinks] 路径: $path');
+    debugPrint('[AppLinks] 查询参数: $queryParams');
 
     // 根据路径导航到不同页面
     switch (path) {
@@ -154,7 +151,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     if (tabIndex == 2 && queryParams.isNotEmpty) {
       final params = AddPageParams.fromMap(queryParams);
       ref.read(addPageParamsProvider.notifier).state = params;
-      debugPrint('[UniLinks] 设置AddPage参数: $params');
+      debugPrint('[AppLinks] 设置AddPage参数: $params');
     }
 
     // 切换到指定标签页
