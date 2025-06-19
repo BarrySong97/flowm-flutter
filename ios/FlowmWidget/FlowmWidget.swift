@@ -26,9 +26,9 @@ struct Provider: AppIntentTimelineProvider {
     SimpleEntry
   > {
     let userDefaults = UserDefaults(suiteName: "group.flowm")
-    let expense = userDefaults?.double(forKey: "expense") ?? 0.0
-    let income = userDefaults?.double(forKey: "income") ?? 0.0
-    let balance = userDefaults?.double(forKey: "balance") ?? 0.0
+    let expense = Double(userDefaults?.string(forKey: "expense") ?? "") ?? 0.0
+    let income = Double(userDefaults?.string(forKey: "income") ?? "") ?? 0.0
+    let balance = Double(userDefaults?.string(forKey: "balance") ?? "") ?? 0.0
 
     let entry = SimpleEntry(
       date: Date(), configuration: configuration, expense: expense, income: income, balance: balance

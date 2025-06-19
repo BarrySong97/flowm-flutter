@@ -175,9 +175,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       debugPrint(
           '[HomeWidget] Updating data: expense=${value.expense}, income=${value.income}, balance=${value.balance}');
       HomeWidget.setAppGroupId('group.flowm');
-      HomeWidget.saveWidgetData<double>('expense', value.expense);
-      HomeWidget.saveWidgetData<double>('income', value.income);
-      HomeWidget.saveWidgetData<double>('balance', value.balance);
+      HomeWidget.saveWidgetData<String>('expense', value.expense.toString());
+      HomeWidget.saveWidgetData<String>('income', value.income.toString());
+      HomeWidget.saveWidgetData<String>('balance', value.balance.toString());
       final result =
           HomeWidget.updateWidget(name: 'FlowmWidget', iOSName: 'FlowmWidget');
       result.then((value) => debugPrint('[HomeWidget] Update result: $value'));
