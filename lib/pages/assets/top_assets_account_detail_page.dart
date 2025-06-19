@@ -160,7 +160,6 @@ class _TopAssetsAccountDetailPageState
                       // Watch the asset trend provider by date range
                       Consumer(builder: (context, ref, child) {
                         // Watch the new provider with null for now
-                        // TODO: Add accountId to Account model and use it here
                         final assetTrendAsync = ref.watch(
                             assetTrendProviderByDateRange(widget.account.id));
                         return assetTrendAsync.when(

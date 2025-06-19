@@ -3,9 +3,9 @@ import 'package:custom_sliding_segmented_control/custom_sliding_segmented_contro
 
 enum TimeRange {
   thisMonth('本月', '1M'),
-  this3Months('近60天', '3M'),
-  this90Days('近90天', '90D'),
-  thisYear('近一年', '1Y'),
+  this3Months('60天', '3M'),
+  this90Days('90天', '90D'),
+  thisYear('一年', '1Y'),
   all('全部', 'ALL');
 
   const TimeRange(this.label, this.shortLabel);

@@ -2,9 +2,7 @@ import 'package:flowm/components/account/account_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/chart/barchart.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
-import 'package:flowm/components/sankey_chart.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/state/account/account_repository.dart';
@@ -13,8 +11,6 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:sankey_flutter/sankey_helpers.dart';
-import 'package:sankey_flutter/sankey_link.dart';
-import 'package:sankey_flutter/sankey_node.dart';
 import 'package:intl/intl.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
