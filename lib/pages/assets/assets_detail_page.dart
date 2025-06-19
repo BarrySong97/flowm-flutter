@@ -128,7 +128,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16),
                                   child: Text(
-                                    '${widget.account.currencySymbol}${widget.account.amount}',
+                                    '${widget.account.currencySymbol}${widget.account.amount.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
