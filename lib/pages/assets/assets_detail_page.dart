@@ -97,7 +97,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                           child: Padding(
                             padding: const EdgeInsets.all(0),
                             child: Column(
-                              spacing: 8,
+                              spacing: 16,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Placeholder for app bar height
@@ -357,7 +357,7 @@ class AssetsDetailBody extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         child: Column(
-          spacing: 12,
+          spacing: 16,
           children: [
             // 流向选择Tab
             _buildFlowSelector(context),
@@ -621,7 +621,7 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
 
                 // 生成布局
                 final sankey = generateSankeyLayout(
-                  width: 350,
+                  width: 300,
                   height: 200,
                   nodeWidth: 12,
                   nodePadding: 20,
