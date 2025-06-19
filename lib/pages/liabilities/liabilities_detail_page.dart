@@ -825,8 +825,9 @@ class AccountTransactionList extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.only(
                             left: 16, right: 16, top: 12, bottom: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               formattedDate,
