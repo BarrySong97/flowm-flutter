@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Flowm</string>
-    <string name="flowm_widget_description">显示您的财务概览，包括收入、支出和余额</string>
+    <string name="flowm_widget_description">显示您的月度财务概览，包括收入、支出和结余信息，一目了然掌握财务状况</string>
 </resources>
