@@ -1,6 +1,4 @@
-import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -8,56 +6,9 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flowm/components/calendar/calendar_day.dart';
 import '../../db/dao/transaction_dao.dart';
 import '../../state/transaction/transaction_repository.dart';
+import '../../state/transaction/calendar_provider.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import '../../utils/transaction_type_map.dart';
-import '../../utils/transaction_utils.dart';
-
-// Provider to get daily income and expense summary for a specific month
-final monthlyCalendarSummaryProvider = StreamProvider.autoDispose
-    .family<Map<int, ({double income, double expenses})>, DateTime>(
-        (ref, dayForMonth) {
-  final transactionRepository = ref.watch(transactionRepositoryProvider);
-
-  final ledgerId = ref.read(selectedLedgerProvider).value?.ledgerId;
-  final firstDayOfMonth = DateTime(dayForMonth.year, dayForMonth.month, 1);
-  final lastDayOfMonth = (dayForMonth.month < 12)
-      ? DateTime(dayForMonth.year, dayForMonth.month + 1, 0, 23, 59, 59)
-      : DateTime(dayForMonth.year + 1, 1, 0, 23, 59, 59);
-
-  // Assuming TransactionRepository has an equivalent of watchTransactionsByDay
-  // that returns List<TransactionWithAmount> for a date range.
-  // Let's call it watchTransactionsWithAmountByDateRange for this example.
-  // This method needs to be implemented in TransactionRepository.
-  return transactionRepository
-      .watchTransactionsWithAmountByDateRange(
-          firstDayOfMonth, lastDayOfMonth, ledgerId)
-      .map((transactionsWithAmount) {
-    final Map<int, ({double income, double expenses})> monthlySummary = {};
-    if (transactionsWithAmount.isEmpty) {
-      return monthlySummary;
-    }
-
-    final Map<int, List<TransactionWithAmount>> transactionsByDay = {};
-    for (var ta in transactionsWithAmount) {
-      // Assuming TransactionWithAmount has access to the original transaction's date
-      // or has its own relevant date property.
-      // If TransactionWithAmount wraps a Transaction object, it would be like ta.transaction.transactionDate.day
-      // For now, let's assume 'ta.transaction.transactionDate.day' is the correct path.
-      // This needs to match the actual structure of TransactionWithAmount.
-      final day = ta.transaction.transactionDate.day;
-      transactionsByDay.putIfAbsent(day, () => []).add(ta);
-    }
-
-    transactionsByDay.forEach((day, dayTransactions) {
-      final totals = calculateDailyIncomeAndExpense(dayTransactions);
-      if (totals['income']! != 0 || totals['expenses']! != 0) {
-        monthlySummary[day] =
-            (income: totals['income']!, expenses: totals['expenses']!);
-      }
-    });
-    return monthlySummary;
-  });
-});
 
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key});
@@ -72,26 +23,21 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   DateTime _selectedDay = DateTime.now();
   String customFormatted1 = DateFormat('yyyy年MM月').format(DateTime.now());
 
-  late Stream<List<TransactionWithAmount>> _selectedDayTransactions;
-  late final TransactionRepository _transactionRepository;
-
   @override
   void initState() {
     super.initState();
-    _transactionRepository = ref.read(transactionRepositoryProvider);
-    _updateSelectedDayTransactions();
   }
 
-  void _updateSelectedDayTransactions() {
-    _selectedDayTransactions =
-        _transactionRepository.watchTransactionsByDay(_selectedDay);
-    if (mounted) {
-      setState(() {});
+  String _getTransactionType(TransactionWithAmount item) {
+    // 如果有明确的from和to账户类型，使用getTransactionFlowType
+    if (item.fromAccount?.accountType != null &&
+        item.toAccount?.accountType != null) {
+      return getTransactionFlowType(
+          item.fromAccount!.accountType, item.toAccount!.accountType);
     }
-  }
 
-  String _mapNatureToTypeString(TransactionNature nature) {
-    switch (nature) {
+    // 回退到基于nature的逻辑
+    switch (item.nature) {
       case TransactionNature.INFLOW:
         return '收入';
       case TransactionNature.OUTFLOW:
@@ -104,8 +50,40 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
   }
 
-  Color _mapNatureToColor(TransactionNature nature) {
-    switch (nature) {
+  Color _getTransactionColor(TransactionWithAmount item) {
+    // 如果有明确的from和to账户类型，基于交易类型确定颜色
+    if (item.fromAccount?.accountType != null &&
+        item.toAccount?.accountType != null) {
+      final transactionType = getTransactionFlowType(
+          item.fromAccount!.accountType, item.toAccount!.accountType);
+
+      switch (transactionType) {
+        case '收入':
+          return Colors.green;
+        case '支出':
+          return Colors.red;
+        case '资产转移':
+        case '转账':
+          return Colors.blue;
+        case '偿还债务':
+          return Colors.orange;
+        case '获得贷款':
+          return Colors.purple;
+        case '个人投入':
+          return Colors.teal;
+        case '个人提取':
+          return Colors.deepOrange;
+        case '费用退款':
+          return Colors.lightGreen;
+        case '贷款支出':
+          return Colors.redAccent;
+        default:
+          return Colors.grey;
+      }
+    }
+
+    // 回退到基于nature的逻辑
+    switch (item.nature) {
       case TransactionNature.INFLOW:
         return Colors.green;
       case TransactionNature.OUTFLOW:
@@ -118,8 +96,21 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
   }
 
-  bool _mapNatureToIsExpense(TransactionNature nature) {
-    return nature == TransactionNature.OUTFLOW;
+  bool _isExpenseTransaction(TransactionWithAmount item) {
+    // 如果有明确的from和to账户类型，基于交易类型确定是否为支出
+    if (item.fromAccount?.accountType != null &&
+        item.toAccount?.accountType != null) {
+      final transactionType = getTransactionFlowType(
+          item.fromAccount!.accountType, item.toAccount!.accountType);
+
+      return transactionType == '支出' ||
+          transactionType == '偿还债务' ||
+          transactionType == '个人提取' ||
+          transactionType == '贷款支出';
+    }
+
+    // 回退到基于nature的逻辑
+    return item.nature == TransactionNature.OUTFLOW;
   }
 
   @override
@@ -147,7 +138,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 setState(() {
                   _selectedDay = DateTime.now();
                   _focusedDay = DateTime.now();
-                  _updateSelectedDayTransactions();
                   customFormatted1 =
                       DateFormat('yyyy年MM月').format(DateTime.now());
                 });
@@ -286,7 +276,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   setState(() {
                     _selectedDay = selectedDay;
                     _focusedDay = focusedDay;
-                    _updateSelectedDayTransactions();
                     customFormatted1 =
                         DateFormat('yyyy年MM月').format(focusedDay);
                   });
@@ -331,54 +320,227 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               ),
             ),
           ),
+          // 当天收支汇总
+          Consumer(
+            builder: (context, ref, child) {
+              final monthKey =
+                  DateTime(_selectedDay.year, _selectedDay.month, 1);
+              final monthlySummaryAsyncValue =
+                  ref.watch(monthlyCalendarSummaryProvider(monthKey));
+
+              return monthlySummaryAsyncValue.when(
+                data: (summaryMap) {
+                  final daySummary = summaryMap[_selectedDay.day];
+                  final income = daySummary?.income ?? 0.0;
+                  final expenses = daySummary?.expenses ?? 0.0;
+                  final net = income - expenses;
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 0.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 10.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        // 收入
+                        Column(
+                          children: [
+                            Text(
+                              '收入',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              NumberFormat.currency(
+                                      symbol: '¥', decimalDigits: 2)
+                                  .format(income),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 分隔线
+                        Container(
+                          height: 40,
+                          width: 1,
+                          color: Colors.grey[300],
+                        ),
+                        // 支出
+                        Column(
+                          children: [
+                            Text(
+                              '支出',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              NumberFormat.currency(
+                                      symbol: '¥', decimalDigits: 2)
+                                  .format(expenses),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 分隔线
+                        Container(
+                          height: 40,
+                          width: 1,
+                          color: Colors.grey[300],
+                        ),
+                        // 净额
+                        Column(
+                          children: [
+                            Text(
+                              '净额',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              NumberFormat.currency(
+                                      symbol: '¥', decimalDigits: 2)
+                                  .format(net),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: net >= 0 ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                loading: () => Container(
+                  margin: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 8),
+                      Text('加载中...', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                error: (error, stackTrace) => const SizedBox.shrink(),
+              );
+            },
+          ),
           Expanded(
-            child: StreamBuilder<List<TransactionWithAmount>>(
-              stream: _selectedDayTransactions,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                      child: Text(
-                          '错误: ${snapshot.error}\n${snapshot.stackTrace}'));
-                }
-                final transactionsWithAmount = snapshot.data ?? [];
-                if (transactionsWithAmount.isEmpty) {
-                  return const Center(child: Text('该日期无交易记录'));
-                }
-                return SuperListView.builder(
-                  itemCount: transactionsWithAmount.length,
-                  itemBuilder: (context, index) {
-                    final item = transactionsWithAmount[index];
-                    final transaction = item.transaction;
-                    final amountString =
-                        NumberFormat.currency(symbol: '¥', decimalDigits: 2)
-                            .format(item.amount.abs());
+            child: Consumer(
+              builder: (context, ref, child) {
+                final selectedDayTransactionsAsync =
+                    ref.watch(selectedDayTransactionsProvider(_selectedDay));
 
-                    String subtitle =
-                        DateFormat('HH:mm').format(transaction.transactionDate);
-                    if (item.fromAccount != null && item.toAccount != null) {
-                      subtitle =
-                          '${item.fromAccount!.accountName} -> ${item.toAccount!.accountName}';
-                    } else if (item.nature == TransactionNature.OUTFLOW &&
-                        item.toAccount != null) {
-                      subtitle = item.toAccount!.accountName;
-                    } else if (item.nature == TransactionNature.INFLOW &&
-                        item.fromAccount != null) {
-                      subtitle = item.fromAccount!.accountName;
+                return selectedDayTransactionsAsync.when(
+                  data: (transactionsWithAmount) {
+                    if (transactionsWithAmount.isEmpty) {
+                      return const Center(child: Text('该日期无交易记录'));
                     }
+                    return SuperListView.builder(
+                      itemCount: transactionsWithAmount.length,
+                      itemBuilder: (context, index) {
+                        final item = transactionsWithAmount[index];
+                        final transaction = item.transaction;
+                        final amountString =
+                            NumberFormat.currency(symbol: '¥', decimalDigits: 2)
+                                .format(item.amount.abs());
 
-                    return TransactionListItem(
-                      title: transaction.description ?? '无描述',
-                      transactionId: transaction.transactionId.toString(),
-                      subtitle: subtitle,
-                      amount: amountString,
-                      type: _mapNatureToTypeString(item.nature),
-                      statusColor: _mapNatureToColor(item.nature),
-                      isExpense: _mapNatureToIsExpense(item.nature),
+                        String subtitle = DateFormat('HH:mm')
+                            .format(transaction.transactionDate);
+                        if (item.fromAccount != null &&
+                            item.toAccount != null) {
+                          subtitle =
+                              '${item.fromAccount!.accountName} -> ${item.toAccount!.accountName}';
+                        } else if (item.nature == TransactionNature.OUTFLOW &&
+                            item.toAccount != null) {
+                          subtitle = item.toAccount!.accountName;
+                        } else if (item.nature == TransactionNature.INFLOW &&
+                            item.fromAccount != null) {
+                          subtitle = item.fromAccount!.accountName;
+                        }
+
+                        return TransactionListItem(
+                          title: transaction.description ?? '无描述',
+                          transactionId: transaction.transactionId.toString(),
+                          subtitle: subtitle,
+                          amount: amountString,
+                          type: _getTransactionType(item),
+                          statusColor: _getTransactionColor(item),
+                          isExpense: _isExpenseTransaction(item),
+                          transactionDate: transaction.transactionDate,
+                          transactionAmount: item.amount,
+                          fullDescription: transaction.description,
+                          fromAccountType: item.fromAccount?.accountType,
+                          toAccountType: item.toAccount?.accountType,
+                          onDelete: () {
+                            // 刷新当月数据
+                            final monthKey = DateTime(
+                                _selectedDay.year, _selectedDay.month, 1);
+                            ref.invalidate(
+                                monthlyCalendarSummaryProvider(monthKey));
+
+                            // 刷新当天交易列表
+                            ref.invalidate(
+                                selectedDayTransactionsProvider(_selectedDay));
+                          },
+                        );
+                      },
                     );
                   },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stackTrace) => Center(
+                    child: Text('错误: $error\n$stackTrace'),
+                  ),
                 );
               },
             ),

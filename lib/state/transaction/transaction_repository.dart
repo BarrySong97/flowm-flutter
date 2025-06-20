@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../db/app_database.dart';
 import '../../db/dao/transaction_dao.dart';
 import '../database/database_provider.dart';
+import '../../utils/transaction_utils.dart';
 
 /// 交易仓库提供者，用于封装交易相关的数据库操作
 final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
@@ -168,6 +169,11 @@ class TransactionRepository {
   Stream<List<TransactionWithAmount>> watchTransactionsByDay(DateTime day) =>
       _transactionDao.watchTransactionsWithAmountByDay(day);
 
+  /// 获取某一天交易 (Future版本)
+  Future<List<TransactionWithAmount>> getTransactionsByDay(
+          DateTime day, int? ledgerId) =>
+      _transactionDao.getTransactionsByDay(day, ledgerId);
+
   /// 根据时间范围监听交易 (TransactionWithAmount)
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountByDateRange(
           DateTime startDate, DateTime endDate, int? ledgerId) =>
@@ -266,5 +272,48 @@ class TransactionRepository {
         ),
       );
     });
+  }
+
+  /// 获取指定月份的每日收支汇总数据 (Future版本)
+  ///
+  /// [dayForMonth] - 月份中的任意一天，用于确定要查询的月份
+  /// [ledgerId] - 账本ID
+  /// Returns: Map<int, ({double income, double expenses})> 其中key是日期中的天数
+  Future<Map<int, ({double income, double expenses})>>
+      getMonthlyCalendarSummary(
+    DateTime dayForMonth,
+    int? ledgerId,
+  ) async {
+    final firstDayOfMonth = DateTime(dayForMonth.year, dayForMonth.month, 1);
+    final lastDayOfMonth = (dayForMonth.month < 12)
+        ? DateTime(dayForMonth.year, dayForMonth.month + 1, 0, 23, 59, 59)
+        : DateTime(dayForMonth.year + 1, 1, 0, 23, 59, 59);
+
+    // 使用TransactionDao的Future方法直接获取数据
+    final transactionsWithAmount =
+        await _transactionDao.getTransactionsWithAmountByDateRange(
+            firstDayOfMonth, lastDayOfMonth, ledgerId);
+
+    final Map<int, ({double income, double expenses})> monthlySummary = {};
+
+    if (transactionsWithAmount.isEmpty) {
+      return monthlySummary;
+    }
+
+    final Map<int, List<TransactionWithAmount>> transactionsByDay = {};
+    for (var ta in transactionsWithAmount) {
+      final day = ta.transaction.transactionDate.day;
+      transactionsByDay.putIfAbsent(day, () => []).add(ta);
+    }
+
+    transactionsByDay.forEach((day, dayTransactions) {
+      final totals = calculateDailyIncomeAndExpense(dayTransactions);
+      if (totals['income']! != 0 || totals['expenses']! != 0) {
+        monthlySummary[day] =
+            (income: totals['income']!, expenses: totals['expenses']!);
+      }
+    });
+
+    return monthlySummary;
   }
 }

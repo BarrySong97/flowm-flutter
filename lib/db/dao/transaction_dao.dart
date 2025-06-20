@@ -1134,4 +1134,273 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       return resultList;
     }
   }
+
+  // 根据日期范围获取交易记录 (TransactionWithAmount) - Future版本 (优化版)
+  Future<List<TransactionWithAmount>> getTransactionsWithAmountByDateRange(
+      DateTime startDate, DateTime endDate, int? ledgerId) async {
+    if (ledgerId == null) {
+      return [];
+    }
+
+    // 使用单一的优化查询，直接获取所需的所有数据
+    final results = await customSelect(
+      '''
+      SELECT DISTINCT
+        t.transaction_id,
+        t.transaction_date,
+        t.description,
+        t.is_recurring,
+        t.created_at,
+        -- 获取from账户信息（金额为负的）
+        pf.amount as from_amount,
+        af.account_id as from_account_id,
+        af.account_name as from_account_name,
+        af.account_type as from_account_type,
+        af.ledger_id as from_ledger_id,
+        af.full_path as from_full_path,
+        af.is_active as from_is_active,
+        af.parent_account_id as from_parent_account_id,
+        af.created_at as from_account_created_at,
+        -- 获取to账户信息（金额为正的）
+        pt.amount as to_amount,
+        at.account_id as to_account_id,
+        at.account_name as to_account_name,
+        at.account_type as to_account_type,
+        at.ledger_id as to_ledger_id,
+        at.full_path as to_full_path,
+        at.is_active as to_is_active,
+        at.parent_account_id as to_parent_account_id,
+        at.created_at as to_account_created_at
+      FROM transactions t
+      -- 关联该账本下的所有交易
+      INNER JOIN postings p_main ON t.transaction_id = p_main.transaction_id
+      INNER JOIN accounts a_main ON p_main.account_id = a_main.account_id AND a_main.ledger_id = ?
+      -- 关联from账户（金额为负）
+      LEFT JOIN postings pf ON t.transaction_id = pf.transaction_id AND pf.amount < 0
+      LEFT JOIN accounts af ON pf.account_id = af.account_id
+      -- 关联to账户（金额为正）
+      LEFT JOIN postings pt ON t.transaction_id = pt.transaction_id AND pt.amount > 0
+      LEFT JOIN accounts at ON pt.account_id = at.account_id
+      WHERE t.transaction_date >= ? 
+        AND t.transaction_date <= ?
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      ''',
+      variables: [
+        Variable.withInt(ledgerId),
+        Variable.withDateTime(startDate),
+        Variable.withDateTime(endDate),
+      ],
+      readsFrom: {transactions, postings, accounts},
+    ).get();
+
+    // 处理结果，转换为TransactionWithAmount对象
+    return results.map((row) {
+      // 构建交易对象
+      final transaction = Transaction(
+        transactionId: row.read<int>('transaction_id'),
+        transactionDate: row.read<DateTime>('transaction_date'),
+        description: row.readNullable<String>('description'),
+        isRecurring: row.read<bool>('is_recurring'),
+        createdAt: row.read<DateTime>('created_at'),
+      );
+
+      // 构建from账户对象
+      Account? fromAccount;
+      if (row.readNullable<int>('from_account_id') != null) {
+        fromAccount = Account(
+          accountId: row.read<int>('from_account_id'),
+          accountName: row.read<String>('from_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('from_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('from_ledger_id'),
+          fullPath: row.read<String>('from_full_path'),
+          isActive: row.read<bool>('from_is_active'),
+          createdAt: row.read<DateTime>('from_account_created_at'),
+          parentAccountId: row.readNullable<int>('from_parent_account_id'),
+        );
+      }
+
+      // 构建to账户对象
+      Account? toAccount;
+      if (row.readNullable<int>('to_account_id') != null) {
+        toAccount = Account(
+          accountId: row.read<int>('to_account_id'),
+          accountName: row.read<String>('to_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('to_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('to_ledger_id'),
+          fullPath: row.read<String>('to_full_path'),
+          isActive: row.read<bool>('to_is_active'),
+          createdAt: row.read<DateTime>('to_account_created_at'),
+          parentAccountId: row.readNullable<int>('to_parent_account_id'),
+        );
+      }
+
+      // 计算交易金额（取正值）
+      double transactionAmount = 0;
+      if (row.readNullable<double>('from_amount') != null) {
+        transactionAmount = row.read<double>('from_amount').abs();
+      } else if (row.readNullable<double>('to_amount') != null) {
+        transactionAmount = row.read<double>('to_amount').abs();
+      }
+
+      // 确定交易性质
+      final nature = getTransactionNature(
+        fromAccount?.accountType,
+        toAccount?.accountType,
+      );
+
+      return TransactionWithAmount(
+        transaction: transaction,
+        amount: transactionAmount,
+        fromAccount: fromAccount,
+        toAccount: toAccount,
+        nature: nature,
+      );
+    }).toList();
+  }
+
+  // 获取某一天的交易记录 (TransactionWithAmount) - Future版本
+  Future<List<TransactionWithAmount>> getTransactionsByDay(
+      DateTime day, int? ledgerId) async {
+    if (ledgerId == null) {
+      return [];
+    }
+
+    final startOfDay = DateTime(day.year, day.month, day.day);
+    final endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59, 999);
+
+    // 使用优化的查询，类似于getTransactionsWithAmountByDateRange的逻辑
+    final results = await customSelect(
+      '''
+      SELECT DISTINCT
+        t.transaction_id,
+        t.transaction_date,
+        t.description,
+        t.is_recurring,
+        t.created_at,
+        -- 获取from账户信息（金额为负的）
+        pf.amount as from_amount,
+        af.account_id as from_account_id,
+        af.account_name as from_account_name,
+        af.account_type as from_account_type,
+        af.ledger_id as from_ledger_id,
+        af.full_path as from_full_path,
+        af.is_active as from_is_active,
+        af.parent_account_id as from_parent_account_id,
+        af.created_at as from_account_created_at,
+        -- 获取to账户信息（金额为正的）
+        pt.amount as to_amount,
+        at.account_id as to_account_id,
+        at.account_name as to_account_name,
+        at.account_type as to_account_type,
+        at.ledger_id as to_ledger_id,
+        at.full_path as to_full_path,
+        at.is_active as to_is_active,
+        at.parent_account_id as to_parent_account_id,
+        at.created_at as to_account_created_at
+      FROM transactions t
+      -- 关联该账本下的所有交易
+      INNER JOIN postings p_main ON t.transaction_id = p_main.transaction_id
+      INNER JOIN accounts a_main ON p_main.account_id = a_main.account_id AND a_main.ledger_id = ?
+      -- 关联from账户（金额为负）
+      LEFT JOIN postings pf ON t.transaction_id = pf.transaction_id AND pf.amount < 0
+      LEFT JOIN accounts af ON pf.account_id = af.account_id
+      -- 关联to账户（金额为正）
+      LEFT JOIN postings pt ON t.transaction_id = pt.transaction_id AND pt.amount > 0
+      LEFT JOIN accounts at ON pt.account_id = at.account_id
+      WHERE t.transaction_date >= ? 
+        AND t.transaction_date <= ?
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      ''',
+      variables: [
+        Variable.withInt(ledgerId),
+        Variable.withDateTime(startOfDay),
+        Variable.withDateTime(endOfDay),
+      ],
+      readsFrom: {transactions, postings, accounts},
+    ).get();
+
+    // 处理结果，转换为TransactionWithAmount对象
+    return results.map((row) {
+      // 构建交易对象
+      final transaction = Transaction(
+        transactionId: row.read<int>('transaction_id'),
+        transactionDate: row.read<DateTime>('transaction_date'),
+        description: row.readNullable<String>('description'),
+        isRecurring: row.read<bool>('is_recurring'),
+        createdAt: row.read<DateTime>('created_at'),
+      );
+
+      // 构建from账户对象
+      Account? fromAccount;
+      if (row.readNullable<int>('from_account_id') != null) {
+        fromAccount = Account(
+          accountId: row.read<int>('from_account_id'),
+          accountName: row.read<String>('from_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('from_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('from_ledger_id'),
+          fullPath: row.read<String>('from_full_path'),
+          isActive: row.read<bool>('from_is_active'),
+          createdAt: row.read<DateTime>('from_account_created_at'),
+          parentAccountId: row.readNullable<int>('from_parent_account_id'),
+        );
+      }
+
+      // 构建to账户对象
+      Account? toAccount;
+      if (row.readNullable<int>('to_account_id') != null) {
+        toAccount = Account(
+          accountId: row.read<int>('to_account_id'),
+          accountName: row.read<String>('to_account_name'),
+          accountType: AccountType.values.firstWhere(
+            (type) =>
+                type.toString().split('.').last ==
+                row.read<String>('to_account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          ledgerId: row.read<int>('to_ledger_id'),
+          fullPath: row.read<String>('to_full_path'),
+          isActive: row.read<bool>('to_is_active'),
+          createdAt: row.read<DateTime>('to_account_created_at'),
+          parentAccountId: row.readNullable<int>('to_parent_account_id'),
+        );
+      }
+
+      // 计算交易金额（取正值）
+      double transactionAmount = 0;
+      if (row.readNullable<double>('from_amount') != null) {
+        transactionAmount = row.read<double>('from_amount').abs();
+      } else if (row.readNullable<double>('to_amount') != null) {
+        transactionAmount = row.read<double>('to_amount').abs();
+      }
+
+      // 确定交易性质
+      final nature = getTransactionNature(
+        fromAccount?.accountType,
+        toAccount?.accountType,
+      );
+
+      return TransactionWithAmount(
+        transaction: transaction,
+        amount: transactionAmount,
+        fromAccount: fromAccount,
+        toAccount: toAccount,
+        nature: nature,
+      );
+    }).toList();
+  }
 }

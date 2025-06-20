@@ -19,10 +19,10 @@ class CalendarDay extends StatelessWidget {
 
   String _formatCompactCurrency(double value) {
     if (value == 0) return '¥0';
-    return NumberFormat.compactCurrency(
+    return NumberFormat.currency(
       locale: 'zh_CN',
-      symbol: '¥',
-      decimalDigits: 0, // No decimal places for compact view
+      symbol: '',
+      decimalDigits: 2,
     ).format(value);
   }
 
@@ -71,7 +71,7 @@ class CalendarDay extends StatelessWidget {
                   hasIncome ? '+' + _formatCompactCurrency(income!) : '',
                   style: const TextStyle(
                     color: Colors.green,
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -88,7 +88,7 @@ class CalendarDay extends StatelessWidget {
                   hasExpense ? '-' + _formatCompactCurrency(expense!) : '',
                   style: const TextStyle(
                     color: Colors.red,
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
