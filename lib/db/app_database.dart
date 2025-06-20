@@ -58,12 +58,57 @@ class AppDatabase extends _$AppDatabase {
           // 创建所有表
           await m.createAll();
 
+          // 添加性能优化索引
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_postings_account_id ON postings(account_id)');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_postings_transaction_id ON postings(transaction_id)');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_accounts_ledger_id ON accounts(ledger_id)');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_accounts_parent_id ON accounts(parent_account_id)');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_accounts_type_ledger ON accounts(account_type, ledger_id)');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date)');
+
+          // 新增：专门为资产账户查询优化的复合索引
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = "ASSET"');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_postings_account_amount ON postings(account_id, amount)');
+
+          // 新增：为交易关联查询优化的索引
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_ledger_date ON transactions(transaction_date) WHERE EXISTS (SELECT 1 FROM postings p JOIN accounts a ON p.account_id = a.account_id WHERE p.transaction_id = transactions.transaction_id)');
+
           // 首次创建数据库时填充种子数据
           final seedData = SeedData(this);
           await seedData.seedDatabase();
         },
         onUpgrade: (Migrator m, int from, int to) async {
           // Handle future migrations
+          if (from == 1 && to == 2) {
+            // 添加索引的迁移逻辑
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_postings_account_id ON postings(account_id)');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_postings_transaction_id ON postings(transaction_id)');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_accounts_ledger_id ON accounts(ledger_id)');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_accounts_parent_id ON accounts(parent_account_id)');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_accounts_type_ledger ON accounts(account_type, ledger_id)');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(transaction_date)');
+
+            // 新增的优化索引
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = "ASSET"');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_postings_account_amount ON postings(account_id, amount)');
+          }
         },
       );
 }

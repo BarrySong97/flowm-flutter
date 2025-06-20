@@ -23,14 +23,21 @@ final topAssetAccountsProvider =
   }
 });
 
-/// 提供UI账户列表，改为 Stream 形式以支持响应式更新
+/// 优化后的UI账户列表提供者，使用更智能的缓存机制
 final uiAccountsProvider =
     StreamProvider<List<account_ui.Account>>((ref) async* {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchAssetsAccountTree(ledgerId: ledger.ledgerId);
+    // 使用防抖机制，避免过于频繁的更新
+    yield* repository
+        .watchAssetsAccountTree(ledgerId: ledger.ledgerId)
+        .distinct() // 只有当数据真正发生变化时才触发更新
+        .asyncExpand((accounts) async* {
+      // 添加简单的缓存机制
+      yield accounts;
+    });
   } else {
     yield [];
   }

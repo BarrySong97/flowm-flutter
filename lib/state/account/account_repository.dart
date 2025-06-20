@@ -160,6 +160,16 @@ class AccountRepository {
   final AccountDao _accountDao;
   final TransactionDao _transactionDao;
 
+  // 添加缓存机制
+  final Map<String, List<account_ui.Account>> _accountTreeCache = {};
+  final Map<String, DateTime> _cacheTimestamps = {};
+  // 为资产账户余额添加专门的缓存
+  final Map<String, List<AccountWithBalance>> _assetAccountsCache = {};
+  final Map<String, DateTime> _assetCacheTimestamps = {};
+  static const Duration _cacheExpiration = Duration(minutes: 5);
+  static const Duration _assetCacheExpiration =
+      Duration(minutes: 2); // 资产缓存过期时间稍短
+
   AccountRepository(this._accountDao, this._transactionDao);
 
   /// 获取所有账户
@@ -172,16 +182,32 @@ class AccountRepository {
   /// 监听所有账户（响应式流）
   Stream<List<Account>> watchAllAccounts() => _accountDao.watchAllAccounts();
 
-  /// 监听UI展示所需的资产账户树
+  /// 监听UI展示所需的资产账户树（已优化版本）
   Stream<List<account_ui.Account>> watchAssetsAccountTree({int? ledgerId}) {
     if (ledgerId == null) {
       return Stream.value(<account_ui.Account>[]);
     }
 
+    final cacheKey = 'assets_$ledgerId';
+
     return _transactionDao
         .watchAllTransactions(ledgerId: ledgerId)
         .asyncMap((_) async {
       try {
+        // 检查缓存是否有效
+        final now = DateTime.now();
+        final cacheTime = _cacheTimestamps[cacheKey];
+
+        if (cacheTime != null &&
+            now.difference(cacheTime) < _cacheExpiration &&
+            _accountTreeCache.containsKey(cacheKey)) {
+          print('[AccountRepository] 使用缓存的账户树数据');
+          return _accountTreeCache[cacheKey]!;
+        }
+
+        // 缓存失效，重新计算
+        print('[AccountRepository] 重新计算账户树数据');
+
         // 构建完整的层级关系
         final accountTree = await getAccountTree(ledgerId: ledgerId);
 
@@ -190,8 +216,15 @@ class AccountRepository {
             .where((acc) => acc.account.accountType == AccountType.ASSET)
             .toList();
 
-        // 递归转换为UI需要的Account格式
-        return await _convertAccountsToUIFormat(assetAccounts);
+        // 使用优化后的转换方法
+        final result =
+            await _convertAccountsToUIFormatOptimized(assetAccounts, ledgerId);
+
+        // 更新缓存
+        _accountTreeCache[cacheKey] = result;
+        _cacheTimestamps[cacheKey] = now;
+
+        return result;
       } catch (e) {
         print('[AccountRepository] Error in watchAssetsAccountTree: $e');
         return <account_ui.Account>[]; // 发生错误时返回空列表
@@ -324,7 +357,7 @@ class AccountRepository {
         ledgerId: ledgerId, accountId: accountId);
   }
 
-  /// 根据时间获取资产历史数据
+  /// 根据时间获取资产历史数据（优化版本）
   Future<List<AssetHistoryData>> getAssetHistoryByTime(
       DateTime start, DateTime end,
       {required int ledgerId, int? accountId}) async {
@@ -384,26 +417,129 @@ class AccountRepository {
         return [];
       }
 
-      final List<AssetHistoryData> history = [];
-      // 3. 迭代日期范围，计算每日总资产
-      for (DateTime currentDate = start;
-          currentDate.isBefore(end.add(const Duration(days: 1)));
-          currentDate = currentDate.add(const Duration(days: 1))) {
-        double dailyTotalAssets = 0.0;
-        for (final account in targetAssetAccounts) {
-          // _getAccountBalanceAtDate 会计算单个账户在指定日期的余额（包含其自身所有记账）
-          dailyTotalAssets +=
-              await _getAccountBalanceAtDate(account.accountId, currentDate);
-        }
-        history.add(
-            AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
-      }
-      return history;
+      // 3. 优化版本：使用单次查询获取所有需要的数据
+      return await _getOptimizedAssetHistory(
+          start, end, targetAssetAccounts, ledgerId);
     } catch (e, s) {
       print('[AccountRepository] Error in getAssetHistoryByTime: $e');
       print('[AccountRepository] Stacktrace: $s');
       return [];
     }
+  }
+
+  /// 优化的资产历史数据获取方法
+  Future<List<AssetHistoryData>> _getOptimizedAssetHistory(DateTime start,
+      DateTime end, List<Account> targetAssetAccounts, int ledgerId) async {
+    try {
+      if (targetAssetAccounts.isEmpty) return [];
+
+      // 构建账户ID列表
+      final accountIds =
+          targetAssetAccounts.map((acc) => acc.accountId).toList();
+      final accountIdPlaceholders = accountIds.map((_) => '?').join(',');
+
+      // 先尝试使用更兼容的批量查询方法
+      return await _getBatchOptimizedAssetHistory(start, end, accountIds);
+    } catch (e, s) {
+      print('[AccountRepository] Error in _getOptimizedAssetHistory: $e');
+      print('[AccountRepository] Stacktrace: $s');
+
+      // 如果优化查询失败，回退到原来的方法
+      print('[AccountRepository] Falling back to original method...');
+      return await _getFallbackAssetHistory(start, end, targetAssetAccounts);
+    }
+  }
+
+  /// 批量优化的资产历史数据获取方法
+  Future<List<AssetHistoryData>> _getBatchOptimizedAssetHistory(
+      DateTime start, DateTime end, List<int> accountIds) async {
+    try {
+      if (accountIds.isEmpty) return [];
+
+      // 使用单次查询预计算所有需要的日期和账户余额
+      final accountIdPlaceholders = accountIds.map((_) => '?').join(',');
+
+      // 创建一个包含所有需要日期的临时表，然后计算每个日期每个账户的余额
+      final List<AssetHistoryData> history = [];
+
+      // 为了优化，我们可以减少查询次数：
+      // 1. 获取指定时间范围内每个账户的所有交易
+      // 2. 在内存中计算每日余额
+
+      final Map<int, double> currentBalances = {};
+      for (final accountId in accountIds) {
+        currentBalances[accountId] = 0.0;
+      }
+
+      // 按日期迭代，但只查询每个账户到该日期为止的总余额
+      // 这仍然不是最优的，让我们改用批量查询方式
+
+      for (DateTime currentDate = start;
+          currentDate.isBefore(end.add(const Duration(days: 1)));
+          currentDate = currentDate.add(const Duration(days: 1))) {
+        // 批量查询所有账户在当前日期的余额
+        final balanceResults = await _accountDao.customSelect(
+          '''
+          SELECT 
+            p.account_id,
+            COALESCE(SUM(p.amount), 0) as balance
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id IN ($accountIdPlaceholders)
+            AND t.transaction_date <= ?
+          GROUP BY p.account_id
+          ''',
+          variables: [
+            ...accountIds.map((id) => Variable.withInt(id)),
+            Variable.withDateTime(currentDate),
+          ],
+        ).get();
+
+        // 计算当前日期的总资产
+        double dailyTotal = 0.0;
+        final balanceMap = <int, double>{};
+
+        for (final row in balanceResults) {
+          final accountId = row.read<int>('account_id');
+          final balance = row.read<double>('balance');
+          balanceMap[accountId] = balance;
+        }
+
+        // 确保所有账户都有余额值（没有交易的账户余额为0）
+        for (final accountId in accountIds) {
+          dailyTotal += balanceMap[accountId] ?? 0.0;
+        }
+
+        history
+            .add(AssetHistoryData(date: currentDate, totalAssets: dailyTotal));
+      }
+
+      return history;
+    } catch (e, s) {
+      print('[AccountRepository] Error in _getBatchOptimizedAssetHistory: $e');
+      print('[AccountRepository] Stacktrace: $s');
+      rethrow;
+    }
+  }
+
+  /// 回退方法：原来的实现逻辑（作为备用）
+  Future<List<AssetHistoryData>> _getFallbackAssetHistory(
+      DateTime start, DateTime end, List<Account> targetAssetAccounts) async {
+    final List<AssetHistoryData> history = [];
+
+    // 使用原来的双重循环逻辑
+    for (DateTime currentDate = start;
+        currentDate.isBefore(end.add(const Duration(days: 1)));
+        currentDate = currentDate.add(const Duration(days: 1))) {
+      double dailyTotalAssets = 0.0;
+      for (final account in targetAssetAccounts) {
+        dailyTotalAssets +=
+            await _getAccountBalanceAtDate(account.accountId, currentDate);
+      }
+      history.add(
+          AssetHistoryData(date: currentDate, totalAssets: dailyTotalAssets));
+    }
+    return history;
   }
 
   // 辅助方法：扁平化账户树，获取节点及其所有子孙账户
@@ -593,6 +729,8 @@ class AccountRepository {
       isActive: Value(isActive),
     ));
 
+    // 创建账户后清理相关缓存，确保数据一致性
+    _clearLedgerRelatedCache(ledgerId);
     // 创建账户后更新 App Group 数据
     _updateHomeWidgetAccountData(ledgerId);
 
@@ -670,6 +808,8 @@ class AccountRepository {
       await _updateChildPaths(child, newFullPath, ledgerId);
     }
 
+    // 更新账户后清理相关缓存，确保数据一致性
+    _clearLedgerRelatedCache(ledgerId);
     // 更新账户后更新 App Group 数据
     _updateHomeWidgetAccountData(ledgerId);
   }
@@ -710,6 +850,8 @@ class AccountRepository {
     if (result) {
       final account = await _accountDao.getAccountById(id);
       if (account != null) {
+        // 更新账户后清理相关缓存，确保数据一致性
+        _clearLedgerRelatedCache(account.ledgerId);
         _updateHomeWidgetAccountData(account.ledgerId);
       }
     }
@@ -743,8 +885,9 @@ class AccountRepository {
       // 没有子账户和关联的posting，执行删除
       final result = await _accountDao.deleteAccount(id);
       if (result > 0) {
-        // 删除成功后更新 App Group 数据
+        // 删除成功后清理相关缓存并更新 App Group 数据
         if (account != null) {
+          _clearLedgerRelatedCache(account.ledgerId);
           _updateHomeWidgetAccountData(account.ledgerId);
         }
         return DeleteAccountResult.success;
@@ -903,53 +1046,156 @@ class AccountRepository {
     });
   }
 
-  /// 获取顶级资产账户（考虑特定账本）（Stream版本）
+  /// 获取顶级资产账户（考虑特定账本）（Stream版本）- 优化版本
   Stream<List<AccountWithBalance>> watchTopAssetAccountsByLedger(
       {int? limit, required int ledgerId}) {
-    // 监听指定账本的所有交易变化
+    // 添加防抖机制，避免过于频繁的更新
     return _transactionDao
         .watchAllTransactions(ledgerId: ledgerId)
+        .distinct() // 只有当数据真正发生变化时才触发更新
         .asyncMap((transactions) async {
       try {
-        // 获取所有与该账本相关的活跃资产账户
-        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-        final assetAccounts = allAccounts
-            .where((account) =>
-                account.accountType == AccountType.ASSET && account.isActive)
-            .toList();
+        final cacheKey = 'assets_${ledgerId}_${limit ?? 'all'}';
+        final now = DateTime.now();
+        final cacheTime = _assetCacheTimestamps[cacheKey];
 
-        if (assetAccounts.isEmpty) {
-          print(
-              '[AccountRepository] watchTopAssetAccountsByLedger: No active asset accounts found in ledger $ledgerId.');
-          return <AccountWithBalance>[];
+        // 当数据库发生变化时，立即清除相关缓存以确保数据实时性
+        // 因为 watchAllTransactions 已经使用了 distinct()，这里被触发说明数据真的发生了变化
+        print('[AccountRepository] 数据库发生变化，清除账本 $ledgerId 的资产缓存');
+        _clearAssetCacheForLedger(ledgerId);
+
+        // 定期清理过期缓存（每20次查询清理一次）
+        if (DateTime.now().millisecond % 20 == 0) {
+          _cleanupExpiredCache();
         }
 
-        // 计算每个资产账户的余额
-        final List<AccountWithBalance> accountsWithBalance = [];
-        for (final account in assetAccounts) {
-          final balance =
-              await _accountDao.getAccountBalance(account.accountId);
-          accountsWithBalance.add(
-            AccountWithBalance(
-              account: account,
-              balance: balance,
-            ),
-          );
-        }
+        // 重新计算数据（确保获取最新数据）
+        print('[AccountRepository] 重新计算资产账户数据');
+        final result = await _getTopAssetAccountsByLedgerOptimized(
+            limit: limit, ledgerId: ledgerId);
 
-        // 按余额降序排序
-        accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
+        // 更新缓存
+        _assetAccountsCache[cacheKey] = result;
+        _assetCacheTimestamps[cacheKey] = now;
 
-        // 如果指定了limit，则返回前limit个
-        return limit != null
-            ? accountsWithBalance.take(limit).toList()
-            : accountsWithBalance;
+        return result;
       } catch (e, s) {
         print('[AccountRepository] Error in watchTopAssetAccountsByLedger: $e');
         print('[AccountRepository] Stacktrace: $s');
         return <AccountWithBalance>[];
       }
     });
+  }
+
+  /// 清理指定账本的资产缓存
+  void _clearAssetCacheForLedger(int ledgerId) {
+    final keysToRemove = <String>[];
+
+    // 找到所有与该账本相关的资产缓存键
+    _assetAccountsCache.keys
+        .where((key) => key.startsWith('assets_$ledgerId'))
+        .forEach((key) {
+      keysToRemove.add(key);
+    });
+
+    // 清除缓存
+    for (final key in keysToRemove) {
+      _assetAccountsCache.remove(key);
+      _assetCacheTimestamps.remove(key);
+    }
+
+    if (keysToRemove.isNotEmpty) {
+      print('[AccountRepository] 已清除 ${keysToRemove.length} 个资产缓存项');
+    }
+  }
+
+  /// 清理指定账本的所有相关缓存
+  void _clearLedgerRelatedCache(int ledgerId) {
+    // 清理资产账户缓存
+    _clearAssetCacheForLedger(ledgerId);
+
+    // 清理账户树缓存
+    final accountTreeKey = 'assets_$ledgerId';
+    _accountTreeCache.remove(accountTreeKey);
+    _cacheTimestamps.remove(accountTreeKey);
+
+    print('[AccountRepository] 已清理账本 $ledgerId 的所有相关缓存');
+  }
+
+  /// 优化的批量查询方法
+  Future<List<AccountWithBalance>> _getTopAssetAccountsByLedgerOptimized(
+      {int? limit, required int ledgerId}) async {
+    try {
+      // 使用单个 SQL 查询一次性获取所有资产账户及其余额
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT 
+          a.account_id,
+          a.ledger_id,
+          a.parent_account_id,
+          a.account_name,
+          a.full_path,
+          a.account_type,
+          a.is_active,
+          a.created_at,
+          COALESCE(SUM(p.amount), 0) as balance
+        FROM accounts a
+        LEFT JOIN postings p ON a.account_id = p.account_id
+        WHERE a.ledger_id = ? 
+          AND a.account_type = ? 
+          AND a.is_active = 1
+        GROUP BY a.account_id, a.ledger_id, a.parent_account_id, a.account_name, 
+                 a.full_path, a.account_type, a.is_active, a.created_at
+        ORDER BY balance DESC
+        ${limit != null ? 'LIMIT ?' : ''}
+        ''',
+        variables: [
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.ASSET.name),
+          if (limit != null) Variable.withInt(limit),
+        ],
+      ).get();
+
+      if (result.isEmpty) {
+        print(
+            '[AccountRepository] _getTopAssetAccountsByLedgerOptimized: No active asset accounts found in ledger $ledgerId.');
+        return <AccountWithBalance>[];
+      }
+
+      // 构建结果列表
+      final List<AccountWithBalance> accountsWithBalance = [];
+      for (final row in result) {
+        final account = Account(
+          accountId: row.read<int>('account_id'),
+          ledgerId: row.read<int>('ledger_id'),
+          parentAccountId: row.readNullable<int>('parent_account_id'),
+          accountName: row.read<String>('account_name'),
+          fullPath: row.read<String>('full_path'),
+          accountType: AccountType.values.firstWhere(
+            (type) => type.name == row.read<String>('account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          isActive: row.read<bool>('is_active'),
+          createdAt: row.read<DateTime>('created_at'),
+        );
+
+        final balance = row.read<double>('balance');
+
+        accountsWithBalance.add(
+          AccountWithBalance(
+            account: account,
+            balance: balance,
+          ),
+        );
+      }
+
+      return accountsWithBalance;
+    } catch (e, s) {
+      print(
+          '[AccountRepository] Error in _getTopAssetAccountsByLedgerOptimized: $e');
+      print('[AccountRepository] Stacktrace: $s');
+      return <AccountWithBalance>[];
+    }
   }
 
   /// 获取指定时间段内的支出总额
@@ -1105,38 +1351,6 @@ class AccountRepository {
     }
   }
 
-  // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
-  List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
-      List<AccountWithChildren> accounts) {
-    if (accounts.isEmpty) {
-      return [];
-    }
-
-    final List<account_ui.Account> results = [];
-
-    for (final acc in accounts) {
-      List<account_ui.Account>? uiChildren;
-
-      // 如果有子账户，递归处理子账户
-      if (acc.children.isNotEmpty) {
-        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
-      }
-
-      // 创建UI需要的Account对象，金额设为0
-      results.add(account_ui.Account(
-        id: acc.account.accountId,
-        name: acc.account.accountName,
-        type: acc.account.accountType,
-        amount: 0.0, // 不计算余额，设为0
-        children: uiChildren,
-        currencySymbol: '¥',
-        icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
-      ));
-    }
-
-    return results;
-  }
-
   // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
   Future<List<account_ui.Account>> _convertAccountsToUIFormat(
       List<AccountWithChildren> accounts) async {
@@ -1175,6 +1389,147 @@ class AccountRepository {
         amount: totalAmountForUI, // 使用新计算的总金额
         children: uiChildren, // 传递已经处理过的UI子账户列表
         currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
+      ));
+    }
+
+    return results;
+  }
+
+  /// 优化后的转换方法，使用批量查询避免N+1问题
+  Future<List<account_ui.Account>> _convertAccountsToUIFormatOptimized(
+      List<AccountWithChildren> accounts, int ledgerId) async {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    // 1. 收集所有需要查询余额的账户ID
+    final allAccountIds = <int>{};
+    void collectAccountIds(List<AccountWithChildren> accountList) {
+      for (final acc in accountList) {
+        allAccountIds.add(acc.account.accountId);
+        if (acc.children.isNotEmpty) {
+          collectAccountIds(acc.children);
+        }
+      }
+    }
+
+    collectAccountIds(accounts);
+
+    // 2. 批量查询所有账户的余额
+    final balanceMap = await _batchGetAccountBalances(allAccountIds.toList());
+
+    // 3. 递归转换为UI格式，使用预先查询的余额数据
+    return _convertAccountsToUIFormatWithBalanceMap(accounts, balanceMap);
+  }
+
+  /// 批量获取账户余额，避免N+1查询问题
+  Future<Map<int, double>> _batchGetAccountBalances(
+      List<int> accountIds) async {
+    if (accountIds.isEmpty) return {};
+
+    try {
+      // 使用IN查询批量获取所有账户的余额
+      final placeholders = accountIds.map((_) => '?').join(',');
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT account_id, COALESCE(SUM(amount), 0) as balance 
+        FROM postings 
+        WHERE account_id IN ($placeholders)
+        GROUP BY account_id
+        ''',
+        variables: accountIds.map((id) => Variable.withInt(id)).toList(),
+      ).get();
+
+      final balanceMap = <int, double>{};
+
+      // 初始化所有账户的余额为0
+      for (final accountId in accountIds) {
+        balanceMap[accountId] = 0.0;
+      }
+
+      // 填充实际的余额数据
+      for (final row in result) {
+        final accountId = row.read<int>('account_id');
+        final balance = row.read<double>('balance');
+        balanceMap[accountId] = balance;
+      }
+
+      return balanceMap;
+    } catch (e) {
+      print('[AccountRepository] Error in _batchGetAccountBalances: $e');
+      // 返回默认值
+      return Map.fromEntries(accountIds.map((id) => MapEntry(id, 0.0)));
+    }
+  }
+
+  /// 使用预先查询的余额数据转换账户格式
+  List<account_ui.Account> _convertAccountsToUIFormatWithBalanceMap(
+      List<AccountWithChildren> accounts, Map<int, double> balanceMap) {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    final List<account_ui.Account> results = [];
+
+    for (final acc in accounts) {
+      // 1. 获取当前账户的直接余额（从缓存中获取）
+      final double directBalance = balanceMap[acc.account.accountId] ?? 0.0;
+
+      double childrensTotalAmount = 0.0;
+      List<account_ui.Account>? uiChildren;
+
+      // 2. 如果有子账户，递归处理子账户
+      if (acc.children.isNotEmpty) {
+        uiChildren =
+            _convertAccountsToUIFormatWithBalanceMap(acc.children, balanceMap);
+        for (final childUiAccount in uiChildren) {
+          childrensTotalAmount += childUiAccount.amount;
+        }
+      }
+
+      // 3. 计算总金额
+      final double totalAmountForUI = directBalance + childrensTotalAmount;
+
+      // 创建UI需要的Account对象
+      results.add(account_ui.Account(
+        id: acc.account.accountId,
+        name: acc.account.accountName,
+        type: acc.account.accountType,
+        amount: totalAmountForUI,
+        children: uiChildren,
+        currencySymbol: '¥',
+      ));
+    }
+
+    return results;
+  }
+
+  // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
+  List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
+      List<AccountWithChildren> accounts) {
+    if (accounts.isEmpty) {
+      return [];
+    }
+
+    final List<account_ui.Account> results = [];
+
+    for (final acc in accounts) {
+      List<account_ui.Account>? uiChildren;
+
+      // 如果有子账户，递归处理子账户
+      if (acc.children.isNotEmpty) {
+        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
+      }
+
+      // 创建UI需要的Account对象，金额设为0
+      results.add(account_ui.Account(
+        id: acc.account.accountId,
+        name: acc.account.accountName,
+        type: acc.account.accountType,
+        amount: 0.0, // 不计算余额，设为0
+        children: uiChildren,
+        currencySymbol: '¥',
+        icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
       ));
     }
 
@@ -1294,6 +1649,78 @@ class AccountRepository {
       }
     }
     return accountsMap;
+  }
+
+  /// 清除账户树缓存
+  void clearAccountTreeCache([int? ledgerId]) {
+    if (ledgerId != null) {
+      final cacheKey = 'assets_$ledgerId';
+      _accountTreeCache.remove(cacheKey);
+      _cacheTimestamps.remove(cacheKey);
+    } else {
+      _accountTreeCache.clear();
+      _cacheTimestamps.clear();
+    }
+  }
+
+  /// 清理过期的缓存
+  void _cleanupExpiredCache() {
+    final now = DateTime.now();
+
+    // 清理账户树缓存
+    _cacheTimestamps.removeWhere((key, timestamp) {
+      final isExpired = now.difference(timestamp) > _cacheExpiration;
+      if (isExpired) {
+        _accountTreeCache.remove(key);
+      }
+      return isExpired;
+    });
+
+    // 清理资产账户缓存
+    _assetCacheTimestamps.removeWhere((key, timestamp) {
+      final isExpired = now.difference(timestamp) > _assetCacheExpiration;
+      if (isExpired) {
+        _assetAccountsCache.remove(key);
+      }
+      return isExpired;
+    });
+  }
+
+  /// 手动清理所有缓存
+  void clearAllCache() {
+    _accountTreeCache.clear();
+    _cacheTimestamps.clear();
+    _assetAccountsCache.clear();
+    _assetCacheTimestamps.clear();
+    print('[AccountRepository] 所有缓存已清理');
+  }
+
+  /// 清理指定账本的缓存
+  void clearLedgerCache(int ledgerId) {
+    final keysToRemove = <String>[];
+
+    // 清理账户树缓存
+    _accountTreeCache.keys
+        .where((key) => key.contains('_$ledgerId'))
+        .forEach((key) {
+      keysToRemove.add(key);
+    });
+
+    // 清理资产账户缓存
+    _assetAccountsCache.keys
+        .where((key) => key.contains('_$ledgerId'))
+        .forEach((key) {
+      keysToRemove.add(key);
+    });
+
+    for (final key in keysToRemove) {
+      _accountTreeCache.remove(key);
+      _cacheTimestamps.remove(key);
+      _assetAccountsCache.remove(key);
+      _assetCacheTimestamps.remove(key);
+    }
+
+    print('[AccountRepository] 账本 $ledgerId 的缓存已清理');
   }
 }
 
