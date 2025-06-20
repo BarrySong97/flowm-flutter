@@ -53,43 +53,51 @@ class ExpenseRepository {
         return [];
       }
 
-      // 构建SQL查询，获取每日支出总额
+      // 优化后的SQL查询
+      // 1. 使用 CTE (DailyExpenses) 预先聚合每日的支出数据，对 transaction_date 使用范围查询以利用索引。
+      // 2. 保持 DateRange CTE 来生成完整的日期序列。
+      // 3. 将 DateRange 与聚合后的 DailyExpenses 进行 LEFT JOIN，以填充没有支出的日期。
       final result = await _postingDao.customSelect(
         '''
         WITH RECURSIVE DateRange(date) AS (
-          SELECT date(?, 'unixepoch', 'localtime') as date
+          SELECT date(?, 'unixepoch', 'localtime')
           UNION ALL
           SELECT date(date, '+1 day')
           FROM DateRange
-          WHERE date < date(?, 'unixepoch', 'localtime')
+          WHERE date <= date(?, 'unixepoch', 'localtime')
+        ),
+        DailyExpenses AS (
+          SELECT
+            date(t.transaction_date, 'unixepoch', 'localtime') as expense_date,
+            SUM(p.amount) as total_expense,
+            COUNT(p.posting_id) as daily_count
+          FROM transactions t
+          JOIN postings p ON p.transaction_id = t.transaction_id
+          JOIN accounts a ON p.account_id = a.account_id
+          WHERE t.transaction_date BETWEEN ? AND ?
+            AND a.ledger_id = ?
+            AND a.account_type = ?
+            AND p.amount > 0
+            ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
+          GROUP BY expense_date
         )
         SELECT 
           strftime('%Y-%m-%d', dr.date) as date,
-          COALESCE(SUM(CASE 
-            WHEN a.account_type = ? AND p.amount > 0 
-            THEN p.amount 
-            ELSE 0 
-          END), 0) as total_expense,
-          COUNT(DISTINCT CASE 
-            WHEN a.account_type = ? AND p.amount > 0 
-            THEN p.posting_id 
-            ELSE NULL 
-          END) as daily_count
+          COALESCE(de.total_expense, 0) as total_expense,
+          COALESCE(de.daily_count, 0) as daily_count
         FROM DateRange dr
-        LEFT JOIN transactions t ON date(t.transaction_date, 'unixepoch', 'localtime') = dr.date
-        LEFT JOIN postings p ON p.transaction_id = t.transaction_id
-        LEFT JOIN accounts a ON p.account_id = a.account_id 
-          AND a.ledger_id = ? 
-          ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
-        GROUP BY dr.date
-        ORDER BY dr.date
+        LEFT JOIN DailyExpenses de ON de.expense_date = dr.date
+        ORDER BY dr.date;
         ''',
         variables: [
           Variable.withDateTime(startDate),
           Variable.withDateTime(endDate),
-          Variable.withString(AccountType.EXPENSE.name),
-          Variable.withString(AccountType.EXPENSE.name),
+          Variable.withDateTime(
+              DateTime(startDate.year, startDate.month, startDate.day)),
+          Variable.withDateTime(
+              DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
           Variable.withInt(ledgerId),
+          Variable.withString(AccountType.EXPENSE.name),
           if (accountId != null) ...[
             Variable.withInt(accountId),
             Variable.withInt(accountId),
@@ -151,7 +159,7 @@ class ExpenseRepository {
         '[ExpenseRepository] getExpenseAccountTree called with: startDate: $startDate, endDate: $endDate, ledgerId: $ledgerId');
     try {
       // 1. 获取所有支出账户 (包括层级关系)
-      final allExpenseAccountsQuery = _postingDao.customSelect(
+      final allExpenseAccountRows = await _postingDao.customSelect(
         '''
         SELECT * 
         FROM accounts
@@ -162,8 +170,7 @@ class ExpenseRepository {
           Variable.withInt(ledgerId),
           Variable.withString(AccountType.EXPENSE.name),
         ],
-      );
-      final allExpenseAccountRows = await allExpenseAccountsQuery.get();
+      ).get();
       final allExpenseAccounts = allExpenseAccountRows
           .map((row) => _postingDao.db.accounts.map(row.data))
           .toList();
@@ -172,31 +179,42 @@ class ExpenseRepository {
         return [];
       }
 
+      // 2. 优化：一次性获取所有相关账户在时间范围内的支出总额
+      final expenseSumsRows = await _postingDao.customSelect(
+        '''
+        SELECT 
+          p.account_id, 
+          SUM(p.amount) as direct_balance
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        JOIN accounts a ON p.account_id = a.account_id
+        WHERE t.transaction_date BETWEEN ? AND ?
+          AND a.ledger_id = ?
+          AND a.account_type = ?
+          AND p.amount > 0
+        GROUP BY p.account_id;
+        ''',
+        variables: [
+          Variable.withDateTime(
+              DateTime(startDate.year, startDate.month, startDate.day)),
+          Variable.withDateTime(
+              DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.EXPENSE.name),
+        ],
+      ).get();
+
+      final Map<int, double> accountBalances = {
+        for (var row in expenseSumsRows)
+          row.read<int>('account_id'): row.read<double>('direct_balance')
+      };
+
       final List<AccountExpenseNode> accountNodes = [];
       final Map<int, AccountExpenseNode> accountNodeMap = {};
 
+      // 3. 构建节点，从Map中获取余额，避免N+1查询
       for (final account in allExpenseAccounts) {
-        final directExpenseResult = await _postingDao.customSelect(
-          '''
-          SELECT COALESCE(SUM(p.amount), 0) as direct_balance
-          FROM postings p
-          JOIN transactions t ON p.transaction_id = t.transaction_id
-          WHERE p.account_id = ? 
-            -- AND t.ledger_id = ? -- Removed: transactions table does not have ledger_id direct_balance
-            AND t.transaction_date >= ? 
-            AND t.transaction_date <= ?
-            AND p.amount > 0; -- 假设支出记为正数，或者根据您的分录设计调整
-          ''',
-          variables: [
-            Variable.withInt(account.accountId),
-            // Variable.withInt(ledgerId), // Removed corresponding variable
-            Variable.withDateTime(startDate),
-            Variable.withDateTime(endDate),
-          ],
-        ).getSingle();
-
-        final directBalance =
-            directExpenseResult.read<double>('direct_balance');
+        final directBalance = accountBalances[account.accountId] ?? 0.0;
 
         final node = AccountExpenseNode(
           accountData: account,
@@ -206,8 +224,7 @@ class ExpenseRepository {
         accountNodeMap[account.accountId] = node;
       }
 
-      // 3. 构建树形结构并计算父节点余额
-
+      // 4. 构建树形结构并计算父节点余额
       final List<AccountExpenseNode> rootNodes = [];
       for (final node in accountNodes) {
         if (node.accountData.parentAccountId != null &&
@@ -217,11 +234,8 @@ class ExpenseRepository {
           rootNodes.add(node);
         }
       }
-      // for (final rNode in rootNodes) {
-      //   print('[ExpenseRepository] Root Node: ${rNode.toJson()}'); // toJson on node can be verbose
-      // }
 
-      // 4. 递归计算父节点的余额 和总支出
+      // 5. 递归计算父节点的余额 和总支出
       double totalOverallExpense = 0;
       double updateTotalBalances(AccountExpenseNode node) {
         double childrenBalance = 0;
@@ -236,14 +250,13 @@ class ExpenseRepository {
         totalOverallExpense += updateTotalBalances(rootNode);
       }
 
-      // 5. 计算百分比
+      // 6. 计算百分比
       if (totalOverallExpense > 0) {
         for (final node in accountNodes) {
           node.percentage = (node.balance / totalOverallExpense) * 100;
         }
       }
 
-      // rootNodes.forEach((node) => print('[ExpenseRepository] Final Root Node: ${node.toJson()}'));
       return rootNodes;
     } catch (e, s) {
       print('[ExpenseRepository] Error in getExpenseAccountTree: $e');

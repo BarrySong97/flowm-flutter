@@ -193,7 +193,7 @@ class _AccountUpdateBottomSheetState
         ref.invalidate(expenseAccountTreeProvider);
         ref.invalidate(incomeAccountTreeProvider);
         ref.invalidate(equityAccountTreeProvider);
-        ref.invalidate(expenseAccountTreeDataProvider);
+        // ref.invalidate(expenseAccountTreeDataProvider);
         ref.invalidate(incomeAccountTreeDataProvider);
 
         if (mounted) {

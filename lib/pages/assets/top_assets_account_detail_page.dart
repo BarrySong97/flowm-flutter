@@ -107,7 +107,7 @@ class _TopAssetsAccountDetailPageState
               children: [
                 // 总资产区域
                 Container(
-                  padding: EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.only(top: 16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(6),
@@ -118,15 +118,15 @@ class _TopAssetsAccountDetailPageState
                     spacing: 12,
                     children: [
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               // Consider changing '总资产' to something like '账户余额' or dynamically including account name
                               // if this page can show sub-account details. For now, keeping as is.
                               '总资产',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                               ),
                             ),
