@@ -158,6 +158,12 @@ class TransactionRepository {
       _transactionDao.watchTransactionsWithAmountPaginated(
           limit: limit, offset: offset, ledgerId: ledgerId);
 
+  /// 获取分页的交易记录 (TransactionWithAmount) - Future版本
+  Future<List<TransactionWithAmount>> getTransactionsWithAmountPaginated(
+          {required int limit, required int offset, int? ledgerId}) =>
+      _transactionDao.getTransactionsWithAmountPaginated(
+          limit: limit, offset: offset, ledgerId: ledgerId);
+
   /// 获取某一天交易
   Stream<List<TransactionWithAmount>> watchTransactionsByDay(DateTime day) =>
       _transactionDao.watchTransactionsWithAmountByDay(day);

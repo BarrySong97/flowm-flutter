@@ -994,4 +994,144 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       );
     }).toList();
   }
+
+  // 获取分页的交易记录 (TransactionWithAmount) - Future版本
+  Future<List<TransactionWithAmount>> getTransactionsWithAmountPaginated(
+      {required int limit, required int offset, int? ledgerId}) async {
+    print(
+        'getTransactionsWithAmountPaginated: ledgerId: $ledgerId, limit: $limit, offset: $offset');
+
+    if (ledgerId != null) {
+      // If ledgerId is provided, filter transactions by accounts under that ledger.
+      final queryBuilder = select(transactions).join([
+        innerJoin(
+          db.postings,
+          db.postings.transactionId.equalsExp(transactions.transactionId),
+        ),
+        innerJoin(
+          db.accounts,
+          db.accounts.accountId.equalsExp(db.postings.accountId),
+        ),
+      ])
+        ..where(db.accounts.ledgerId.equals(ledgerId))
+        ..groupBy([transactions.transactionId]) // Ensure distinct transactions
+        ..orderBy([
+          OrderingTerm(
+              expression: transactions.transactionDate,
+              mode: OrderingMode.desc),
+          OrderingTerm(
+              expression: transactions.transactionId, mode: OrderingMode.desc)
+        ])
+        ..limit(limit, offset: offset);
+
+      final typedResults = await queryBuilder.get();
+      final paginatedTransactionsList =
+          typedResults.map((row) => row.readTable(transactions)).toList();
+
+      if (paginatedTransactionsList.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+
+      final resultList = <TransactionWithAmount>[];
+      for (final transaction in paginatedTransactionsList) {
+        final postingsQuery = select(db.postings).join([
+          innerJoin(db.accounts,
+              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ])
+          ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+        final postingsWithAccounts = await postingsQuery.get();
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+
+        if (postingsWithAccounts.isNotEmpty) {
+          final firstPosting =
+              postingsWithAccounts.first.readTable(db.postings);
+          transactionAmount = firstPosting.amount.abs();
+        }
+
+        for (final rowData in postingsWithAccounts) {
+          final posting = rowData.readTable(db.postings);
+          final account = rowData.readTable(db.accounts);
+          if (posting.amount < 0) {
+            fromAccountObj = account;
+          } else if (posting.amount > 0) {
+            toAccountObj = account;
+          }
+        }
+        final nature = getTransactionNature(
+            fromAccountObj?.accountType, toAccountObj?.accountType);
+        resultList.add(TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
+          nature: nature,
+        ));
+      }
+      return resultList;
+    } else {
+      // This part is executed only if ledgerId is null
+      final paginatedTransactionsQuery = select(transactions)
+        ..orderBy([
+          (t) => OrderingTerm(
+              expression: t.transactionDate, mode: OrderingMode.desc),
+          (t) => OrderingTerm(
+              expression: t.transactionId, mode: OrderingMode.desc),
+        ])
+        ..limit(limit, offset: offset);
+
+      final paginatedTransactionsList = await paginatedTransactionsQuery.get();
+
+      if (paginatedTransactionsList.isEmpty) {
+        return <TransactionWithAmount>[];
+      }
+
+      final resultList = <TransactionWithAmount>[];
+
+      for (final transaction in paginatedTransactionsList) {
+        final postingsQuery = select(db.postings).join([
+          innerJoin(db.accounts,
+              db.accounts.accountId.equalsExp(db.postings.accountId)),
+        ])
+          ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+        final postingsWithAccounts = await postingsQuery.get();
+
+        Account? fromAccountObj;
+        Account? toAccountObj;
+        double transactionAmount = 0;
+
+        if (postingsWithAccounts.isNotEmpty) {
+          final firstPosting =
+              postingsWithAccounts.first.readTable(db.postings);
+          transactionAmount = firstPosting.amount.abs();
+        }
+
+        for (final rowData in postingsWithAccounts) {
+          final posting = rowData.readTable(db.postings);
+          final account = rowData.readTable(db.accounts);
+          if (posting.amount < 0) {
+            fromAccountObj = account;
+          } else if (posting.amount > 0) {
+            toAccountObj = account;
+          }
+        }
+
+        // Determine transaction nature
+        final nature = getTransactionNature(
+            fromAccountObj?.accountType, toAccountObj?.accountType);
+
+        resultList.add(TransactionWithAmount(
+          transaction: transaction,
+          amount: transactionAmount,
+          fromAccount: fromAccountObj,
+          toAccount: toAccountObj,
+          nature: nature,
+        ));
+      }
+      return resultList;
+    }
+  }
 }
