@@ -34,103 +34,70 @@ class IncomeRepository {
     int? accountId,
   }) async {
     try {
-      // 首先检查是否有收入类型的账户
       final incomeAccounts = await _postingDao.customSelect(
-        '''
-        SELECT COUNT(*) as count
-        FROM accounts
-        WHERE ledger_id = ? AND account_type = ?
-        ''',
+        'SELECT 1 FROM accounts WHERE ledger_id = ? AND account_type = ? LIMIT 1',
         variables: [
           Variable.withInt(ledgerId),
           Variable.withString(AccountType.INCOME.name),
         ],
-      ).getSingle();
+      ).getSingleOrNull();
 
-      final incomeAccountCount = incomeAccounts.read<int>('count');
-
-      if (incomeAccountCount == 0) {
+      if (incomeAccounts == null) {
         return [];
       }
 
-      // 构建SQL查询，获取每日收入总额
-      final result = await _postingDao.customSelect(
-        '''
-        WITH RECURSIVE DateRange(date) AS (
-          SELECT date(?, 'unixepoch', 'localtime') as date
-          UNION ALL
-          SELECT date(date, '+1 day')
-          FROM DateRange
-          WHERE date < date(?, 'unixepoch', 'localtime')
-        )
-        SELECT 
-          strftime('%Y-%m-%d', dr.date) as date,
-          COALESCE(SUM(CASE 
-            WHEN a.account_type = ? AND p.amount < 0 
-            THEN ABS(p.amount) 
-            ELSE 0 
-          END), 0) as total_income,
-          COUNT(DISTINCT CASE 
-            WHEN a.account_type = ? AND p.amount < 0 
-            THEN p.posting_id 
-            ELSE NULL 
-          END) as daily_count
-        FROM DateRange dr
-        LEFT JOIN transactions t ON date(t.transaction_date, 'unixepoch', 'localtime') = dr.date
-        LEFT JOIN postings p ON p.transaction_id = t.transaction_id
-        LEFT JOIN accounts a ON p.account_id = a.account_id 
-          AND a.ledger_id = ? 
-          ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
-        GROUP BY dr.date
-        ORDER BY dr.date
-        ''',
-        variables: [
-          Variable.withDateTime(startDate),
-          Variable.withDateTime(endDate),
-          Variable.withString(AccountType.INCOME.name),
-          Variable.withString(AccountType.INCOME.name),
-          Variable.withInt(ledgerId),
-          if (accountId != null) ...[
-            Variable.withInt(accountId),
-            Variable.withInt(accountId),
-          ],
-        ],
-      ).get();
+      // 调整endDate以包含一整天
+      final inclusiveEndDate =
+          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
 
-      // 将查询结果转换为ChartData列表
+      final query = '''
+        SELECT
+          strftime('%Y-%m-%d', t.transaction_date, 'unixepoch', 'localtime') as date_str,
+          SUM(ABS(p.amount)) as total_income
+        FROM transactions t
+        JOIN postings p ON p.transaction_id = t.transaction_id
+        JOIN accounts a ON p.account_id = a.account_id
+        WHERE t.transaction_date BETWEEN ? AND ?
+          AND a.ledger_id = ?
+          AND a.account_type = ?
+          AND p.amount < 0
+          ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
+        GROUP BY date_str
+        ORDER BY date_str;
+      ''';
+
+      final variables = [
+        Variable.withDateTime(startDate),
+        Variable.withDateTime(inclusiveEndDate),
+        Variable.withInt(ledgerId),
+        Variable.withString(AccountType.INCOME.name),
+        if (accountId != null) ...[
+          Variable.withInt(accountId),
+          Variable.withInt(accountId),
+        ],
+      ];
+
+      final result =
+          await _postingDao.customSelect(query, variables: variables).get();
+
+      final Map<String, double> incomeByDate = {
+        for (var row in result)
+          row.read<String>('date_str'): row.read<double>('total_income'),
+      };
+
       final List<barchart.ChartData> chartData = [];
       int index = 0;
+      for (var day = 0; day <= endDate.difference(startDate).inDays; day++) {
+        final currentDate = startDate.add(Duration(days: day));
+        final dateStr =
+            '${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}';
 
-      for (final row in result) {
-        try {
-          final dateStr = row.read<String>('date');
-          final amount = row.read<double>('total_income');
-          final count = row.read<int>('daily_count');
+        final amount = incomeByDate[dateStr] ?? 0.0;
+        final formattedDate = '${currentDate.month}/${currentDate.day}';
 
-          if (dateStr == null || dateStr.isEmpty) {
-            continue;
-          }
-
-          final dateParts = dateStr.split('-');
-          if (dateParts.length != 3) {
-            continue;
-          }
-
-          final date = DateTime(
-            int.parse(dateParts[0]),
-            int.parse(dateParts[1]),
-            int.parse(dateParts[2]),
-          );
-
-          final formattedDate = '${date.month}/${date.day}';
-          chartData
-              .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
-
-          index++;
-        } catch (e) {
-          print('[IncomeRepository] Error processing row: $e');
-          continue;
-        }
+        chartData
+            .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
+        index++;
       }
 
       return chartData;

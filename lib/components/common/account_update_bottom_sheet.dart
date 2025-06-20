@@ -194,7 +194,7 @@ class _AccountUpdateBottomSheetState
         ref.invalidate(incomeAccountTreeProvider);
         ref.invalidate(equityAccountTreeProvider);
         // ref.invalidate(expenseAccountTreeDataProvider);
-        ref.invalidate(incomeAccountTreeDataProvider);
+        // ref.invalidate(incomeAccountTreeDataProvider);
 
         if (mounted) {
           Navigator.of(context).pop(true); // Success
