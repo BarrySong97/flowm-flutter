@@ -1,12 +1,12 @@
 import 'package:flowm/components/common/popover_select.dart';
+import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flowm/components/chart/area_chart.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Re-add for Account model
 import 'package:flowm/components/account/account_row.dart'; // Import AccountRow
-import 'package:flowm/state/account/account_repository.dart';
+// ignore: depend_on_referenced_packages
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 

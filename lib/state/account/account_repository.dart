@@ -13,10 +13,6 @@ import '../../components/common/time_range_selector.dart';
 import '../database/database_provider.dart';
 import '../ledger/ledger_repository.dart';
 
-// StateProvider for the selected date range string
-final selectedDateRangeProvider =
-    StateProvider<String>((ref) => 'month'); // Default to 'month'
-
 /// 删除账户结果枚举
 enum DeleteAccountResult {
   success,
@@ -30,34 +26,6 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final accountDao = ref.watch(accountDaoProvider);
   final transactionDao = ref.watch(transactionDaoProvider);
   return AccountRepository(accountDao, transactionDao);
-});
-
-/// 顶级资产账户提供者，改为 Stream 形式以支持响应式更新
-final topAssetAccountsProvider =
-    StreamProvider<List<AccountWithBalance>>((ref) async* {
-  final repository = ref.watch(accountRepositoryProvider);
-  final ledger = await ref.watch(selectedLedgerProvider.future);
-
-  if (ledger != null) {
-    // 如果有选中的账本，根据账本获取资产账户
-    yield* repository.watchTopAssetAccountsByLedger(ledgerId: ledger.ledgerId);
-  } else {
-    // 如果没有选中的账本，返回空列表
-    yield [];
-  }
-});
-
-/// 提供UI账户列表，改为 Stream 形式以支持响应式更新
-final uiAccountsProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
-  final repository = ref.watch(accountRepositoryProvider);
-  final ledger = await ref.watch(selectedLedgerProvider.future);
-
-  if (ledger != null) {
-    yield* repository.watchAssetsAccountTree(ledgerId: ledger.ledgerId);
-  } else {
-    yield [];
-  }
 });
 
 /// 提供资产账户树，改为 Stream 形式
@@ -136,49 +104,6 @@ final yearlyAssetTrendProvider =
   } else {
     yield [];
   }
-});
-
-// 基于selectedDateRangeProvider的资产趋势数据提供者，改为 Stream 形式
-final assetTrendProviderByDateRange =
-    StreamProvider.family<List<AssetHistoryData>, int?>(
-        (ref, accountId) async* {
-  final repository = ref.watch(accountRepositoryProvider);
-  final selectedRange = ref.watch(selectedDateRangeProvider);
-  final ledger = await ref.watch(selectedLedgerProvider.future);
-
-  if (ledger == null) {
-    yield [];
-    return;
-  }
-
-  DateTime endDate = DateTime.now();
-  DateTime startDate;
-
-  switch (selectedRange) {
-    case 'year':
-      startDate = DateTime(endDate.year, 1, 1);
-      break;
-    case '60days':
-      startDate = endDate.subtract(const Duration(days: 59));
-      break;
-    case '30days':
-      startDate = endDate.subtract(const Duration(days: 29));
-      break;
-    case '15days':
-      startDate = endDate.subtract(const Duration(days: 14));
-      break;
-    case 'month':
-    default:
-      startDate = DateTime(endDate.year, endDate.month, 1);
-      break;
-  }
-
-  yield* repository.watchAssetHistoryByTimeRange(
-    startDate,
-    endDate,
-    ledgerId: ledger.ledgerId,
-    accountId: accountId,
-  );
 });
 
 // 基于TimeRange类型的资产趋势数据提供者，改为 Stream 形式

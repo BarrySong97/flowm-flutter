@@ -1,11 +1,12 @@
 import 'package:flowm/components/common/popover_select.dart';
+// ignore: depend_on_referenced_packages
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
-import 'package:flowm/state/account/account_repository.dart';
-import 'package:collection/collection.dart';
+import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
 
 class AssetsPage extends ConsumerStatefulWidget {
@@ -37,7 +38,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     final selectedDateRange = ref.watch(selectedDateRangeProvider);
     return SingleChildScrollView(
       child: Padding(
-        padding: EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,7 +46,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           children: [
             // 总资产区域
             Container(
-              padding: EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.only(top: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(6),
@@ -56,13 +57,13 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 spacing: 12,
                 children: [
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           '总资产',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                           ),
                         ),
@@ -79,7 +80,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Consumer(builder: (context, ref, child) {
                       final topAssetsAsync =
                           ref.watch(topAssetAccountsProvider);
@@ -144,7 +145,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             ),
 
             // 资产分布标题
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -166,7 +167,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 data: (allAccounts) {
                   // Renamed to allAccounts for clarity
                   if (allAccounts.isEmpty) {
-                    return Center(child: Text('暂无资产数据'));
+                    return const Center(child: Text('暂无资产数据'));
                   }
 
                   List<dynamic>
@@ -239,9 +240,9 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     TextButton.icon(
-                                      icon:
-                                          Icon(Icons.arrow_back_ios, size: 16),
-                                      label: Text('返回上一级'),
+                                      icon: const Icon(Icons.arrow_back_ios,
+                                          size: 16),
+                                      label: const Text('返回上一级'),
                                       onPressed: () {
                                         setState(() {
                                           _drilledDownAccountName = null;
@@ -392,7 +393,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                     ],
                   );
                 },
-                loading: () => Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (err, stack) => Center(
                   child: Text('加载数据失败: $err'),
                 ),

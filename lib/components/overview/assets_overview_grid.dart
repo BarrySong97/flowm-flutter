@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../state/home/page_controller_provider.dart';
 
 class AssetItem {
   final String symbol;
@@ -62,28 +61,18 @@ class AssetsOverviewGrid extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
-        Padding(
+        const Padding(
             padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text(
+                Text(
                   '资产概览',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black54,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    // Navigate to the AssetsPage (index 1)
-                    navigateToPage(ref, 1);
-                  },
-                  child: const Text(
-                    '查看更多',
-                    style: TextStyle(fontSize: 12),
                   ),
                 ),
               ],
