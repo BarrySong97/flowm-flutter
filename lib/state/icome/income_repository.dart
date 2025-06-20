@@ -141,30 +141,41 @@ class IncomeRepository {
         return [];
       }
 
+      // 2. 一次性查询所有账户的直接收入余额
+      final accountIds = allIncomeAccounts.map((a) => a.accountId).toList();
+      final placeholders = accountIds.map((id) => '?').join(',');
+
+      final directIncomesQuery = _postingDao.customSelect(
+        '''
+        SELECT 
+          p.account_id,
+          COALESCE(SUM(ABS(p.amount)), 0) as direct_balance
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN ($placeholders)
+          AND t.transaction_date >= ? 
+          AND t.transaction_date <= ?
+          AND p.amount < 0
+        GROUP BY p.account_id;
+        ''',
+        variables: [
+          ...accountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(startDate),
+          Variable.withDateTime(endDate),
+        ],
+      );
+
+      final directIncomesResult = await directIncomesQuery.get();
+      final Map<int, double> directIncomesMap = {
+        for (var row in directIncomesResult)
+          row.read<int>('account_id'): row.read<double>('direct_balance'),
+      };
+
       final List<AccountExpenseNode> accountNodes = [];
       final Map<int, AccountExpenseNode> accountNodeMap = {};
 
       for (final account in allIncomeAccounts) {
-        final directIncomeResult = await _postingDao.customSelect(
-          '''
-          SELECT COALESCE(SUM(ABS(p.amount)), 0) as direct_balance
-          FROM postings p
-          JOIN transactions t ON p.transaction_id = t.transaction_id
-          WHERE p.account_id = ? 
-            -- AND t.ledger_id = ? -- Removed: transactions table does not have ledger_id direct_balance
-            AND t.transaction_date >= ? 
-            AND t.transaction_date <= ?
-            AND p.amount < 0; -- 假设收入记为负数，获取绝对值
-          ''',
-          variables: [
-            Variable.withInt(account.accountId),
-            // Variable.withInt(ledgerId), // Removed corresponding variable
-            Variable.withDateTime(startDate),
-            Variable.withDateTime(endDate),
-          ],
-        ).getSingle();
-
-        final directBalance = directIncomeResult.read<double>('direct_balance');
+        final directBalance = directIncomesMap[account.accountId] ?? 0.0;
 
         final node = AccountExpenseNode(
           accountData: account,
