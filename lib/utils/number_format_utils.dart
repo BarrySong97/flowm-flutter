@@ -1,6 +1,38 @@
 import 'package:intl/intl.dart';
+import '../config/app_constants.dart';
 
+/// 数字格式化工具类
 class NumberFormatUtils {
+  static final NumberFormat _currencyFormat = NumberFormat(
+    '#,##0.00',
+    AppConstants.defaultLocale,
+  );
+
+  /// 格式化货币显示
+  /// 对于大于10万的金额使用k单位显示
+  static String formatCurrency(double amount) {
+    if (amount >= AppConstants.largeAmountThreshold) {
+      return '${(amount / 1000).toStringAsFixed(2)}k';
+    } else {
+      return _currencyFormat.format(amount);
+    }
+  }
+
+  /// 格式化完整货币显示（带货币符号）
+  static String formatCurrencyWithSymbol(double amount) {
+    return '${AppConstants.currencySymbol} ${formatCurrency(amount)}';
+  }
+
+  /// 格式化百分比显示
+  static String formatPercentage(double percentage) {
+    return '${percentage.toStringAsFixed(0)}%';
+  }
+
+  /// 格式化简单数字
+  static String formatNumber(double number) {
+    return _currencyFormat.format(number);
+  }
+
   /// 格式化数字，万以上显示为k
   /// 例如：15000 -> 15k, 1500 -> ¥1,500
   static String formatCurrencyWithK(double amount, {String symbol = '¥'}) {
