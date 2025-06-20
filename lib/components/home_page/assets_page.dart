@@ -1,6 +1,8 @@
+import 'package:flowm/db/dao/account_dao.dart';
 import 'package:flowm/components/common/popover_select.dart';
 // ignore: depend_on_referenced_packages
 import 'package:collection/collection.dart';
+import 'package:flowm/state/account/account_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
@@ -8,7 +10,6 @@ import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
 import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
-import 'package:visibility_detector/visibility_detector.dart'; // 引入 GoRouter
 
 class AssetsPage extends ConsumerStatefulWidget {
   const AssetsPage({super.key});
@@ -20,49 +21,93 @@ class AssetsPage extends ConsumerStatefulWidget {
 class _AssetsPageState extends ConsumerState<AssetsPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
-  bool _isDistributionVisible = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
+    final asyncAssetsPageData = ref.watch(assetsPageDataProvider);
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 16,
-          children: [
-            _buildTotalAssetsSection(context, ref),
-            _buildAssetDistributionTitle(),
-            VisibilityDetector(
-              key: const Key('asset-distribution-detector'),
-              onVisibilityChanged: (visibilityInfo) {
-                if (visibilityInfo.visibleFraction > 0 &&
-                    !_isDistributionVisible) {
-                  setState(() {
-                    _isDistributionVisible = true;
-                  });
-                }
-              },
-              child: _buildAssetDistributionSection(context, ref),
+    return asyncAssetsPageData.when(
+      data: (data) {
+        if (data.accounts.isEmpty) {
+          return const Center(child: Text('暂无资产数据'));
+        }
+
+        final totalAssets =
+            data.accounts.fold(0.0, (sum, account) => sum + account.amount);
+
+        bool isDrilledDown = _drilledDownAccountName != null;
+        List<dynamic> displayedAccounts;
+
+        if (!isDrilledDown) {
+          displayedAccounts = data.accounts;
+        } else {
+          final parentAccount = data.accounts
+              .firstWhereOrNull((acc) => acc.name == _drilledDownAccountName);
+
+          if (parentAccount != null &&
+              parentAccount.children != null &&
+              parentAccount.children!.isNotEmpty) {
+            displayedAccounts = parentAccount.children!;
+          } else {
+            // Fallback if drill-down is invalid
+            displayedAccounts = data.accounts;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _drilledDownAccountName = null;
+                });
+              }
+            });
+          }
+        }
+
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding:
+                  const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 16,
+                  children: [
+                    _buildTotalAssetsSection(
+                        context, ref, totalAssets, data.assetTrend),
+                    _buildAssetDistributionTitle(),
+                    _buildTreemapContainer(context, data.accounts,
+                        displayedAccounts, isDrilledDown),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              sliver: _buildAccountList(context, data.accounts),
             ),
           ],
-        ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(
+        child: Text('加载数据失败: $err'),
       ),
     );
   }
 
   /// 构建总资产区域
-  Widget _buildTotalAssetsSection(BuildContext context, WidgetRef ref) {
+  Widget _buildTotalAssetsSection(BuildContext context, WidgetRef ref,
+      double totalAssets, List<AssetHistoryData> assetTrend) {
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
       PopoverSelectItem(value: '15days', label: '最近15天'),
       PopoverSelectItem(value: '30days', label: '最近30天'),
       PopoverSelectItem(value: '60days', label: '最近60天'),
       PopoverSelectItem(value: 'year', label: '本年'),
-      // PopoverSelectItem(value: 'custom', label: '自定义'),
     ];
     final selectedDateRange = ref.watch(selectedDateRangeProvider);
 
@@ -82,12 +127,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  '总资产',
-                  style: TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
+                const Text('总资产', style: TextStyle(fontSize: 14)),
                 PopoverSelect(
                   items: dateRangeOptions,
                   value: selectedDateRange,
@@ -100,57 +140,20 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Consumer(builder: (context, ref, child) {
-              final topAssetsAsync = ref.watch(topAssetAccountsProvider);
-              return topAssetsAsync.when(
-                data: (accounts) {
-                  final totalAssets = accounts.fold(
-                      0.0, (sum, account) => sum + account.balance);
-                  return Text(
-                    '¥${totalAssets.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                },
-                loading: () => const Text(
-                  '加载中...',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                error: (_, __) => const Text(
-                  '加载错误',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                ),
-              );
-            }),
+            child: Text(
+              '¥${totalAssets.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-          Consumer(builder: (context, ref, child) {
-            final assetTrendAsync =
-                ref.watch(assetTrendProviderByDateRange(null));
-            return assetTrendAsync.when(
-              data: (assetData) {
-                if (assetData.isEmpty) {
-                  return const SizedBox(
-                      height: 140, child: Center(child: Text('暂无该时间段资产趋势数据')));
-                }
-                return AssetTrendChart(assetData: assetData);
-              },
-              loading: () => const SizedBox(
-                  height: 140,
-                  child: Center(child: CircularProgressIndicator())),
-              error: (error, stack) => SizedBox(
-                  height: 140, child: Center(child: Text('加载趋势图失败: $error'))),
-            );
-          }),
+          if (assetTrend.isEmpty)
+            const SizedBox(
+                height: 140, child: Center(child: Text('暂无该时间段资产趋势数据')))
+          else
+            AssetTrendChart(assetData: assetTrend),
         ],
       ),
     );
@@ -174,77 +177,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     );
   }
 
-  /// 构建资产分布内容，包括 Treemap 和账户列表
-  Widget _buildAssetDistributionSection(BuildContext context, WidgetRef ref) {
-    if (!_isDistributionVisible) {
-      return const SizedBox(
-        height: 300,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('加载资产分布...'),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Consumer(builder: (context, ref, child) {
-      final uiAccountsAsync = ref.watch(uiAccountsProvider);
-      return uiAccountsAsync.when(
-        data: (allAccounts) {
-          if (allAccounts.isEmpty) {
-            return const Center(child: Text('暂无资产数据'));
-          }
-
-          bool isDrilledDown = _drilledDownAccountName != null;
-          List<dynamic> displayedAccounts;
-
-          if (!isDrilledDown) {
-            displayedAccounts = allAccounts;
-          } else {
-            final parentAccount = allAccounts
-                .firstWhereOrNull((acc) => acc.name == _drilledDownAccountName);
-
-            if (parentAccount != null &&
-                parentAccount.children != null &&
-                parentAccount.children!.isNotEmpty) {
-              displayedAccounts = parentAccount.children!;
-            } else {
-              // Fallback if drill-down is invalid
-              displayedAccounts = allAccounts;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  setState(() {
-                    _drilledDownAccountName = null;
-                  });
-                }
-              });
-            }
-          }
-
-          return Column(
-            spacing: 16,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildTreemapContainer(context, displayedAccounts, isDrilledDown),
-              _buildAccountList(context, allAccounts),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Text('加载数据失败: $err'),
-        ),
-      );
-    });
-  }
-
   /// 构建包含 Treemap 的容器
-  Widget _buildTreemapContainer(BuildContext context,
+  Widget _buildTreemapContainer(BuildContext context, List<Account> allAccounts,
       List<dynamic> displayedAccounts, bool isDrilledDown) {
     return Container(
       height:
@@ -254,13 +188,14 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         borderRadius: BorderRadius.circular(6),
       ),
       clipBehavior: Clip.hardEdge,
-      child: _buildTreemap(context, displayedAccounts, isDrilledDown),
+      child:
+          _buildTreemap(context, allAccounts, displayedAccounts, isDrilledDown),
     );
   }
 
   /// 构建 Treemap 图表
-  Widget _buildTreemap(BuildContext context, List<dynamic> displayedAccounts,
-      bool isDrilledDown) {
+  Widget _buildTreemap(BuildContext context, List<Account> allAccounts,
+      List<dynamic> displayedAccounts, bool isDrilledDown) {
     final double totalValueAtThisLevel = displayedAccounts
         .where((account) => account.amount > 0)
         .fold(0.0, (sum, account) => sum + account.amount);
@@ -331,7 +266,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                 }
               },
               onDoubleClick: (accountName) {
-                final selectedAccountToNavigate = displayedAccounts
+                // To find the original account object, we must search from the full list
+                final selectedAccountToNavigate = allAccounts
                     .firstWhereOrNull((acc) => acc.name == accountName);
                 if (selectedAccountToNavigate != null) {
                   bool hasChildren =
@@ -354,7 +290,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   }
 
   /// 构建账户列表
-  Widget _buildAccountList(BuildContext context, List<Account> allAccounts) {
+  SliverList _buildAccountList(
+      BuildContext context, List<Account> allAccounts) {
     final double totalTopLevelAmount =
         allAccounts.fold(0.0, (sum, account) => sum + account.amount.abs());
 
@@ -374,31 +311,28 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
       );
     }).toList();
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsetsGeometry.only(top: 0),
+    return SliverList.builder(
       itemCount: accountsWithPercentage.length,
       itemBuilder: (context, index) {
         final account = accountsWithPercentage[index];
-        return AccountItem(
-          account: account,
-          onTap: (tappedAccount) {
-            bool hasChildren = tappedAccount.children != null &&
-                tappedAccount.children!.isNotEmpty;
-            if (hasChildren) {
-              GoRouter.of(context).pushNamed('topAssetsAccountDetail',
-                  extra: {'account': tappedAccount});
-            } else {
-              GoRouter.of(context)
-                  .pushNamed('assetsDetail', extra: {'account': tappedAccount});
-            }
-          },
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: AccountItem(
+            account: account,
+            onTap: (tappedAccount) {
+              bool hasChildren = tappedAccount.children != null &&
+                  tappedAccount.children!.isNotEmpty;
+              if (hasChildren) {
+                GoRouter.of(context).pushNamed('topAssetsAccountDetail',
+                    extra: {'account': tappedAccount});
+              } else {
+                GoRouter.of(context).pushNamed('assetsDetail',
+                    extra: {'account': tappedAccount});
+              }
+            },
+          ),
         );
       },
     );
   }
-
-  @override
-  bool get wantKeepAlive => true;
 }
