@@ -52,7 +52,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
             ),
             asyncData.when(
               data: (data) => _IncomeContent(data: data),
-              loading: () => const IncomeLoadingWidget(),
+              loading: () => const _OptimizedIncomeLoadingWidget(),
               error: (error, stack) => ErrorDisplayWidget(error: error),
             ),
           ],
@@ -102,6 +102,102 @@ class _IncomeContent extends StatelessWidget {
         IncomeChartSection(data: data),
         IncomePieChartSection(data: data),
       ],
+    );
+  }
+}
+
+// 优化的加载组件，提供更好的用户体验
+class _OptimizedIncomeLoadingWidget extends StatelessWidget {
+  const _OptimizedIncomeLoadingWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      spacing: AppConstants.defaultSpacing,
+      children: [
+        // 统计卡片骨架屏
+        Row(
+          children: [
+            _buildSkeletonCard(),
+            const SizedBox(width: AppConstants.smallSpacing),
+            _buildSkeletonCard(),
+            const SizedBox(width: AppConstants.smallSpacing),
+            _buildSkeletonCard(),
+          ],
+        ),
+        // 图表骨架屏
+        _buildSkeletonChart(),
+        // 饼图和列表骨架屏
+        _buildSkeletonPieChartSection(),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonCard() {
+    return Expanded(
+      child: Container(
+        height: AppConstants.statsCardHeight,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
+        ),
+        child: Center(
+          child: Container(
+            width: 60,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.grey[400],
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonChart() {
+    return Container(
+      height: AppConstants.chartHeight,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(strokeWidth: 2),
+            const SizedBox(height: AppConstants.smallSpacing),
+            Text(
+              '正在加载图表数据...',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonPieChartSection() {
+    return Container(
+      height: AppConstants.pieChartHeight + 200, // 饼图高度 + 列表估计高度
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(strokeWidth: 2),
+            const SizedBox(height: AppConstants.smallSpacing),
+            Text(
+              '正在加载账户数据...',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

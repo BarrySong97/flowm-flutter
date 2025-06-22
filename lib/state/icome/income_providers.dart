@@ -9,8 +9,9 @@ final selectedMonthProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 上个月收入数据提供者
+/// 移除autoDispose以启用缓存，提升性能
 final previousMonthIncomeProvider =
-    FutureProvider.autoDispose<List<barchart.ChartData>>((ref) async {
+    FutureProvider<List<barchart.ChartData>>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -33,8 +34,9 @@ final previousMonthIncomeProvider =
 });
 
 /// 收入图表数据提供者
+/// 移除autoDispose以启用缓存，提升性能
 final incomeChartDataProvider =
-    FutureProvider.autoDispose<List<barchart.ChartData>>((ref) async {
+    FutureProvider<List<barchart.ChartData>>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -56,8 +58,9 @@ final incomeChartDataProvider =
 });
 
 /// 收入账户树数据提供者
+/// 移除autoDispose以启用缓存，提升性能
 final incomeAccountTreeDataProvider =
-    FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
+    FutureProvider<List<AccountExpenseNode>>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -100,42 +103,59 @@ class IncomePageData {
 final incomePageDataProvider =
     FutureProvider.autoDispose<IncomePageData>((ref) async {
   final selectedDate = ref.watch(selectedMonthProvider);
-  final currentMonthChartData = await ref.watch(incomeChartDataProvider.future);
-  final previousMonthChartData =
-      await ref.watch(previousMonthIncomeProvider.future);
-  final accountTree = await ref.watch(incomeAccountTreeDataProvider.future);
 
-  final currentMonthTotal =
-      currentMonthChartData.fold<double>(0.0, (sum, item) => sum + item.y);
+  try {
+    // 并行加载三个数据源，而不是串行等待
+    final results = await Future.wait([
+      ref.watch(incomeChartDataProvider.future),
+      ref.watch(previousMonthIncomeProvider.future),
+      ref.watch(incomeAccountTreeDataProvider.future),
+    ]);
 
-  final previousMonthTotal =
-      previousMonthChartData.fold<double>(0.0, (sum, item) => sum + item.y);
+    final currentMonthChartData = results[0] as List<barchart.ChartData>;
+    final previousMonthChartData = results[1] as List<barchart.ChartData>;
+    final accountTree = results[2] as List<AccountExpenseNode>;
 
-  final daysInMonth = DateTime(
-    selectedDate.year,
-    selectedDate.month + 1,
-    0,
-  ).day;
-  final dailyAverage = daysInMonth > 0 ? currentMonthTotal / daysInMonth : 0.0;
+    final currentMonthTotal =
+        currentMonthChartData.fold<double>(0.0, (sum, item) => sum + item.y);
 
-  double changePercentage;
-  if (previousMonthTotal != 0) {
-    changePercentage =
-        ((currentMonthTotal - previousMonthTotal) / previousMonthTotal.abs()) *
-            100;
-  } else if (currentMonthTotal > 0) {
-    changePercentage = 100.0;
-  } else {
-    changePercentage = 0.0;
+    final previousMonthTotal =
+        previousMonthChartData.fold<double>(0.0, (sum, item) => sum + item.y);
+
+    final daysInMonth = DateTime(
+      selectedDate.year,
+      selectedDate.month + 1,
+      0,
+    ).day;
+    final dailyAverage =
+        daysInMonth > 0 ? currentMonthTotal / daysInMonth : 0.0;
+
+    double changePercentage;
+    if (previousMonthTotal != 0) {
+      changePercentage = ((currentMonthTotal - previousMonthTotal) /
+              previousMonthTotal.abs()) *
+          100;
+    } else if (currentMonthTotal > 0) {
+      changePercentage = 100.0;
+    } else {
+      changePercentage = 0.0;
+    }
+
+    return IncomePageData(
+      currentMonthChartData: currentMonthChartData,
+      previousMonthChartData: previousMonthChartData,
+      accountTree: accountTree,
+      currentMonthTotal: currentMonthTotal,
+      previousMonthTotal: previousMonthTotal,
+      dailyAverage: dailyAverage,
+      changePercentage: changePercentage,
+    );
+  } catch (e, stackTrace) {
+    // 记录错误以便调试
+    print('[IncomePageDataProvider] Error loading data: $e');
+    print('[IncomePageDataProvider] StackTrace: $stackTrace');
+
+    // 重新抛出错误，让UI层处理
+    rethrow;
   }
-
-  return IncomePageData(
-    currentMonthChartData: currentMonthChartData,
-    previousMonthChartData: previousMonthChartData,
-    accountTree: accountTree,
-    currentMonthTotal: currentMonthTotal,
-    previousMonthTotal: previousMonthTotal,
-    dailyAverage: dailyAverage,
-    changePercentage: changePercentage,
-  );
 });
