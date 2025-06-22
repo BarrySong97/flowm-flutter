@@ -77,7 +77,6 @@ class IncomeRepository {
           WHERE t.transaction_date BETWEEN ? AND ?
             AND a.ledger_id = ?
             AND a.account_type = ?
-            AND p.amount < 0
             ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
           GROUP BY income_date
         )
