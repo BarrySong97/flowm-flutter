@@ -34,76 +34,113 @@ class IncomeRepository {
     int? accountId,
   }) async {
     try {
+      // 首先检查是否有收入类型的账户
       final incomeAccounts = await _postingDao.customSelect(
-        'SELECT 1 FROM accounts WHERE ledger_id = ? AND account_type = ? LIMIT 1',
+        '''
+        SELECT COUNT(*) as count
+        FROM accounts
+        WHERE ledger_id = ? AND account_type = ?
+        ''',
         variables: [
           Variable.withInt(ledgerId),
           Variable.withString(AccountType.INCOME.name),
         ],
-      ).getSingleOrNull();
+      ).getSingle();
 
-      if (incomeAccounts == null) {
+      final incomeAccountCount = incomeAccounts.read<int>('count');
+
+      if (incomeAccountCount == 0) {
         return [];
       }
 
-      // 调整endDate以包含一整天
-      final inclusiveEndDate =
-          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
-
-      final query = '''
-        SELECT
-          strftime('%Y-%m-%d', t.transaction_date, 'unixepoch', 'localtime') as date_str,
-          SUM(ABS(p.amount)) as total_income
-        FROM transactions t
-        JOIN postings p ON p.transaction_id = t.transaction_id
-        JOIN accounts a ON p.account_id = a.account_id
-        WHERE t.transaction_date BETWEEN ? AND ?
-          AND a.ledger_id = ?
-          AND a.account_type = ?
-          AND p.amount < 0
-          ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
-        GROUP BY date_str
-        ORDER BY date_str;
-      ''';
-
-      final variables = [
-        Variable.withDateTime(startDate),
-        Variable.withDateTime(inclusiveEndDate),
-        Variable.withInt(ledgerId),
-        Variable.withString(AccountType.INCOME.name),
-        if (accountId != null) ...[
-          Variable.withInt(accountId),
-          Variable.withInt(accountId),
+      // 优化后的SQL查询
+      // 1. 使用 CTE (DailyIncomes) 预先聚合每日的收入数据，对 transaction_date 使用范围查询以利用索引。
+      // 2. 保持 DateRange CTE 来生成完整的日期序列。
+      // 3. 将 DateRange 与聚合后的 DailyIncomes 进行 LEFT JOIN，以填充没有收入的日期。
+      final result = await _postingDao.customSelect(
+        '''
+        WITH RECURSIVE DateRange(date) AS (
+          SELECT date(?, 'unixepoch', 'localtime')
+          UNION ALL
+          SELECT date(date, '+1 day')
+          FROM DateRange
+          WHERE date <= date(?, 'unixepoch', 'localtime')
+        ),
+        DailyIncomes AS (
+          SELECT
+            date(t.transaction_date, 'unixepoch', 'localtime') as income_date,
+            -SUM(p.amount) as total_income,
+            COUNT(p.posting_id) as daily_count
+          FROM transactions t
+          JOIN postings p ON p.transaction_id = t.transaction_id
+          JOIN accounts a ON p.account_id = a.account_id
+          WHERE t.transaction_date BETWEEN ? AND ?
+            AND a.ledger_id = ?
+            AND a.account_type = ?
+            AND p.amount < 0
+            ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
+          GROUP BY income_date
+        )
+        SELECT 
+          strftime('%Y-%m-%d', dr.date) as date,
+          COALESCE(di.total_income, 0) as total_income,
+          COALESCE(di.daily_count, 0) as daily_count
+        FROM DateRange dr
+        LEFT JOIN DailyIncomes di ON di.income_date = dr.date
+        ORDER BY dr.date;
+        ''',
+        variables: [
+          Variable.withDateTime(startDate),
+          Variable.withDateTime(endDate),
+          Variable.withDateTime(
+              DateTime(startDate.year, startDate.month, startDate.day)),
+          Variable.withDateTime(
+              DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.INCOME.name),
+          if (accountId != null) ...[
+            Variable.withInt(accountId),
+            Variable.withInt(accountId),
+          ],
         ],
-      ];
+      ).get();
 
-      final result =
-          await _postingDao.customSelect(query, variables: variables).get();
-
-      final Map<String, double> incomeByDate = {
-        for (var row in result)
-          row.read<String>('date_str'): row.read<double>('total_income'),
-      };
-
+      // 将查询结果转换为ChartData列表
       final List<barchart.ChartData> chartData = [];
       int index = 0;
-      for (var day = 0; day <= endDate.difference(startDate).inDays; day++) {
-        final currentDate = startDate.add(Duration(days: day));
-        final dateStr =
-            '${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}';
 
-        final amount = incomeByDate[dateStr] ?? 0.0;
-        final formattedDate = '${currentDate.month}/${currentDate.day}';
+      for (final row in result) {
+        try {
+          final dateStr = row.read<String>('date');
+          if (dateStr == null || dateStr.isEmpty) {
+            continue;
+          }
 
-        chartData
-            .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
-        index++;
+          final dateParts = dateStr.split('-');
+          if (dateParts.length != 3) {
+            continue;
+          }
+
+          final date = DateTime(
+            int.parse(dateParts[0]),
+            int.parse(dateParts[1]),
+            int.parse(dateParts[2]),
+          );
+
+          final amount = row.read<double>('total_income');
+          final count = row.read<int>('daily_count');
+
+          final formattedDate = '${date.month}/${date.day}';
+          chartData
+              .add(barchart.ChartData(index.toDouble(), amount, formattedDate));
+          index++;
+        } catch (e) {
+          continue;
+        }
       }
 
       return chartData;
-    } catch (e, s) {
-      print('[IncomeRepository] Error in getIncomeChartData: $e');
-      print('[IncomeRepository] Stacktrace: $s');
+    } catch (e) {
       return [];
     }
   }
@@ -118,9 +155,11 @@ class IncomeRepository {
     required DateTime endDate,
     required int ledgerId,
   }) async {
+    print(
+        '[IncomeRepository] getIncomeAccountTree called with: startDate: $startDate, endDate: $endDate, ledgerId: $ledgerId');
     try {
       // 1. 获取所有收入账户 (包括层级关系)
-      final allIncomeAccountsQuery = _postingDao.customSelect(
+      final allIncomeAccountRows = await _postingDao.customSelect(
         '''
         SELECT * 
         FROM accounts
@@ -131,8 +170,7 @@ class IncomeRepository {
           Variable.withInt(ledgerId),
           Variable.withString(AccountType.INCOME.name),
         ],
-      );
-      final allIncomeAccountRows = await allIncomeAccountsQuery.get();
+      ).get();
       final allIncomeAccounts = allIncomeAccountRows
           .map((row) => _postingDao.db.accounts.map(row.data))
           .toList();
@@ -141,41 +179,42 @@ class IncomeRepository {
         return [];
       }
 
-      // 2. 一次性查询所有账户的直接收入余额
-      final accountIds = allIncomeAccounts.map((a) => a.accountId).toList();
-      final placeholders = accountIds.map((id) => '?').join(',');
-
-      final directIncomesQuery = _postingDao.customSelect(
+      // 2. 优化：一次性获取所有相关账户在时间范围内的收入总额
+      final incomeSumsRows = await _postingDao.customSelect(
         '''
         SELECT 
-          p.account_id,
-          COALESCE(SUM(ABS(p.amount)), 0) as direct_balance
+          p.account_id, 
+          -SUM(p.amount) as direct_balance
         FROM postings p
         JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id IN ($placeholders)
-          AND t.transaction_date >= ? 
-          AND t.transaction_date <= ?
+        JOIN accounts a ON p.account_id = a.account_id
+        WHERE t.transaction_date BETWEEN ? AND ?
+          AND a.ledger_id = ?
+          AND a.account_type = ?
           AND p.amount < 0
         GROUP BY p.account_id;
         ''',
         variables: [
-          ...accountIds.map((id) => Variable.withInt(id)),
-          Variable.withDateTime(startDate),
-          Variable.withDateTime(endDate),
+          Variable.withDateTime(
+              DateTime(startDate.year, startDate.month, startDate.day)),
+          Variable.withDateTime(
+              DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.INCOME.name),
         ],
-      );
+      ).get();
 
-      final directIncomesResult = await directIncomesQuery.get();
-      final Map<int, double> directIncomesMap = {
-        for (var row in directIncomesResult)
-          row.read<int>('account_id'): row.read<double>('direct_balance'),
+      final Map<int, double> accountBalances = {
+        for (var row in incomeSumsRows)
+          row.read<int>('account_id'): row.read<double>('direct_balance')
       };
 
       final List<AccountExpenseNode> accountNodes = [];
       final Map<int, AccountExpenseNode> accountNodeMap = {};
 
+      // 3. 构建节点，从Map中获取余额，避免N+1查询
       for (final account in allIncomeAccounts) {
-        final directBalance = directIncomesMap[account.accountId] ?? 0.0;
+        final directBalance = accountBalances[account.accountId] ?? 0.0;
 
         final node = AccountExpenseNode(
           accountData: account,
@@ -185,8 +224,7 @@ class IncomeRepository {
         accountNodeMap[account.accountId] = node;
       }
 
-      // 3. 构建树形结构并计算父节点余额
-
+      // 4. 构建树形结构并计算父节点余额
       final List<AccountExpenseNode> rootNodes = [];
       for (final node in accountNodes) {
         if (node.accountData.parentAccountId != null &&
@@ -197,7 +235,7 @@ class IncomeRepository {
         }
       }
 
-      // 4. 递归计算父节点的余额 和总收入
+      // 5. 递归计算父节点的余额 和总收入
       double totalOverallIncome = 0;
       double updateTotalBalances(AccountExpenseNode node) {
         double childrenBalance = 0;
@@ -212,15 +250,13 @@ class IncomeRepository {
         totalOverallIncome += updateTotalBalances(rootNode);
       }
 
-      // 5. 计算百分比
+      // 6. 计算百分比
       if (totalOverallIncome > 0) {
         for (final node in accountNodes) {
-          // 直接计算百分比，不进行任何四舍五入
           node.percentage = (node.balance / totalOverallIncome) * 100;
         }
       }
 
-      // rootNodes.forEach((node) => print('[IncomeRepository] Final Root Node: ${node.toJson()}'));
       return rootNodes;
     } catch (e, s) {
       print('[IncomeRepository] Error in getIncomeAccountTree: $e');
@@ -243,7 +279,7 @@ class IncomeRepository {
       final result = await _postingDao.customSelect(
         '''
         SELECT 
-          COALESCE(SUM(ABS(p.amount)), 0) as total_balance
+          COALESCE(-SUM(p.amount), 0) as total_balance
         FROM postings p
         JOIN transactions t ON p.transaction_id = t.transaction_id
         JOIN accounts a ON p.account_id = a.account_id
@@ -279,7 +315,7 @@ class IncomeRepository {
       final result = await _postingDao.customSelect(
         '''
         SELECT 
-          COALESCE(SUM(ABS(p.amount)), 0) as total_balance
+          COALESCE(-SUM(p.amount), 0) as total_balance
         FROM postings p
         JOIN accounts a ON p.account_id = a.account_id
         WHERE p.account_id = ? 
