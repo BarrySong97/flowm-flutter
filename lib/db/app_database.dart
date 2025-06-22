@@ -74,7 +74,7 @@ class AppDatabase extends _$AppDatabase {
 
           // 新增：专门为资产账户查询优化的复合索引
           await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = "ASSET"');
+              'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = \'ASSET\'');
           await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_postings_account_amount ON postings(account_id, amount)');
 
@@ -86,19 +86,19 @@ class AppDatabase extends _$AppDatabase {
 
           // 新增：为收入账户查询优化的复合索引
           await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_accounts_income_ledger ON accounts(account_type, ledger_id) WHERE account_type = "INCOME"');
+              'CREATE INDEX IF NOT EXISTS idx_accounts_income_ledger ON accounts(account_type, ledger_id) WHERE account_type = \'INCOME\'');
 
           // 新增：为支出账户查询优化的复合索引
           await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_accounts_expense_ledger ON accounts(account_type, ledger_id) WHERE account_type = "EXPENSE"');
+              'CREATE INDEX IF NOT EXISTS idx_accounts_expense_ledger ON accounts(account_type, ledger_id) WHERE account_type = \'EXPENSE\'');
 
           // 新增：为交易日期和金额组合查询优化的索引
           await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_date_postings ON transactions(transaction_date) INCLUDE (transaction_id)');
+              'CREATE INDEX IF NOT EXISTS idx_transactions_date_postings ON transactions(transaction_date)');
 
           // 新增：为交易关联查询优化的索引
           await customStatement(
-              'CREATE INDEX IF NOT EXISTS idx_transactions_ledger_date ON transactions(transaction_date) WHERE EXISTS (SELECT 1 FROM postings p JOIN accounts a ON p.account_id = a.account_id WHERE p.transaction_id = transactions.transaction_id)');
+              'CREATE INDEX IF NOT EXISTS idx_transactions_ledger_date ON transactions(transaction_date)');
 
           // 首次创建数据库时填充种子数据
           final seedData = SeedData(this);
@@ -123,7 +123,7 @@ class AppDatabase extends _$AppDatabase {
 
             // 新增的优化索引
             await customStatement(
-                'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = "ASSET"');
+                'CREATE INDEX IF NOT EXISTS idx_accounts_asset_active_ledger ON accounts(account_type, is_active, ledger_id) WHERE account_type = \'ASSET\'');
             await customStatement(
                 'CREATE INDEX IF NOT EXISTS idx_postings_account_amount ON postings(account_id, amount)');
 
@@ -135,15 +135,15 @@ class AppDatabase extends _$AppDatabase {
 
             // 新增：为收入账户查询优化的复合索引
             await customStatement(
-                'CREATE INDEX IF NOT EXISTS idx_accounts_income_ledger ON accounts(account_type, ledger_id) WHERE account_type = "INCOME"');
+                'CREATE INDEX IF NOT EXISTS idx_accounts_income_ledger ON accounts(account_type, ledger_id) WHERE account_type = \'INCOME\'');
 
             // 新增：为支出账户查询优化的复合索引
             await customStatement(
-                'CREATE INDEX IF NOT EXISTS idx_accounts_expense_ledger ON accounts(account_type, ledger_id) WHERE account_type = "EXPENSE"');
+                'CREATE INDEX IF NOT EXISTS idx_accounts_expense_ledger ON accounts(account_type, ledger_id) WHERE account_type = \'EXPENSE\'');
 
             // 新增：为交易日期和金额组合查询优化的索引
             await customStatement(
-                'CREATE INDEX IF NOT EXISTS idx_transactions_date_postings ON transactions(transaction_date) INCLUDE (transaction_id)');
+                'CREATE INDEX IF NOT EXISTS idx_transactions_date_postings ON transactions(transaction_date)');
           }
         },
       );
