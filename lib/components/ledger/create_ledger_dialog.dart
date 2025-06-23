@@ -131,6 +131,13 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
         ],
       ),
       actions: [
+        if (_isEditMode)
+          TextButton(
+            onPressed: _showDeleteConfirmation,
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('删除'),
+          ),
+        const Spacer(),
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: const Text('取消'),
@@ -140,6 +147,50 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
           child: Text(_isEditMode ? '更新' : '创建'),
         ),
       ],
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('确认删除'),
+          content: const Text('确定要删除此账本吗？所有关联的数据（包括账户、交易）都将被永久删除，此操作不可恢复。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(ledgerRepositoryProvider)
+                      .deleteLedgerWithRelatedData(widget.ledger!.ledgerId);
+
+                  if (mounted) {
+                    Navigator.pop(dialogContext); // Close confirmation dialog
+                    Navigator.pop(context, true); // Close edit dialog
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(dialogContext); // Close confirmation dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('删除失败: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('确认删除'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

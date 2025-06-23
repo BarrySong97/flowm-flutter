@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../../db/app_database.dart';
@@ -6,8 +7,9 @@ import '../database/database_provider.dart';
 
 /// 账本仓库提供者，用于封装账本相关的数据库操作
 final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) {
+  final db = ref.watch(databaseProvider);
   final ledgerDao = ref.watch(ledgerDaoProvider);
-  return LedgerRepository(ledgerDao);
+  return LedgerRepository(db, ledgerDao);
 });
 
 /// 所有账本列表提供者，缓存获取的账本数据
@@ -32,9 +34,10 @@ final selectedLedgerProvider = StreamProvider<Ledger?>((ref) {
 ///
 /// 封装与账本相关的所有数据库操作，提供更高级别的业务逻辑方法
 class LedgerRepository {
+  final AppDatabase _db;
   final LedgerDao _ledgerDao;
 
-  LedgerRepository(this._ledgerDao);
+  LedgerRepository(this._db, this._ledgerDao);
 
   /// 获取所有账本
   Future<List<Ledger>> getAllLedgers() => _ledgerDao.getAllLedgers();
@@ -115,4 +118,71 @@ class LedgerRepository {
 
   /// 删除账本
   Future<int> deleteLedger(int id) => _ledgerDao.deleteLedger(id);
+
+  /// 删除账本及其所有关联数据
+  Future<void> deleteLedgerWithRelatedData(int ledgerId) async {
+    // 检查是否为最后一个账本
+    final allLedgers = await getAllLedgers();
+    if (allLedgers.length <= 1) {
+      throw Exception('无法删除最后一个账本，必须至少保留一个账本。');
+    }
+
+    await _db.transaction(() async {
+      // 1. 找到所有与该账本关联的账户ID
+      final accountsInLedger = await (_db.select(_db.accounts)
+            ..where((tbl) => tbl.ledgerId.equals(ledgerId)))
+          .get();
+      final accountIds = accountsInLedger.map((a) => a.accountId).toList();
+
+      if (accountIds.isNotEmpty) {
+        // 2. 删除与这些账户关联的账户配置
+        await (_db.delete(_db.accountConfigs)
+              ..where((tbl) => tbl.accountId.isIn(accountIds)))
+            .go();
+
+        // 3. 找到所有与这些账户关联的 Posting，并获取唯一的交易ID
+        final postings = await (_db.select(_db.postings)
+              ..where((tbl) => tbl.accountId.isIn(accountIds)))
+            .get();
+        final transactionIds =
+            postings.map((p) => p.transactionId).toSet().toList();
+
+        if (transactionIds.isNotEmpty) {
+          // 4. 删除与这些交易关联的交易标签
+          await (_db.delete(_db.transactionTags)
+                ..where((tbl) => tbl.transactionId.isIn(transactionIds)))
+              .go();
+
+          // 5. 删除与这些交易关联的分录 (postings)
+          await (_db.delete(_db.postings)
+                ..where((tbl) => tbl.transactionId.isIn(transactionIds)))
+              .go();
+
+          // 6. 删除交易本身
+          await (_db.delete(_db.transactions)
+                ..where((tbl) => tbl.transactionId.isIn(transactionIds)))
+              .go();
+        }
+      }
+
+      // 7. 删除账本下的所有账户
+      await (_db.delete(_db.accounts)
+            ..where((tbl) => tbl.ledgerId.equals(ledgerId)))
+          .go();
+
+      // 8. 最后删除账本自身
+      await (_db.delete(_db.ledgers)
+            ..where((tbl) => tbl.ledgerId.equals(ledgerId)))
+          .go();
+    });
+
+    // 如果删除的是当前选中的账本，则选择另一个账本
+    final selectedLedger = await getSelectedLedger();
+    if (selectedLedger == null || selectedLedger.ledgerId == ledgerId) {
+      final remainingLedgers = await getAllLedgers();
+      if (remainingLedgers.isNotEmpty) {
+        await setLedgerAsSelected(remainingLedgers.first.ledgerId);
+      }
+    }
+  }
 }
