@@ -211,11 +211,19 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             // Monthly Overview Card
             monthlyOverviewDataAsync.when(
                 data: (data) {
+                  double fixNegativeZero(double value) {
+                    // 如果接近 0，就返回正 0
+                    return value.abs() < 0.00001 ? 0.0 : value;
+                  }
+
                   final formatter =
                       NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
-                  final formattedExpense = formatter.format(data.expense);
-                  final formattedIncome = formatter.format(data.income);
-                  final formattedBalance = formatter.format(data.balance);
+                  final formattedExpense =
+                      formatter.format(fixNegativeZero(data.expense));
+                  final formattedIncome =
+                      formatter.format(fixNegativeZero(data.income));
+                  final formattedBalance =
+                      formatter.format(fixNegativeZero(data.balance));
 
                   return MonthlyOverviewCard(
                     month: '${DateTime.now().month}月', // Display current month
