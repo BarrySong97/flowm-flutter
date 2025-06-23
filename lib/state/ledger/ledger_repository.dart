@@ -87,28 +87,30 @@ class LedgerRepository {
     String? name,
     String? description,
     bool? isSelected,
+    String? currencySymbol,
   }) async {
-    // 先获取现有账本
-    final existingLedger = await _ledgerDao.getLedgerById(id);
-    if (existingLedger == null) {
+    final companion = LedgersCompanion(
+      ledgerId: Value(id),
+      name: name != null ? Value(name) : const Value.absent(),
+      description:
+          description != null ? Value(description) : const Value.absent(),
+      currencySymbol:
+          currencySymbol != null ? Value(currencySymbol) : const Value.absent(),
+    );
+
+    // 首先更新账本的非选中状态信息
+    final updateSuccess = await _ledgerDao.updateLedger(companion);
+
+    if (!updateSuccess) {
       return false;
     }
 
-    // 如果isSelected=true，则使用setLedgerSelected方法，它会处理其他账本的状态
+    // 如果 isSelected 被指定为 true，则调用 setLedgerSelected 来处理选中逻辑
     if (isSelected == true) {
       return _ledgerDao.setLedgerSelected(id);
     }
 
-    // 创建更新对象，只更新提供的字段
-    final updatedLedger = LedgersCompanion(
-      ledgerId: Value(id),
-      name: name == null ? const Value.absent() : Value(name),
-      description:
-          description == null ? const Value.absent() : Value(description),
-      isSelected: isSelected == null ? const Value.absent() : Value(isSelected),
-    );
-
-    return _ledgerDao.updateLedger(updatedLedger);
+    return true;
   }
 
   /// 删除账本

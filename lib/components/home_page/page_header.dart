@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../state/ledger/ledger_repository.dart';
 import '../../db/app_database.dart';
+import '../ledger/create_ledger_dialog.dart';
 
 class PageHeader extends ConsumerWidget {
   final int currentIndex;
@@ -163,44 +164,90 @@ class LedgerSelector extends ConsumerWidget {
               ),
               Flexible(
                 child: ListView.builder(
-                  shrinkWrap: true,
                   itemCount: ledgers.length,
                   itemBuilder: (context, index) {
                     final ledger = ledgers[index];
                     final isSelected =
                         selectedLedger?.ledgerId == ledger.ledgerId;
 
-                    return ListTile(
-                      leading: Container(
-                        padding: EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(6),
-                          color:
-                              isSelected ? Colors.blue[100] : Colors.grey[200],
-                        ),
-                        child: Text(
-                          ledger.name.substring(0, 1),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: isSelected
-                                ? Colors.blue[800]
-                                : Colors.grey[800],
-                          ),
-                        ),
-                      ),
-                      title: Text(ledger.name),
-                      subtitle: ledger.description != null
-                          ? Text(ledger.description!)
-                          : null,
-                      trailing: isSelected
-                          ? const Icon(Icons.check_circle, color: Colors.blue)
-                          : null,
+                    return InkWell(
                       onTap: () {
                         ref
                             .read(ledgerRepositoryProvider)
                             .setLedgerAsSelected(ledger.ledgerId);
                         Navigator.pop(context);
                       },
+                      onLongPress: () {
+                        Navigator.pop(
+                            context); // Close the selection sheet first
+                        showDialog(
+                          context: context,
+                          builder: (_) => CreateLedgerDialog(ledger: ledger),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                            left: 16.0, right: 16.0, top: 16.0, bottom: 0.0),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(6),
+                                color: isSelected
+                                    ? Colors.blue[100]
+                                    : Colors.grey[200],
+                              ),
+                              child: Text(
+                                ledger.name.substring(0, 1),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.blue[800]
+                                      : Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ledger.name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    ledger.description ?? '',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Visibility(
+                              visible: isSelected,
+                              maintainAnimation: true,
+                              maintainState: true,
+                              maintainSize: true,
+                              child: const Icon(Icons.check_circle,
+                                  color: Colors.blue),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -210,7 +257,14 @@ class LedgerSelector extends ConsumerWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     // 显示创建账本的对话框
-                    _showCreateLedgerDialog(context, ref);
+                    showDialog<bool>(
+                      context: context,
+                      builder: (context) => const CreateLedgerDialog(),
+                    ).then((created) {
+                      if (created == true && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    });
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
@@ -230,77 +284,6 @@ class LedgerSelector extends ConsumerWidget {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  void _showCreateLedgerDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final currencySymbolController =
-        TextEditingController(text: '¥'); // 默认使用人民币符号
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('创建新账本'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: '账本名称',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: '描述 (可选)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: currencySymbolController,
-                decoration: const InputDecoration(
-                  labelText: '货币符号',
-                  border: OutlineInputBorder(),
-                  hintText: '¥',
-                ),
-                maxLength: 1,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isNotEmpty) {
-                  ref.read(ledgerRepositoryProvider).createLedger(
-                        name: nameController.text.trim(),
-                        description:
-                            descriptionController.text.trim().isNotEmpty
-                                ? descriptionController.text.trim()
-                                : null,
-                        currencySymbol: currencySymbolController.text.trim(),
-                        isSelected: true, // 创建后自动选中
-                      );
-                  Navigator.pop(context); // 关闭创建对话框
-                  Navigator.pop(context); // 关闭选择账本对话框
-                }
-              },
-              child: const Text('创建'),
-            ),
-          ],
         );
       },
     );
