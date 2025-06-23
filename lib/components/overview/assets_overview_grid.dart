@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:path/path.dart';
+import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/components/account/account_item.dart';
 
 class AssetItem {
+  final int id;
+  final String name;
+  final double amountNumber;
   final String symbol;
   final String amount;
   final double changePercentage;
@@ -9,6 +16,9 @@ class AssetItem {
   final String percent;
 
   const AssetItem({
+    required this.id,
+    required this.name,
+    required this.amountNumber,
     required this.symbol,
     required this.amount,
     required this.changePercentage,
@@ -110,8 +120,9 @@ class AssetsOverviewGrid extends ConsumerWidget {
                 mainAxisSpacing: 1,
                 crossAxisSpacing: 1,
                 childAspectRatio: 2,
-                children:
-                    assets.map((asset) => _buildAssetCard(asset)).toList(),
+                children: assets
+                    .map((asset) => _buildAssetCard(asset, context))
+                    .toList(),
               ),
             ],
           ),
@@ -120,59 +131,72 @@ class AssetsOverviewGrid extends ConsumerWidget {
     );
   }
 
-  Widget _buildAssetCard(AssetItem asset) {
+  Widget _buildAssetCard(AssetItem asset, BuildContext context) {
     final isPositive = asset.changePercentage >= 0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: asset.backgroundColor,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+    return GestureDetector(
+        onTap: () {
+          final account = Account(
+            id: asset.id,
+            name: asset.name,
+            amount: asset.amountNumber,
+            type: AccountType.ASSET,
+            currencySymbol: asset.symbol,
+          );
+          GoRouter.of(context)
+              .pushNamed('assetsDetail', extra: {'account': account});
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: asset.backgroundColor,
+            borderRadius: BorderRadius.circular(0),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                asset.symbol,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(0),
-                ),
-                child: Text(
-                  asset.percent,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isPositive ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.w500,
+              Row(
+                children: [
+                  Text(
+                    asset.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
                   ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPositive
+                          ? Colors.green.withOpacity(0.2)
+                          : Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(0),
+                    ),
+                    child: Text(
+                      asset.percent,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isPositive ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                asset.amount,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
             ],
           ),
-          Text(
-            asset.amount,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
+        ));
   }
 }

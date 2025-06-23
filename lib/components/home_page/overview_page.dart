@@ -129,6 +129,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             if (topAccounts.isEmpty) {
               assetItems = List.generate(4, (index) {
                 return AssetItem(
+                  id: 0,
+                  amountNumber: 0,
+                  name: '',
                   symbol: '资产账户 ${index + 1}',
                   amount: '¥--',
                   changePercentage: 0.0,
@@ -151,7 +154,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                     : 0.0;
 
                 return AssetItem(
-                  symbol: accountWithBalance.account.accountName,
+                  id: accountWithBalance.account.accountId,
+                  name: accountWithBalance.account.accountName,
+                  symbol: "¥",
+                  amountNumber: accountWithBalance.balance,
                   amount: formattedBalance,
                   changePercentage: percentValue,
                   backgroundColor: const Color(0xFFE8F5E9),
