@@ -214,12 +214,45 @@ class LiabilitiesRepository {
       final accountTree = await getAccountTree(ledgerId: ledgerId);
 
       // 只保留负债类型的账户
-      final liabilityAccounts = accountTree
+      final liabilityAccountsTree = accountTree
           .where((acc) => acc.account.accountType == AccountType.LIABILITY)
           .toList();
 
+      if (liabilityAccountsTree.isEmpty) {
+        return [];
+      }
+
+      // 展平树以获取所有相关的负债账户ID
+      final allLiabilityAccounts = _flattenAccountTree(liabilityAccountsTree);
+      if (allLiabilityAccounts.isEmpty) {
+        return [];
+      }
+      final accountIds =
+          allLiabilityAccounts.map((acc) => acc.accountId).toList();
+
+      // 在单个查询中获取所有余额
+      final balanceQuery = '''
+          SELECT
+            p.account_id,
+            SUM(p.amount) as balance
+          FROM postings p
+          WHERE p.account_id IN (${accountIds.map((_) => '?').join(',')})
+          GROUP BY p.account_id
+      ''';
+      final balanceResults = await _accountDao
+          .customSelect(
+            balanceQuery,
+            variables: accountIds.map((id) => Variable.withInt(id)).toList(),
+          )
+          .get();
+      final balancesMap = {
+        for (var row in balanceResults)
+          row.read<int>('account_id'): row.read<double>('balance')
+      };
+
       // 递归转换为UI需要的Account格式
-      final result = await _convertAccountsToUIFormat(liabilityAccounts);
+      final result =
+          _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap);
       return result;
     } catch (e) {
       print('[LiabilitiesRepository] Error in getLiabilitiesAccountTree: $e');
@@ -227,44 +260,41 @@ class LiabilitiesRepository {
     }
   }
 
-  // 递归将AccountWithChildren转换为UI格式的Account并计算余额
-  Future<List<account_ui.Account>> _convertAccountsToUIFormat(
-      List<AccountWithChildren> accounts) async {
+  // 递归将AccountWithChildren转换为UI格式的Account并计算余额 (Optimized)
+  List<account_ui.Account> _convertAccountsToUIFormat(
+      List<AccountWithChildren> accounts, Map<int, double> balances) {
     if (accounts.isEmpty) {
       return [];
     }
 
-    final List<account_ui.Account> results = [];
+    return accounts.map((acc) {
+      // 从预取映射中获取余额（同步）
+      final double directBalance = balances[acc.account.accountId] ?? 0.0;
 
-    for (final acc in accounts) {
-      // 负债账户的余额通常是负数或零。UI上我们通常希望显示为正数。
-      final double directBalance =
-          (await _accountDao.getAccountBalance(acc.account.accountId));
-
-      double childrensTotalAmount = 0.0;
       List<account_ui.Account>? uiChildren;
+      double childrensTotalAmount = 0.0;
 
       if (acc.children.isNotEmpty) {
-        uiChildren = await _convertAccountsToUIFormat(acc.children);
-        for (final childUiAccount in uiChildren) {
-          childrensTotalAmount += childUiAccount.amount;
-        }
+        // 递归调用并将余额映射向下传递
+        uiChildren = _convertAccountsToUIFormat(acc.children, balances);
+        childrensTotalAmount =
+            uiChildren.fold(0.0, (sum, child) => sum + child.amount);
       }
 
-      final double totalAmountForUI = directBalance + childrensTotalAmount;
+      // UI的总金额是账户自身余额的绝对值加上其子账户的总金额
+      final double totalAmountForUI =
+          directBalance.abs() + childrensTotalAmount;
 
-      results.add(account_ui.Account(
+      return account_ui.Account(
         id: acc.account.accountId,
         name: acc.account.accountName,
         type: acc.account.accountType,
-        amount: totalAmountForUI.abs(), // 使用绝对值确保UI上显示为正数
+        amount: totalAmountForUI, // The value is already positive
         children: uiChildren,
         currencySymbol: '¥',
         icon: _getAccountIcon(acc.account.accountType),
-      ));
-    }
-
-    return results;
+      );
+    }).toList();
   }
 
   IconData _getAccountIcon(AccountType accountType) {
@@ -332,18 +362,16 @@ class LiabilitiesRepository {
         ledgerId: ledgerId, accountId: accountId);
   }
 
-  /// 根据时间获取负债历史数据
+  /// 根据时间获取负债历史数据 (Optimized)
   Future<List<LiabilityHistoryData>> getLiabilityHistoryByTime(
       DateTime start, DateTime end,
       {required int ledgerId, int? accountId}) async {
     try {
+      // 1. 获取目标负债账户 (与原逻辑相同)
       List<Account> targetLiabilityAccounts = [];
-
       final allAccountsInLedger =
           await _accountDao.getAccountsByLedgerId(ledgerId);
       if (allAccountsInLedger.isEmpty) {
-        print(
-            '[LiabilitiesRepository] getLiabilityHistoryByTime: No accounts found in ledger $ledgerId.');
         return [];
       }
 
@@ -387,18 +415,67 @@ class LiabilitiesRepository {
         return [];
       }
 
-      final List<LiabilityHistoryData> history = [];
-      for (DateTime currentDate = start;
-          currentDate.isBefore(end.add(const Duration(days: 1)));
-          currentDate = currentDate.add(const Duration(days: 1))) {
-        double dailyTotalLiabilities = 0.0;
-        for (final account in targetLiabilityAccounts) {
-          dailyTotalLiabilities +=
-              await _getAccountBalanceAtDate(account.accountId, currentDate);
-        }
-        history.add(LiabilityHistoryData(
-            date: currentDate, totalLiabilities: dailyTotalLiabilities.abs()));
+      final targetAccountIds =
+          targetLiabilityAccounts.map((a) => a.accountId).toList();
+
+      // 2. 一次性获取期初总余额
+      final initialBalanceResult = await _accountDao.customSelect(
+        '''
+        SELECT SUM(p.amount) as balance 
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN (${targetAccountIds.map((_) => '?').join(',')})
+        AND t.transaction_date < ?
+        ''',
+        variables: [
+          ...targetAccountIds.map(Variable.withInt),
+          Variable.withDateTime(start)
+        ],
+      ).getSingle();
+      double currentTotalLiabilities =
+          initialBalanceResult.read<double?>('balance') ?? 0.0;
+
+      // 3. 一次性获取时间范围内的所有相关交易记录
+      final postingsResult = await _accountDao.customSelect(
+        '''
+        SELECT t.transaction_date, p.amount
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN (${targetAccountIds.map((_) => '?').join(',')})
+        AND t.transaction_date >= ?
+        AND t.transaction_date <= ?
+        ''',
+        variables: [
+          ...targetAccountIds.map(Variable.withInt),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).get();
+
+      // 在内存中按天聚合交易金额
+      final dailyChangesMap = <DateTime, double>{};
+      for (var row in postingsResult) {
+        final date = DateUtils.dateOnly(row.read<DateTime>('transaction_date'));
+        final amount = row.read<double>('amount');
+        dailyChangesMap.update(date, (value) => value + amount,
+            ifAbsent: () => amount);
       }
+
+      // 4. 在内存中计算每日历史数据
+      final history = <LiabilityHistoryData>[];
+      final normalizedEnd = DateUtils.dateOnly(end);
+
+      for (var currentDate = DateUtils.dateOnly(start);
+          currentDate.isBefore(normalizedEnd.add(const Duration(days: 1)));
+          currentDate = currentDate.add(const Duration(days: 1))) {
+        // 累加当天的总变化
+        currentTotalLiabilities += dailyChangesMap[currentDate] ?? 0.0;
+        history.add(LiabilityHistoryData(
+          date: currentDate,
+          totalLiabilities: currentTotalLiabilities.abs(),
+        ));
+      }
+
       return history;
     } catch (e, s) {
       print('[LiabilitiesRepository] Error in getLiabilityHistoryByTime: $e');
@@ -413,29 +490,6 @@ class LiabilitiesRepository {
     final now = DateTime.now();
     final oneYearAgo = now.subtract(const Duration(days: 365));
     return getLiabilityHistoryByTime(oneYearAgo, now, ledgerId: ledgerId);
-  }
-
-  /// 获取指定账户在指定日期时的余额
-  Future<double> _getAccountBalanceAtDate(int accountId, DateTime date) async {
-    try {
-      final result = await _accountDao.customSelect(
-        '''
-        SELECT SUM(p.amount) as balance 
-        FROM postings p
-        JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id = ? 
-        AND t.transaction_date <= ?
-        ''',
-        variables: [
-          Variable.withInt(accountId),
-          Variable.withDateTime(date),
-        ],
-      ).getSingle();
-
-      return (result.read<double?>('balance') ?? 0.0).abs();
-    } catch (e) {
-      return 0.0;
-    }
   }
 
   /// 获取账户树
@@ -470,41 +524,73 @@ class LiabilitiesRepository {
     return accounts;
   }
 
-  /// 获取顶级负债账户（考虑特定账本）
+  // Helper to flatten a list of AccountWithChildren nodes
+  List<Account> _flattenAccountTree(List<AccountWithChildren> treeNodes) {
+    final List<Account> accounts = [];
+    for (final node in treeNodes) {
+      accounts.addAll(_flattenAccountTreeHelper(node));
+    }
+    return accounts;
+  }
+
+  /// 获取顶级负债账户（考虑特定账本）- Optimized
   Future<List<AccountWithBalance>> getTopLiabilityAccountsByLedger(
       {int? limit, required int ledgerId}) async {
     try {
-      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final liabilityAccounts = allAccounts
-          .where((account) =>
-              account.accountType == AccountType.LIABILITY && account.isActive)
-          .toList();
+      String limitClause = limit != null ? 'LIMIT ?' : '';
+      List<Variable> variables = [
+        Variable.withInt(ledgerId),
+        Variable.withString(AccountType.LIABILITY.name),
+      ];
+      if (limit != null) {
+        variables.add(Variable.withInt(limit));
+      }
 
-      if (liabilityAccounts.isEmpty) {
+      final query = '''
+        SELECT
+          a.*,
+          COALESCE(ABS(SUM(p.amount)), 0.0) as balance
+        FROM accounts a
+        LEFT JOIN postings p ON a.account_id = p.account_id
+        WHERE a.ledger_id = ?
+          AND a.account_type = ?
+          AND a.is_active = 1
+        GROUP BY a.account_id
+        ORDER BY balance DESC
+        $limitClause
+      ''';
+
+      final results =
+          await _accountDao.customSelect(query, variables: variables).get();
+
+      if (results.isEmpty) {
         print(
             '[LiabilitiesRepository] getTopLiabilityAccountsByLedger: No active liability accounts found in ledger $ledgerId.');
         return [];
       }
 
-      final List<AccountWithBalance> accountsWithBalance = [];
-      for (final account in liabilityAccounts) {
-        final balance = await _accountDao.getAccountBalance(account.accountId);
-        accountsWithBalance.add(
-          AccountWithBalance(
-            account: account,
-            balance: balance.abs(), // 使用绝对值
-          ),
+      return results.map((row) {
+        final account = Account(
+          accountId: row.read<int>('account_id'),
+          ledgerId: row.read<int>('ledger_id'),
+          parentAccountId: row.read<int?>('parent_account_id'),
+          accountName: row.read<String>('account_name'),
+          fullPath: row.read<String>('full_path'),
+          accountType:
+              AccountType.values.byName(row.read<String>('account_type')),
+          isActive: row.read<bool>('is_active'),
+          createdAt: row.read<DateTime>('created_at'),
         );
-      }
-
-      accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
-
-      return limit != null
-          ? accountsWithBalance.take(limit).toList()
-          : accountsWithBalance;
-    } catch (e) {
+        final balance = row.read<double>('balance');
+        return AccountWithBalance(
+          account: account,
+          balance: balance,
+        );
+      }).toList();
+    } catch (e, s) {
       print(
           '[LiabilitiesRepository] Error in getTopLiabilityAccountsByLedger: $e');
+      print('[LiabilitiesRepository] Stacktrace: $s');
       return [];
     }
   }
@@ -969,10 +1055,45 @@ class LiabilitiesRepository {
         .asyncMap((_) async {
       try {
         final accountTree = await getAccountTree(ledgerId: ledgerId);
-        final liabilityAccounts = accountTree
+        final liabilityAccountsTree = accountTree
             .where((acc) => acc.account.accountType == AccountType.LIABILITY)
             .toList();
-        final result = await _convertAccountsToUIFormat(liabilityAccounts);
+
+        if (liabilityAccountsTree.isEmpty) {
+          return [];
+        }
+
+        // 展平树以获取所有相关的负债账户ID
+        final allLiabilityAccounts = _flattenAccountTree(liabilityAccountsTree);
+        if (allLiabilityAccounts.isEmpty) {
+          return [];
+        }
+        final accountIds =
+            allLiabilityAccounts.map((acc) => acc.accountId).toList();
+
+        // 在单个查询中获取所有余额
+        final balanceQuery = '''
+            SELECT
+              p.account_id,
+              SUM(p.amount) as balance
+            FROM postings p
+            WHERE p.account_id IN (${accountIds.map((_) => '?').join(',')})
+            GROUP BY p.account_id
+        ''';
+        final balanceResults = await _accountDao
+            .customSelect(
+              balanceQuery,
+              variables: accountIds.map((id) => Variable.withInt(id)).toList(),
+            )
+            .get();
+        final balancesMap = {
+          for (var row in balanceResults)
+            row.read<int>('account_id'): row.read<double>('balance')
+        };
+
+        // 使用预取的余额递归构建UI树
+        final result =
+            _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap);
         return result;
       } catch (e) {
         print('[LiabilitiesRepository] Error in watchLiabilityAccountTree: $e');
