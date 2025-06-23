@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
+import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/state/expense/expense_repository.dart';
@@ -311,16 +312,26 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                               child: ColoredBox(color: Colors.transparent),
                             ),
                             Container(
-                              height: 240,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: chartDataAsync.when(
-                                data: (chartData) => barchart.MyBarChart(
-                                  barColor: Colors.red,
-                                  chartData: chartData,
-                                ),
+                                data: (chartData) {
+                                  final daysInMonth = DateTime(
+                                          currentSelectedMonth.year,
+                                          currentSelectedMonth.month + 1,
+                                          0)
+                                      .day;
+                                  return fl_barchart.FlBarChart(
+                                    barColor: Colors.red,
+                                    chartData: chartData
+                                        .map((e) => fl_barchart.ChartData(
+                                            e.x, e.y, e.day))
+                                        .toList(),
+                                    daysInMonth: daysInMonth,
+                                  );
+                                },
                                 loading: () => const Center(
                                   child: CircularProgressIndicator(),
                                 ),

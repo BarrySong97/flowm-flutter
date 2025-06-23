@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
+import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
@@ -377,18 +378,33 @@ class TopIncomeDetailPage extends ConsumerWidget {
                         child: ColoredBox(color: Colors.transparent),
                       ),
                       Container(
-                        height: 240,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: chartDataAsync.when(
-                          data: (chartData) => barchart.MyBarChart(
-                            barColor: Colors.green,
-                            chartData: chartData,
-                          ),
+                          data: (chartData) {
+                            final daysInMonth = DateTime(
+                                    currentSelectedMonth.year,
+                                    currentSelectedMonth.month + 1,
+                                    0)
+                                .day;
+                            return fl_barchart.FlBarChart(
+                              barColor: Colors.green,
+                              chartData: chartData
+                                  .map((e) =>
+                                      fl_barchart.ChartData(e.x, e.y, e.day))
+                                  .toList(),
+                              daysInMonth: daysInMonth,
+                            );
+                          },
                           loading: () => const Center(
-                            child: CircularProgressIndicator(),
+                            child: SizedBox(
+                              height: 240,
+                              child: Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
                           ),
                           error: (error, stack) => Center(
                             child: Text('加载失败: $error'),
