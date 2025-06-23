@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
+import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
@@ -155,16 +156,14 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
   }
 
   Widget _buildBarChart(List<barchart.ChartData> chartData) {
-    return Container(
-      height: 240,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: barchart.MyBarChart(
-        barColor: Colors.red,
-        chartData: chartData,
-      ),
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final daysInMonth =
+        DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    return fl_barchart.FlBarChart(
+      barColor: Colors.red,
+      chartData:
+          chartData.map((e) => fl_barchart.ChartData(e.x, e.y, e.day)).toList(),
+      daysInMonth: daysInMonth,
     );
   }
 
