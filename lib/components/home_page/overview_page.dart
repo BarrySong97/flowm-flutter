@@ -14,6 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 
+import '../../pages/main_screen.dart';
+
 class OverviewPage extends ConsumerStatefulWidget {
   const OverviewPage({super.key});
 
@@ -406,7 +408,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
         ),
         const SizedBox(height: 24.0),
         TextButton(
-          onPressed: () {},
+          onPressed: () {
+            ref.read(mainScreenIndexProvider.notifier).state = 3;
+          },
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

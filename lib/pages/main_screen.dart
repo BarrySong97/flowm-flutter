@@ -154,8 +154,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       debugPrint('[AppLinks] 设置AddPage参数: $params');
     }
 
-    // 切换到指定标签页
-    _onItemTapped(tabIndex);
+    // 切换到指定标签页, 只更新 provider，让 listener 去驱动页面切换
+    ref.read(mainScreenIndexProvider.notifier).state = tabIndex;
 
     // 如果有参数，显示给用户
     if (queryParams.isNotEmpty && tabIndex != 2) {
@@ -188,7 +188,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _onItemTapped(int index) {
-    _pageController.jumpToPage(index);
+    // _pageController.jumpToPage(index);
     ref.read(mainScreenIndexProvider.notifier).state = index;
   }
 
@@ -196,10 +196,16 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(mainScreenIndexProvider);
 
+    ref.listen<int>(mainScreenIndexProvider, (previous, next) {
+      if (next != _pageController.page?.round()) {
+        _pageController.jumpToPage(next);
+      }
+    });
+
     return Scaffold(
       body: PageView(
         controller: _pageController,
-        physics: NeverScrollableScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         children: _pages,
         onPageChanged: (index) {
           if (index != selectedIndex) {
