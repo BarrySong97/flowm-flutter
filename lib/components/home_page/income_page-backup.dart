@@ -1,11 +1,10 @@
-import 'package:flowm/state/icome/income_providers.dart';
-import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
+import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:go_router/go_router.dart';
@@ -129,10 +128,10 @@ class _IncomePageState extends ConsumerState<IncomePage>
                     children: [
                       if (isPositive)
                         const Icon(Icons.arrow_upward,
-                            color: Colors.red, size: 16),
+                            color: Colors.green, size: 16),
                       if (isNegative)
                         const Icon(Icons.arrow_downward,
-                            color: Colors.green, size: 16),
+                            color: Colors.red, size: 16),
                       if (!isPositive && !isNegative) const SizedBox(width: 16),
                       Text(
                         '${changePercent.toStringAsFixed(0)}%',
@@ -140,8 +139,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: isPositive
-                              ? Colors.red
-                              : (isNegative ? Colors.green : Colors.grey),
+                              ? Colors.green
+                              : (isNegative ? Colors.red : Colors.grey),
                         ),
                       ),
                     ],
@@ -186,11 +185,11 @@ class _IncomePageState extends ConsumerState<IncomePage>
     }
 
     final List<Color> pieColors = [
-      Colors.red.shade800,
-      Colors.orange,
-      Colors.green,
-      Colors.pink,
+      Colors.green.shade800,
       Colors.blue,
+      Colors.orange,
+      Colors.pink,
+      Colors.green.shade300,
       Colors.blue.shade300,
       Colors.purple,
       Colors.purple.shade300,
@@ -198,7 +197,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
       Colors.indigo,
       Colors.deepOrange,
       Colors.brown,
-      Colors.red.shade400
+      Colors.green.shade400
     ];
 
     final List<Map<String, dynamic>> pieChartExpenseData = [];
@@ -243,7 +242,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
               onItemTap: (index) {
                 final selectedNode = accountTreeNodes[index];
                 final routeName = selectedNode.children.isNotEmpty
-                    ? 'topIncomeDetail'
+                    ? 'topIncomesDetail'
                     : 'incomeDetail';
                 GoRouter.of(context).pushNamed(
                   routeName,
@@ -345,7 +344,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text('加载支出分类失败: $error'),
+                    child: Text('加载收入分类失败: $error'),
                   ),
                 ),
               ),
