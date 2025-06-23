@@ -15,7 +15,7 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
 
   // Get account by ID
   Future<Account?> getAccountById(int id) =>
-      (select(accounts)..where((a) => a.accountId.equals(id)))
+      (select(accounts)..where((tbl) => tbl.accountId.equals(id)))
           .getSingleOrNull();
 
   // Get accounts by ledger ID
@@ -47,7 +47,7 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
 
   // Get child accounts
   Future<List<Account>> getChildAccounts(int parentId) =>
-      (select(accounts)..where((a) => a.parentAccountId.equals(parentId)))
+      (select(accounts)..where((tbl) => tbl.parentAccountId.equals(parentId)))
           .get();
 
   // Get account balance by account ID from postings table
@@ -120,6 +120,12 @@ class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
     }
 
     return totalLiabilities;
+  }
+
+  /// 根据ID列表获取账户
+  Future<List<Account>> getAccountsByIds(List<int> ids) {
+    if (ids.isEmpty) return Future.value([]);
+    return (select(accounts)..where((tbl) => tbl.accountId.isIn(ids))).get();
   }
 }
 

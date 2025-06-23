@@ -450,75 +450,82 @@ class AccountRepository {
     }
   }
 
-  /// 批量优化的资产历史数据获取方法
+  /// 批量优化的资产历史数据获取方法 (更高效的版本)
   Future<List<AssetHistoryData>> _getBatchOptimizedAssetHistory(
       DateTime start, DateTime end, List<int> accountIds) async {
     try {
       if (accountIds.isEmpty) return [];
 
-      // 使用单次查询预计算所有需要的日期和账户余额
       final accountIdPlaceholders = accountIds.map((_) => '?').join(',');
 
-      // 创建一个包含所有需要日期的临时表，然后计算每个日期每个账户的余额
-      final List<AssetHistoryData> history = [];
+      // 1. 计算起始日期前的总余额
+      final initialBalanceResult = await _accountDao.customSelect(
+        '''
+        SELECT COALESCE(SUM(p.amount), 0) as balance
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN ($accountIdPlaceholders)
+        AND t.transaction_date < ?
+        ''',
+        variables: [
+          ...accountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(start),
+        ],
+      ).getSingle();
 
-      // 为了优化，我们可以减少查询次数：
-      // 1. 获取指定时间范围内每个账户的所有交易
-      // 2. 在内存中计算每日余额
+      double currentBalance =
+          initialBalanceResult.read<double?>('balance') ?? 0.0;
 
-      final Map<int, double> currentBalances = {};
-      for (final accountId in accountIds) {
-        currentBalances[accountId] = 0.0;
+      // 2. 获取时间范围内的每日资产变动
+      final dailyChangesResult = await _accountDao.customSelect(
+        '''
+        SELECT 
+            t.transaction_date,
+            SUM(p.amount) as daily_change
+        FROM postings p
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE p.account_id IN ($accountIdPlaceholders)
+        AND t.transaction_date BETWEEN ? AND ?
+        GROUP BY t.transaction_date
+        ORDER BY t.transaction_date
+        ''',
+        variables: [
+          ...accountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).get();
+
+      final dailyChanges = <DateTime, double>{};
+      for (final row in dailyChangesResult) {
+        final date = row.read<DateTime>('transaction_date');
+        // 将日期标准化为午夜，以避免时间部分引起的问题
+        final day = DateTime(date.year, date.month, date.day);
+        final change = row.read<double>('daily_change');
+        dailyChanges[day] = change;
       }
 
-      // 按日期迭代，但只查询每个账户到该日期为止的总余额
-      // 这仍然不是最优的，让我们改用批量查询方式
-
+      // 3. 在内存中计算每一天的资产总额
+      final List<AssetHistoryData> history = [];
       for (DateTime currentDate = start;
           currentDate.isBefore(end.add(const Duration(days: 1)));
           currentDate = currentDate.add(const Duration(days: 1))) {
-        // 批量查询所有账户在当前日期的余额
-        final balanceResults = await _accountDao.customSelect(
-          '''
-          SELECT 
-            p.account_id,
-            COALESCE(SUM(p.amount), 0) as balance
-          FROM postings p
-          JOIN transactions t ON p.transaction_id = t.transaction_id
-          WHERE p.account_id IN ($accountIdPlaceholders)
-            AND t.transaction_date <= ?
-          GROUP BY p.account_id
-          ''',
-          variables: [
-            ...accountIds.map((id) => Variable.withInt(id)),
-            Variable.withDateTime(currentDate),
-          ],
-        ).get();
+        final day =
+            DateTime(currentDate.year, currentDate.month, currentDate.day);
+        currentBalance += dailyChanges[day] ?? 0.0;
 
-        // 计算当前日期的总资产
-        double dailyTotal = 0.0;
-        final balanceMap = <int, double>{};
-
-        for (final row in balanceResults) {
-          final accountId = row.read<int>('account_id');
-          final balance = row.read<double>('balance');
-          balanceMap[accountId] = balance;
-        }
-
-        // 确保所有账户都有余额值（没有交易的账户余额为0）
-        for (final accountId in accountIds) {
-          dailyTotal += balanceMap[accountId] ?? 0.0;
-        }
-
-        history
-            .add(AssetHistoryData(date: currentDate, totalAssets: dailyTotal));
+        history.add(AssetHistoryData(date: day, totalAssets: currentBalance));
       }
 
       return history;
     } catch (e, s) {
       print('[AccountRepository] Error in _getBatchOptimizedAssetHistory: $e');
       print('[AccountRepository] Stacktrace: $s');
-      rethrow;
+      // 发生错误时，回退到老方法以保证功能可用性
+      print(
+          '[AccountRepository] Falling back to original method due to error...');
+      return await _getFallbackAssetHistory(
+          start, end, await _accountDao.getAccountsByIds(accountIds));
     }
   }
 
@@ -1016,34 +1023,99 @@ class AccountRepository {
     });
   }
 
-  /// 获取总负债（考虑特定账本）（Stream版本）
-  Stream<double> watchTotalLiabilitiesByLedger(int ledgerId) {
-    // 监听指定账本的所有交易变化
-    return _transactionDao
-        .watchAllTransactions(ledgerId: ledgerId)
-        .asyncMap((transactions) async {
-      try {
-        // 获取所有与该账本相关的负债账户
-        final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-        final liabilityAccountsList = allAccounts
-            .where((account) => account.accountType == AccountType.LIABILITY)
-            .toList();
+  /// 获取指定时间段内的支出总额 (Future version)
+  Future<double> getExpenseInPeriod(
+      int ledgerId, DateTime start, DateTime end) async {
+    try {
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final expenseAccountIds = allAccounts
+          .where((account) => account.accountType == AccountType.EXPENSE)
+          .map((acc) => acc.accountId)
+          .toList();
 
-        if (liabilityAccountsList.isEmpty) return 0.0;
-
-        double totalLiabilities = 0.0;
-        for (final account in liabilityAccountsList) {
-          final balance =
-              await _accountDao.getAccountBalance(account.accountId);
-          totalLiabilities += balance;
-        }
-
-        return totalLiabilities;
-      } catch (e) {
-        print('[AccountRepository] Error in watchTotalLiabilitiesByLedger: $e');
+      if (expenseAccountIds.isEmpty) {
         return 0.0;
       }
-    });
+
+      final result = await _accountDao.customSelect(
+        '''
+          SELECT SUM(p.amount) as total
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id IN (${expenseAccountIds.map((_) => '?').join(',')})
+          AND t.transaction_date BETWEEN ? AND ?
+          ''',
+        variables: [
+          ...expenseAccountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).getSingle();
+
+      return result.read<double?>('total') ?? 0.0;
+    } catch (e) {
+      print('[AccountRepository] Error in getExpenseInPeriod: $e');
+      return 0.0;
+    }
+  }
+
+  /// 获取指定时间段内的收入总额 (Future version)
+  Future<double> getIncomeInPeriod(
+      int ledgerId, DateTime start, DateTime end) async {
+    try {
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final incomeAccountIds = allAccounts
+          .where((account) => account.accountType == AccountType.INCOME)
+          .map((acc) => acc.accountId)
+          .toList();
+
+      if (incomeAccountIds.isEmpty) {
+        return 0.0;
+      }
+
+      final result = await _accountDao.customSelect(
+        '''
+          SELECT SUM(p.amount) as total
+          FROM postings p
+          JOIN transactions t ON p.transaction_id = t.transaction_id
+          WHERE p.account_id IN (${incomeAccountIds.map((_) => '?').join(',')})
+          AND t.transaction_date BETWEEN ? AND ?
+          ''',
+        variables: [
+          ...incomeAccountIds.map((id) => Variable.withInt(id)),
+          Variable.withDateTime(start),
+          Variable.withDateTime(end),
+        ],
+      ).getSingle();
+
+      return -(result.read<double?>('total') ?? 0.0);
+    } catch (e) {
+      print('[AccountRepository] Error in getIncomeInPeriod: $e');
+      return 0.0;
+    }
+  }
+
+  /// 获取总负债（考虑特定账本）(Future version)
+  Future<double> getTotalLiabilitiesByLedger(int ledgerId) async {
+    try {
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final liabilityAccountsList = allAccounts
+          .where((account) => account.accountType == AccountType.LIABILITY)
+          .toList();
+
+      if (liabilityAccountsList.isEmpty) return 0.0;
+
+      double totalLiabilities = 0.0;
+      for (final account in liabilityAccountsList) {
+        final balance = await _accountDao.getAccountBalance(account.accountId);
+        totalLiabilities += balance;
+      }
+
+      return totalLiabilities;
+    } catch (e) {
+      print('[AccountRepository] Error in getTotalLiabilitiesByLedger: $e');
+      return 0.0;
+    }
   }
 
   /// 获取顶级资产账户（考虑特定账本）（Stream版本）- 优化版本
@@ -1198,157 +1270,11 @@ class AccountRepository {
     }
   }
 
-  /// 获取指定时间段内的支出总额
-  Future<double> getExpenseInPeriod(
-      int ledgerId, DateTime start, DateTime end) async {
-    try {
-      // 获取所有与该账本相关的费用账户
-      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final expenseAccountIds = allAccounts
-          .where((account) => account.accountType == AccountType.EXPENSE)
-          .map((acc) => acc.accountId)
-          .toList();
-
-      if (expenseAccountIds.isEmpty) {
-        return 0.0;
-      }
-
-      // 计算费用账户在此期间的总金额。
-      // 在复式记账中，费用账户的增加通常记录为借方（正值）。
-      final result = await _accountDao.customSelect(
-        '''
-        SELECT SUM(p.amount) as total
-        FROM postings p
-        JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id IN (${expenseAccountIds.map((_) => '?').join(',')})
-        AND t.transaction_date BETWEEN ? AND ?
-        ''',
-        variables: [
-          ...expenseAccountIds.map((id) => Variable.withInt(id)),
-          Variable.withDateTime(start),
-          Variable.withDateTime(end),
-        ],
-      ).getSingle();
-
-      return result.read<double?>('total') ?? 0.0;
-    } catch (e) {
-      print('[AccountRepository] Error in getExpenseInPeriod: $e');
-      return 0.0;
-    }
-  }
-
-  /// 获取指定时间段内的收入总额
-  Future<double> getIncomeInPeriod(
-      int ledgerId, DateTime start, DateTime end) async {
-    try {
-      // 获取所有与该账本相关的收入账户
-      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final incomeAccountIds = allAccounts
-          .where((account) => account.accountType == AccountType.INCOME)
-          .map((acc) => acc.accountId)
-          .toList();
-
-      if (incomeAccountIds.isEmpty) {
-        return 0.0;
-      }
-
-      // 计算收入账户在此期间的总金额。
-      // 在复式记账中，收入账户的增加通常记录为贷方（负值）。
-      // 因此，我们需要对总和取反以得到正数的收入值。
-      final result = await _accountDao.customSelect(
-        '''
-        SELECT SUM(p.amount) as total
-        FROM postings p
-        JOIN transactions t ON p.transaction_id = t.transaction_id
-        WHERE p.account_id IN (${incomeAccountIds.map((_) => '?').join(',')})
-        AND t.transaction_date BETWEEN ? AND ?
-        ''',
-        variables: [
-          ...incomeAccountIds.map((id) => Variable.withInt(id)),
-          Variable.withDateTime(start),
-          Variable.withDateTime(end),
-        ],
-      ).getSingle();
-
-      // 收入是贷方，金额为负，所以取反
-      return -(result.read<double?>('total') ?? 0.0);
-    } catch (e) {
-      print('[AccountRepository] Error in getIncomeInPeriod: $e');
-      return 0.0;
-    }
-  }
-
-  /// 获取总负债（原始版本，不需要ledgerId）
-  Future<double> getTotalLiabilities() {
-    return _accountDao.getTotalLiabilities();
-  }
-
-  /// 获取总负债（考虑特定账本）
-  Future<double> getTotalLiabilitiesByLedger(int ledgerId) async {
-    try {
-      // 获取所有与该账本相关的负债账户
-      final liabilityAccounts =
-          await _accountDao.getAccountsByLedgerId(ledgerId);
-      final liabilityAccountsList = liabilityAccounts
-          .where((account) => account.accountType == AccountType.LIABILITY)
-          .toList();
-
-      if (liabilityAccountsList.isEmpty) return 0.0;
-
-      double totalLiabilities = 0.0;
-      for (final account in liabilityAccountsList) {
-        final balance = await _accountDao.getAccountBalance(account.accountId);
-        totalLiabilities += balance;
-      }
-
-      return totalLiabilities;
-    } catch (e) {
-      return 0.0;
-    }
-  }
-
   /// 获取顶级资产账户（考虑特定账本）
   Future<List<AccountWithBalance>> getTopAssetAccountsByLedger(
       {int? limit, required int ledgerId}) async {
-    try {
-      // 获取所有与该账本相关的活跃资产账户
-      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      final assetAccounts = allAccounts
-          .where((account) =>
-              account.accountType == AccountType.ASSET && account.isActive)
-          .toList();
-
-      if (assetAccounts.isEmpty) {
-        print(
-            '[AccountRepository] getTopAssetAccountsByLedger: No active asset accounts found in ledger $ledgerId.');
-        return [];
-      }
-
-      // 计算每个资产账户的余额 (不再只计算叶子节点)
-      final List<AccountWithBalance> accountsWithBalance = [];
-      for (final account in assetAccounts) {
-        // _accountDao.getAccountBalance 应该能正确计算单个账户的总余额（包含其所有记账）
-        final balance = await _accountDao.getAccountBalance(account.accountId);
-        accountsWithBalance.add(
-          AccountWithBalance(
-            account: account,
-            balance: balance,
-          ),
-        );
-      }
-
-      // 按余额降序排序
-      accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
-
-      // 如果指定了limit，则返回前limit个
-      return limit != null
-          ? accountsWithBalance.take(limit).toList()
-          : accountsWithBalance;
-    } catch (e, s) {
-      print('[AccountRepository] Error in getTopAssetAccountsByLedger: $e');
-      print('[AccountRepository] Stacktrace: $s');
-      return [];
-    }
+    return _getTopAssetAccountsByLedgerOptimized(
+        limit: limit, ledgerId: ledgerId);
   }
 
   // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
@@ -1562,6 +1488,9 @@ class AccountRepository {
   /// 将数据库中的账户转换为UI组件所需的格式
   Future<List<account_ui.Account>> getAssetsAccountTree({int? ledgerId}) async {
     try {
+      if (ledgerId == null) {
+        return [];
+      }
       // 获取账户树，先构建完整的层级关系
       final accountTree = await getAccountTree(ledgerId: ledgerId);
 
@@ -1571,9 +1500,11 @@ class AccountRepository {
           .toList();
 
       // 递归转换为UI需要的Account格式
-      final result = await _convertAccountsToUIFormat(assetAccounts);
+      final result =
+          await _convertAccountsToUIFormatOptimized(assetAccounts, ledgerId);
       return result;
     } catch (e) {
+      print('[AccountRepository] Error in getAssetsAccountTree: $e');
       return []; // 发生错误时返回空列表
     }
   }
