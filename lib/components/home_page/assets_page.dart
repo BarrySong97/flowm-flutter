@@ -32,10 +32,6 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
     return asyncAssetsPageData.when(
       data: (data) {
-        if (data.accounts.isEmpty) {
-          return const Center(child: Text('暂无资产数据'));
-        }
-
         final totalAssets =
             data.accounts.fold(0.0, (sum, account) => sum + account.amount);
 
@@ -149,11 +145,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               ),
             ),
           ),
-          if (assetTrend.isEmpty)
-            const SizedBox(
-                height: 140, child: Center(child: Text('暂无该时间段资产趋势数据')))
-          else
-            AssetTrendChart(assetData: assetTrend),
+          AssetTrendChart(assetData: assetTrend),
         ],
       ),
     );
@@ -200,7 +192,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         .where((account) => account.amount > 0)
         .fold(0.0, (sum, account) => sum + account.amount);
 
-    final treeMapData =
+    var treeMapData =
         displayedAccounts.where((account) => account.amount > 0).map((account) {
       double? percentage;
       if (totalValueAtThisLevel > 0) {
@@ -215,7 +207,16 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
     }).toList();
 
     if (treeMapData.isEmpty) {
-      return Center(child: Text(isDrilledDown ? '此分类下无子账户数据' : '暂无可显示的资产数据'));
+      if (isDrilledDown) {
+        return const Center(child: Text('此分类下无子账户数据'));
+      } else {
+        treeMapData = [
+          TreemapData(name: '资产示例 1', value: 40, canDrillDown: false),
+          TreemapData(name: '资产示例 2', value: 30, canDrillDown: false),
+          TreemapData(name: '资产示例 3', value: 20, canDrillDown: false),
+          TreemapData(name: '资产示例 4', value: 10, canDrillDown: false),
+        ];
+      }
     }
 
     return Column(

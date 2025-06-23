@@ -236,10 +236,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8.0),
+                  borderRadius: BorderRadius.circular(6.0),
                 ),
+                margin: const EdgeInsets.only(top: 16),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0),
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16),
                 child: const Center(
                   child: Text('暂无交易记录'),
                 ),
