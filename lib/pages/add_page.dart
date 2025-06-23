@@ -559,7 +559,8 @@ class _AddPageState extends ConsumerState<AddPage>
           children: [
             // 金额显示区域
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              padding: const EdgeInsets.only(
+                  top: 0, left: 16, right: 16, bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -567,14 +568,6 @@ class _AddPageState extends ConsumerState<AddPage>
                     spacing: 8,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // 显示运算表达式（如果有的话）
-                      const Text(
-                        '金额',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
                       if (_currentExpression.isNotEmpty) ...[
                         Text(
                           _currentExpression,

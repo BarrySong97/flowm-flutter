@@ -120,7 +120,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     if (state.transactions.isEmpty && !state.isLoading) {
       return Center(
         child: Text(
-          'No transactions yet.',
+          '暂无流水数据',
           style: TextStyle(fontSize: 16, color: Colors.grey[600]),
         ),
       );
