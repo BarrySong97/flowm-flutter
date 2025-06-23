@@ -30,10 +30,6 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
 
     return uiLiabilitiesAsync.when(
       data: (allAccounts) {
-        if (allAccounts.isEmpty) {
-          return const Center(child: Text('暂无负债数据'));
-        }
-
         List<dynamic> displayedAccounts;
         bool isDrilledDown = _drilledDownAccountName != null;
 
@@ -173,10 +169,6 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                 ref.watch(liabilityTrendProviderByDateRange(null));
             return liabilityTrendAsync.when(
               data: (liabilityData) {
-                if (liabilityData.isEmpty) {
-                  return const SizedBox(
-                      height: 140, child: Center(child: Text('暂无该时间段负债趋势数据')));
-                }
                 return LiabilityTrendChart(liabilityData: liabilityData);
               },
               loading: () => const SizedBox(
@@ -232,7 +224,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
         .where((account) => account.amount > 0)
         .fold(0.0, (sum, account) => sum + account.amount);
 
-    final treeMapData =
+    var treeMapData =
         displayedAccounts.where((account) => account.amount > 0).map((account) {
       double? percentage;
       if (totalValueAtThisLevel > 0) {
@@ -247,7 +239,16 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
     }).toList();
 
     if (treeMapData.isEmpty) {
-      return Center(child: Text(isDrilledDown ? '此分类下无子账户数据' : '暂无可显示的负债数据'));
+      if (isDrilledDown) {
+        return const Center(child: Text('此分类下无子账户数据'));
+      } else {
+        treeMapData = [
+          LiabilityTreemapData(name: '负债示例 1', value: 40, canDrillDown: false),
+          LiabilityTreemapData(name: '负债示例 2', value: 30, canDrillDown: false),
+          LiabilityTreemapData(name: '负债示例 3', value: 20, canDrillDown: false),
+          LiabilityTreemapData(name: '负债示例 4', value: 10, canDrillDown: false),
+        ];
+      }
     }
 
     return Column(
