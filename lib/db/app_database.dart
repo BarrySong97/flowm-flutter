@@ -84,6 +84,12 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_postings_positive_amount ON postings(amount, account_id) WHERE amount > 0');
 
+          // 新增：为收入查询优化的复合索引
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_postings_income_optimized ON postings(account_id, amount, transaction_id) WHERE amount < 0');
+          await customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_transactions_postings_join ON transactions(transaction_id, transaction_date)');
+
           // 新增：为收入账户查询优化的复合索引
           await customStatement(
               'CREATE INDEX IF NOT EXISTS idx_accounts_income_ledger ON accounts(account_type, ledger_id) WHERE account_type = \'INCOME\'');
@@ -132,6 +138,12 @@ class AppDatabase extends _$AppDatabase {
                 'CREATE INDEX IF NOT EXISTS idx_postings_negative_amount ON postings(amount, account_id) WHERE amount < 0');
             await customStatement(
                 'CREATE INDEX IF NOT EXISTS idx_postings_positive_amount ON postings(amount, account_id) WHERE amount > 0');
+
+            // 新增：为收入查询优化的复合索引
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_postings_income_optimized ON postings(account_id, amount, transaction_id) WHERE amount < 0');
+            await customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_transactions_postings_join ON transactions(transaction_id, transaction_date)');
 
             // 新增：为收入账户查询优化的复合索引
             await customStatement(
