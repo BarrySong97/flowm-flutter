@@ -94,59 +94,80 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
       ),
     );
 
-    return AlertDialog(
-      title: Text(_isEditMode ? '编辑账本' : '创建新账本'),
+    return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: inputDecoration.copyWith(
-              labelText: '账本名称',
+      child: Container(
+        width: 320,
+        constraints: const BoxConstraints(maxHeight: 500),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _isEditMode ? '编辑账本' : '创建新账本',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
-            autofocus: true,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _descriptionController,
-            decoration: inputDecoration.copyWith(
-              labelText: '描述 (可选)',
+            const SizedBox(height: 24),
+            TextField(
+              controller: _nameController,
+              decoration: inputDecoration.copyWith(
+                labelText: '账本名称',
+              ),
+              autofocus: true,
             ),
-            maxLines: 2,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _currencySymbolController,
-            decoration: inputDecoration.copyWith(
-              labelText: '货币符号',
-              hintText: '¥',
-              counterText: '',
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descriptionController,
+              decoration: inputDecoration.copyWith(
+                labelText: '描述 (可选)',
+              ),
+              maxLines: 2,
             ),
-            maxLength: 1,
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _currencySymbolController,
+              decoration: inputDecoration.copyWith(
+                labelText: '货币符号',
+                hintText: '¥',
+              ),
+              maxLength: 1,
+              buildCounter: (context,
+                      {required currentLength,
+                      required isFocused,
+                      maxLength}) =>
+                  null,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (_isEditMode)
+                  TextButton(
+                    onPressed: _showDeleteConfirmation,
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('删除'),
+                  ),
+                if (_isEditMode) const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _submit,
+                  child: Text(_isEditMode ? '更新' : '创建'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      actions: [
-        if (_isEditMode)
-          TextButton(
-            onPressed: _showDeleteConfirmation,
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('删除'),
-          ),
-        const Spacer(),
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: _submit,
-          child: Text(_isEditMode ? '更新' : '创建'),
-        ),
-      ],
     );
   }
 
