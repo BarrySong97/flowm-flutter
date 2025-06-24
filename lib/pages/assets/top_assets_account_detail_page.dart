@@ -123,25 +123,46 @@ class _TopAssetsAccountDetailPageState
                           ],
                         ),
                       ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          // Use widget.account.amount directly
-                          '¥${widget.account.amount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      // AssetTrendChart()
-                      // Watch the asset trend provider by date range
                       Consumer(builder: (context, ref, child) {
-                        // Watch the new provider with null for now
                         final assetTrendAsync = ref.watch(
                             assetTrendProviderByDateRange(widget.account.id));
-                        return assetTrendAsync.when(
+
+                        final amountWidget = Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: assetTrendAsync.when(
+                            data: (assetData) {
+                              final amount = assetData.isNotEmpty
+                                  ? assetData.last.totalAssets
+                                  : widget.account.amount;
+                              return Text(
+                                '¥${amount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                            loading: () => const Text(
+                              '计算中...',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            error: (e, s) => const Text(
+                              '加载失败',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        );
+
+                        final chartWidget = assetTrendAsync.when(
                           data: (assetData) {
                             if (assetData.isEmpty) {
                               return const SizedBox(
@@ -159,6 +180,15 @@ class _TopAssetsAccountDetailPageState
                           error: (error, stack) => SizedBox(
                               height: 200,
                               child: Center(child: Text('加载趋势图失败: $error'))),
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 12,
+                          children: [
+                            amountWidget,
+                            chartWidget,
+                          ],
                         );
                       }),
                     ],
