@@ -11,6 +11,11 @@ import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/home_page/overview_page_providers.dart';
+import 'package:flowm/state/expense/expense_providers.dart';
+import 'package:flowm/state/icome/income_providers.dart';
+import 'package:flowm/state/home_page/assets_page_providers.dart';
+import 'package:flowm/state/liabilities/liabilities_repository.dart';
 
 class AddPage extends ConsumerStatefulWidget {
   final int? transactionId;
@@ -430,7 +435,6 @@ class _AddPageState extends ConsumerState<AddPage>
   }
 
   void _saveTransaction() async {
-    // TODO: 实现保存逻辑
     if (_fromAccount == null || _toAccount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -493,6 +497,22 @@ class _AddPageState extends ConsumerState<AddPage>
         );
         _clearForm();
         if (mounted) {
+          // revalidate providers
+          ref.invalidate(monthlyOverviewDataProvider);
+          ref.invalidate(topAssetAccountsProvider);
+          ref.invalidate(latestTransactionsProvider);
+          ref.invalidate(totalLiabilitiesProvider);
+          ref.invalidate(expensePageDataProvider);
+          ref.invalidate(incomePageDataProvider);
+          ref.invalidate(assetsPageDataProvider);
+          ref.invalidate(uiLiabilityAccountsProvider);
+          ref.invalidate(topLiabilityAccountsProvider);
+          ref.invalidate(liabilityTrendProviderByDateRange);
+          ref.invalidate(assetsAccountTreeProvider);
+          ref.invalidate(liabilityAccountTreeProvider);
+          ref.invalidate(expenseAccountTreeProvider);
+          ref.invalidate(incomeAccountTreeProvider);
+          ref.invalidate(equityAccountTreeProvider);
           Navigator.of(context).pop();
         }
       } else {
@@ -506,6 +526,23 @@ class _AddPageState extends ConsumerState<AddPage>
               transactionDate: DateTime.parse(_currentDate),
               description: _noteController.text,
             );
+
+        // revalidate providers
+        ref.invalidate(monthlyOverviewDataProvider);
+        ref.invalidate(topAssetAccountsProvider);
+        ref.invalidate(latestTransactionsProvider);
+        ref.invalidate(totalLiabilitiesProvider);
+        ref.invalidate(expensePageDataProvider);
+        ref.invalidate(incomePageDataProvider);
+        ref.invalidate(assetsPageDataProvider);
+        ref.invalidate(uiLiabilityAccountsProvider);
+        ref.invalidate(topLiabilityAccountsProvider);
+        ref.invalidate(liabilityTrendProviderByDateRange);
+        ref.invalidate(assetsAccountTreeProvider);
+        ref.invalidate(liabilityAccountTreeProvider);
+        ref.invalidate(expenseAccountTreeProvider);
+        ref.invalidate(incomeAccountTreeProvider);
+        ref.invalidate(equityAccountTreeProvider);
 
         // 显示成功消息并返回
         ScaffoldMessenger.of(context).showSnackBar(

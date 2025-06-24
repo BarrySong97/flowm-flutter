@@ -28,68 +28,96 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   return AccountRepository(accountDao, transactionDao);
 });
 
-/// 提供资产账户树，改为 Stream 形式
+/// 提供资产账户树，改为 Future 形式
 final assetsAccountTreeProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchAssetsAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getAssetsAccountTree(ledgerId: ledger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
-/// 提供负债账户树，改为 Stream 形式
+/// 根据父账户ID获取资产账户子树
+final assetSubAccountTreeProvider = FutureProvider.family
+    .autoDispose<List<account_ui.Account>, int>((ref, parentId) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    return repository.getAssetsAccountTree(
+        ledgerId: ledger.ledgerId, parentId: parentId);
+  } else {
+    return [];
+  }
+});
+
+/// 根据父账户ID获取负债账户子树
+final liabilitySubAccountTreeProvider = FutureProvider.family
+    .autoDispose<List<account_ui.Account>, int>((ref, parentId) async {
+  final repository = ref.watch(accountRepositoryProvider);
+  final ledger = await ref.watch(selectedLedgerProvider.future);
+
+  if (ledger != null) {
+    return repository.getLiabilityAccountTree(
+        ledgerId: ledger.ledgerId, parentId: parentId);
+  } else {
+    return [];
+  }
+});
+
+/// 提供负债账户树，改为 Future 形式
 final liabilityAccountTreeProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchLiabilityAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getLiabilityAccountTree(ledgerId: ledger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
-/// 提供费用账户树，改为 Stream 形式
+/// 提供费用账户树，改为 Future 形式
 final expenseAccountTreeProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchExpenseAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getExpenseAccountTree(ledgerId: ledger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
-/// 提供收入账户树，改为 Stream 形式
+/// 提供收入账户树，改为 Future 形式
 final incomeAccountTreeProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchIncomeAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getIncomeAccountTree(ledgerId: ledger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
-/// 提供权益账户树，改为 Stream 形式
+/// 提供权益账户树，改为 Future 形式
 final equityAccountTreeProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    yield* repository.watchEquityAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getEquityAccountTree(ledgerId: ledger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
@@ -909,14 +937,18 @@ class AccountRepository {
 
   /// 获取账户树
   ///
+  /// [ledgerId] 账本ID.
+  /// [parentId] 如果提供，则只获取该父账户下的子树.
   /// 返回一个包含所有顶级账户及其子账户的嵌套结构
-  Future<List<AccountWithChildren>> getAccountTree({int? ledgerId}) async {
+  Future<List<AccountWithChildren>> getAccountTree(
+      {int? ledgerId, int? parentId}) async {
     // 获取所有账户
     final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId ?? 0);
 
-    // 找出顶级账户（没有父账户的账户）
+    // 找出顶级账户（父账户ID与`parentId`匹配的账户）
+    // 如果 parentId 为 null, 则查找没有父账户的顶级账户.
     final rootAccounts = allAccounts
-        .where((account) => account.parentAccountId == null)
+        .where((account) => account.parentAccountId == parentId)
         .toList();
 
     // 递归构建账户树
@@ -1486,13 +1518,15 @@ class AccountRepository {
 
   /// 获取UI展示所需的账户树
   /// 将数据库中的账户转换为UI组件所需的格式
-  Future<List<account_ui.Account>> getAssetsAccountTree({int? ledgerId}) async {
+  Future<List<account_ui.Account>> getAssetsAccountTree(
+      {int? ledgerId, int? parentId}) async {
     try {
       if (ledgerId == null) {
         return [];
       }
       // 获取账户树，先构建完整的层级关系
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      final accountTree =
+          await getAccountTree(ledgerId: ledgerId, parentId: parentId);
 
       // 只保留资产类型的账户
       final assetAccounts = accountTree
@@ -1511,13 +1545,18 @@ class AccountRepository {
 
   /// 获取负债账户树
   Future<List<account_ui.Account>> getLiabilityAccountTree(
-      {int? ledgerId}) async {
+      {int? ledgerId, int? parentId}) async {
     try {
-      final accountTree = await getAccountTree(ledgerId: ledgerId);
+      if (ledgerId == null) {
+        return [];
+      }
+      final accountTree =
+          await getAccountTree(ledgerId: ledgerId, parentId: parentId);
       final liabilityAccounts = accountTree
           .where((acc) => acc.account.accountType == AccountType.LIABILITY)
           .toList();
-      return _convertAccountsToUIFormatWithoutBalance(liabilityAccounts);
+      return await _convertAccountsToUIFormatOptimized(
+          liabilityAccounts, ledgerId);
     } catch (e) {
       return [];
     }
@@ -1527,11 +1566,15 @@ class AccountRepository {
   Future<List<account_ui.Account>> getExpenseAccountTree(
       {int? ledgerId}) async {
     try {
+      if (ledgerId == null) {
+        return [];
+      }
       final accountTree = await getAccountTree(ledgerId: ledgerId);
       final expenseAccounts = accountTree
           .where((acc) => acc.account.accountType == AccountType.EXPENSE)
           .toList();
-      return _convertAccountsToUIFormatWithoutBalance(expenseAccounts);
+      return await _convertAccountsToUIFormatOptimized(
+          expenseAccounts, ledgerId);
     } catch (e) {
       return [];
     }
@@ -1540,11 +1583,15 @@ class AccountRepository {
   /// 获取收入账户树
   Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId}) async {
     try {
+      if (ledgerId == null) {
+        return [];
+      }
       final accountTree = await getAccountTree(ledgerId: ledgerId);
       final incomeAccounts = accountTree
           .where((acc) => acc.account.accountType == AccountType.INCOME)
           .toList();
-      return _convertAccountsToUIFormatWithoutBalance(incomeAccounts);
+      return await _convertAccountsToUIFormatOptimized(
+          incomeAccounts, ledgerId);
     } catch (e) {
       return [];
     }
@@ -1553,11 +1600,15 @@ class AccountRepository {
   /// 获取权益账户树
   Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId}) async {
     try {
+      if (ledgerId == null) {
+        return [];
+      }
       final accountTree = await getAccountTree(ledgerId: ledgerId);
       final equityAccounts = accountTree
           .where((acc) => acc.account.accountType == AccountType.EQUITY)
           .toList();
-      return _convertAccountsToUIFormatWithoutBalance(equityAccounts);
+      return await _convertAccountsToUIFormatOptimized(
+          equityAccounts, ledgerId);
     } catch (e) {
       return [];
     }

@@ -1,4 +1,5 @@
 import 'package:flowm/components/common/popover_select.dart';
+import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,31 +52,9 @@ class _TopAssetsAccountDetailPageState
       // PopoverSelectItem(value: 'custom', label: '自定义'),
     ];
 
-    final double totalTopLevelAmount = widget.account.children
-            ?.fold(0.0, (sum, account) => sum! + account.amount.abs()) ??
-        0.0;
-
-    final List<Account> accountsWithPercentage =
-        widget.account.children?.map((account) {
-              double percentage = totalTopLevelAmount == 0
-                  ? 0.0
-                  : (account.amount.abs() / totalTopLevelAmount) * 100;
-              return Account(
-                id: account.id,
-                name: account.name,
-                amount: account.amount,
-                icon: account.icon,
-                type: account.type,
-                children: account
-                    .children, // Children percentages are handled within AccountItem
-                currencySymbol: account.currencySymbol,
-                percentage:
-                    percentage, // Assign calculated top-level percentage
-              );
-            }).toList() ??
-            [];
-
     final selectedDateRange = ref.watch(selectedDateRangeProvider);
+    final subAccountsAsync =
+        ref.watch(assetSubAccountTreeProvider(widget.account.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -185,235 +164,308 @@ class _TopAssetsAccountDetailPageState
                     ],
                   ),
                 ),
-
-                // 资产分布标题
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '资产分布',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // 资产分布图表
-                Container(
-                  height: _drilledDownAccountName == null
-                      ? 240
-                      : 280, // Adjust height if back button is shown
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
+                subAccountsAsync.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 64.0),
+                    child: Center(child: CircularProgressIndicator()),
                   ),
-                  clipBehavior: Clip.hardEdge,
-                  child: Builder(
-                    // Using Builder to create a new context for modifications
-                    builder: (context) {
-                      final List<Account> treemapBaseData =
-                          widget.account.children ?? [];
+                  error: (err, stack) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 64.0),
+                    child: Center(child: Text('加载子账户失败: $err')),
+                  ),
+                  data: (subAccounts) {
+                    if (subAccounts.isEmpty) {
+                      return Container(
+                          margin: const EdgeInsets.only(top: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 48),
+                          child: Center(
+                              child: Text('${widget.account.name} 无下级账户')));
+                    }
+                    final double totalTopLevelAmount = subAccounts.fold(
+                        0.0, (sum, account) => sum + account.amount.abs());
 
-                      if (treemapBaseData.isEmpty) {
-                        return Center(
-                            child: Text('${widget.account.name} 无下级账户可供分布展示'));
-                      }
+                    final List<Account> accountsWithPercentage =
+                        subAccounts.map((account) {
+                      double percentage = totalTopLevelAmount == 0
+                          ? 0.0
+                          : (account.amount.abs() / totalTopLevelAmount) * 100;
+                      return Account(
+                        id: account.id,
+                        name: account.name,
+                        amount: account.amount,
+                        icon: account.icon,
+                        type: account.type,
+                        children: account.children,
+                        currencySymbol: account.currencySymbol,
+                        percentage: percentage,
+                      );
+                    }).toList();
 
-                      List<Account> displayedAccounts;
-                      String currentTreemapTitle;
-                      bool isDrilledDown = _drilledDownAccountName != null;
+                    return Column(
+                      spacing: 12,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 资产分布标题
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: const [
+                            Text(
+                              '资产分布',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
 
-                      if (!isDrilledDown) {
-                        displayedAccounts = treemapBaseData;
-                        currentTreemapTitle = '${widget.account.name} - 资产构成';
-                      } else {
-                        final parentAccount = treemapBaseData.firstWhereOrNull(
-                            (acc) => acc.name == _drilledDownAccountName);
+                        // 资产分布图表
+                        Container(
+                          height: _drilledDownAccountName == null
+                              ? 240
+                              : 280, // Adjust height if back button is shown
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          clipBehavior: Clip.hardEdge,
+                          child: Builder(
+                            // Using Builder to create a new context for modifications
+                            builder: (context) {
+                              final List<Account> treemapBaseData = subAccounts;
 
-                        if (parentAccount != null &&
-                            parentAccount.children != null &&
-                            parentAccount.children!.isNotEmpty) {
-                          displayedAccounts = parentAccount.children!;
-                          currentTreemapTitle =
-                              '$_drilledDownAccountName - 资产构成';
-                        } else {
-                          // Fallback: If parent not found or has no children, show base level and reset drill-down
-                          displayedAccounts = treemapBaseData;
-                          currentTreemapTitle = '${widget.account.name} - 资产构成';
-                          _drilledDownAccountName = null;
-                          isDrilledDown = false;
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) {
-                              setState(() {
-                                _drilledDownAccountName = null;
-                              });
-                            }
-                          });
-                        }
-                      }
+                              if (treemapBaseData.isEmpty) {
+                                return Center(
+                                    child: Text(
+                                        '${widget.account.name} 无下级账户可供分布展示'));
+                              }
 
-                      final double totalValueAtThisLevel = displayedAccounts
-                          .where((account) => account.amount > 0)
-                          .fold(0.0, (sum, account) => sum + account.amount);
+                              List<Account> displayedAccounts;
+                              String currentTreemapTitle;
+                              bool isDrilledDown =
+                                  _drilledDownAccountName != null;
 
-                      final treeMapData = displayedAccounts
-                          .where((account) => account.amount > 0)
-                          .map((account) {
-                        double? percentage;
-                        if (totalValueAtThisLevel > 0) {
-                          percentage =
-                              (account.amount / totalValueAtThisLevel) * 100;
-                        }
-                        return TreemapData(
-                          name: account.name,
-                          value: account.amount,
-                          canDrillDown: account.children != null &&
-                              account.children!.isNotEmpty,
-                          percentageOfLevel: percentage,
-                        );
-                      }).toList();
+                              if (!isDrilledDown) {
+                                displayedAccounts = treemapBaseData;
+                                currentTreemapTitle =
+                                    '${widget.account.name} - 资产构成';
+                              } else {
+                                final parentAccount =
+                                    treemapBaseData.firstWhereOrNull((acc) =>
+                                        acc.name == _drilledDownAccountName);
 
-                      if (treeMapData.isEmpty) {
-                        return Center(
-                            child: Text(isDrilledDown
-                                ? '此分类下无子账户数据'
-                                : '${widget.account.name} 无可显示的下级资产数据'));
-                      }
-
-                      return Column(
-                        // Wrap Treemap with a Column to add a back button
-                        children: [
-                          if (isDrilledDown)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  top: 8.0, left: 8.0, right: 8.0),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  TextButton.icon(
-                                    icon: Icon(Icons.arrow_back_ios, size: 16),
-                                    label: Text(
-                                        '返回 ${widget.account.name}'), // Clarify back destination
-                                    onPressed: () {
+                                if (parentAccount != null &&
+                                    parentAccount.children != null &&
+                                    parentAccount.children!.isNotEmpty) {
+                                  displayedAccounts = parentAccount.children!;
+                                  currentTreemapTitle =
+                                      '$_drilledDownAccountName - 资产构成';
+                                } else {
+                                  // Fallback: If parent not found or has no children, show base level and reset drill-down
+                                  displayedAccounts = treemapBaseData;
+                                  currentTreemapTitle =
+                                      '${widget.account.name} - 资产构成';
+                                  _drilledDownAccountName = null;
+                                  isDrilledDown = false;
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (mounted) {
                                       setState(() {
                                         _drilledDownAccountName = null;
                                       });
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor:
-                                          Theme.of(context).primaryColor,
+                                    }
+                                  });
+                                }
+                              }
+
+                              final double totalValueAtThisLevel =
+                                  displayedAccounts
+                                      .where((account) => account.amount > 0)
+                                      .fold(
+                                          0.0,
+                                          (sum, account) =>
+                                              sum + account.amount);
+
+                              final treeMapData = displayedAccounts
+                                  .where((account) => account.amount > 0)
+                                  .map((account) {
+                                double? percentage;
+                                if (totalValueAtThisLevel > 0) {
+                                  percentage =
+                                      (account.amount / totalValueAtThisLevel) *
+                                          100;
+                                }
+                                return TreemapData(
+                                  name: account.name,
+                                  value: account.amount,
+                                  canDrillDown: account.children != null &&
+                                      account.children!.isNotEmpty,
+                                  percentageOfLevel: percentage,
+                                );
+                              }).toList();
+
+                              if (treeMapData.isEmpty) {
+                                return Center(
+                                    child: Text(isDrilledDown
+                                        ? '此分类下无子账户数据'
+                                        : '${widget.account.name} 无可显示的下级资产数据'));
+                              }
+
+                              return Column(
+                                // Wrap Treemap with a Column to add a back button
+                                children: [
+                                  if (isDrilledDown)
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 8.0, left: 8.0, right: 8.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          TextButton.icon(
+                                            icon: const Icon(
+                                                Icons.arrow_back_ios,
+                                                size: 16),
+                                            label: Text(
+                                                '返回 ${widget.account.name}'), // Clarify back destination
+                                            onPressed: () {
+                                              setState(() {
+                                                _drilledDownAccountName = null;
+                                              });
+                                            },
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: Theme.of(context)
+                                                  .primaryColor,
+                                            ),
+                                          ),
+                                          // Spacer(),
+                                          // Text(currentTreemapTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: AnimatedSwitcher(
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                      transitionBuilder: (Widget child,
+                                          Animation<double> animation) {
+                                        return FadeTransition(
+                                            opacity: animation, child: child);
+                                      },
+                                      child: TreemapWidget(
+                                        key: ValueKey(_drilledDownAccountName ??
+                                            widget.account.name), // Simpler key
+                                        title: currentTreemapTitle,
+                                        dataItems: treeMapData,
+                                        tooltipValueSuffix: ' ¥',
+                                        drilledDownAccountName:
+                                            _drilledDownAccountName,
+                                        onDrillDownSelected: (accountName) {
+                                          final selectedAccount =
+                                              displayedAccounts
+                                                  .firstWhereOrNull((acc) =>
+                                                      acc.name == accountName);
+
+                                          if (selectedAccount != null &&
+                                              selectedAccount.children !=
+                                                  null &&
+                                              selectedAccount
+                                                  .children!.isNotEmpty) {
+                                            setState(() {
+                                              _drilledDownAccountName =
+                                                  accountName;
+                                            });
+                                          } else {
+                                            print(
+                                                'Cannot drill down: $accountName has no children or was not found in the current view.');
+                                          }
+                                        },
+                                        onDoubleClick: (accountName) {
+                                          final selectedAccountToNavigate =
+                                              displayedAccounts
+                                                  .firstWhereOrNull((acc) =>
+                                                      acc.name == accountName);
+                                          if (selectedAccountToNavigate !=
+                                              null) {
+                                            print(
+                                                '双击 $accountName, 准备导航到详情页 for account: ${selectedAccountToNavigate.name}');
+                                            bool hasChildren =
+                                                selectedAccountToNavigate
+                                                            .children !=
+                                                        null &&
+                                                    selectedAccountToNavigate
+                                                        .children!.isNotEmpty;
+                                            if (hasChildren) {
+                                              GoRouter.of(context).pushNamed(
+                                                  'topAssetsAccountDetail',
+                                                  extra: {
+                                                    'account':
+                                                        selectedAccountToNavigate
+                                                  });
+                                            } else {
+                                              GoRouter.of(context).pushNamed(
+                                                  'assetsDetail', // Navigate to accountDetail if no children
+                                                  extra: {
+                                                    'account':
+                                                        selectedAccountToNavigate
+                                                  });
+                                            }
+                                          } else {}
+                                        },
+                                      ),
                                     ),
                                   ),
-                                  // Spacer(),
-                                  // Text(currentTreemapTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                 ],
-                              ),
-                            ),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              transitionBuilder:
-                                  (Widget child, Animation<double> animation) {
-                                return FadeTransition(
-                                    opacity: animation, child: child);
-                              },
-                              child: TreemapWidget(
-                                key: ValueKey(_drilledDownAccountName ??
-                                    widget.account.name), // Simpler key
-                                title: currentTreemapTitle,
-                                dataItems: treeMapData,
-                                tooltipValueSuffix: ' ¥',
-                                drilledDownAccountName: _drilledDownAccountName,
-                                onDrillDownSelected: (accountName) {
-                                  final selectedAccount =
-                                      displayedAccounts.firstWhereOrNull(
-                                          (acc) => acc.name == accountName);
-
-                                  if (selectedAccount != null &&
-                                      selectedAccount.children != null &&
-                                      selectedAccount.children!.isNotEmpty) {
-                                    setState(() {
-                                      _drilledDownAccountName = accountName;
-                                    });
+                              );
+                            },
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: accountsWithPercentage
+                                .length, // Use the new list
+                            itemBuilder: (context, index) {
+                              return AccountRow(
+                                account: accountsWithPercentage[index],
+                                percentage:
+                                    accountsWithPercentage[index].percentage,
+                                showCurrencySymbolInAmount:
+                                    false, // Pass account with percentage
+                                onTap: (account) {
+                                  // 实现和treemap相同的导航逻辑
+                                  bool hasChildren = account.children != null &&
+                                      account.children!.isNotEmpty;
+                                  if (hasChildren) {
+                                    GoRouter.of(context).pushNamed(
+                                        'topAssetsAccountDetail',
+                                        extra: {'account': account});
                                   } else {
-                                    print(
-                                        'Cannot drill down: $accountName has no children or was not found in the current view.');
+                                    GoRouter.of(context).pushNamed(
+                                        'assetsDetail', // Navigate to assetsDetail if no children
+                                        extra: {'account': account});
                                   }
                                 },
-                                onDoubleClick: (accountName) {
-                                  final selectedAccountToNavigate =
-                                      displayedAccounts.firstWhereOrNull(
-                                          (acc) => acc.name == accountName);
-                                  if (selectedAccountToNavigate != null) {
-                                    print(
-                                        '双击 $accountName, 准备导航到详情页 for account: ${selectedAccountToNavigate.name}');
-                                    bool hasChildren =
-                                        selectedAccountToNavigate.children !=
-                                                null &&
-                                            selectedAccountToNavigate
-                                                .children!.isNotEmpty;
-                                    if (hasChildren) {
-                                      GoRouter.of(context).pushNamed(
-                                          'topAssetsAccountDetail',
-                                          extra: {
-                                            'account': selectedAccountToNavigate
-                                          });
-                                    } else {
-                                      GoRouter.of(context).pushNamed(
-                                          'assetsDetail', // Navigate to accountDetail if no children
-                                          extra: {
-                                            'account': selectedAccountToNavigate
-                                          });
-                                    }
-                                  } else {}
-                                },
-                              ),
-                            ),
+                              );
+                            },
                           ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount:
-                        accountsWithPercentage.length, // Use the new list
-                    itemBuilder: (context, index) {
-                      return AccountRow(
-                        account: accountsWithPercentage[index],
-                        percentage: accountsWithPercentage[index].percentage,
-                        showCurrencySymbolInAmount:
-                            false, // Pass account with percentage
-                        onTap: (account) {
-                          // 实现和treemap相同的导航逻辑
-                          bool hasChildren = account.children != null &&
-                              account.children!.isNotEmpty;
-                          if (hasChildren) {
-                            GoRouter.of(context).pushNamed(
-                                'topAssetsAccountDetail',
-                                extra: {'account': account});
-                          } else {
-                            GoRouter.of(context).pushNamed(
-                                'assetsDetail', // Navigate to assetsDetail if no children
-                                extra: {'account': account});
-                          }
-                        },
-                      );
-                    },
-                  ),
+                        )
+                      ],
+                    );
+                  },
                 )
               ],
             ),

@@ -43,41 +43,39 @@ final topLiabilityAccountsProvider =
 
 /// 提供UI负债账户列表，与AccountItem组件兼容
 final uiLiabilityAccountsProvider =
-    StreamProvider<List<account_ui.Account>>((ref) async* {
+    FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   if (selectedLedger != null) {
-    yield* repository.watchLiabilityAccountTree(
+    return repository.getLiabilityAccountTree(
         ledgerId: selectedLedger.ledgerId);
   } else {
-    yield [];
+    return [];
   }
 });
 
 /// 年度负债趋势数据提供者，用于绘制负债变化曲线图
 final yearlyLiabilityTrendProvider =
-    StreamProvider<List<LiabilityHistoryData>>((ref) async* {
+    FutureProvider<List<LiabilityHistoryData>>((ref) async {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    yield [];
-    return;
+    return [];
   }
 
-  yield* repository.watchYearlyLiabilityHistory(
+  return repository.getYearlyLiabilityHistory(
       ledgerId: selectedLedger.ledgerId);
 });
 
-final liabilityTrendProviderByTimeRange = StreamProvider.family<
+final liabilityTrendProviderByTimeRange = FutureProvider.family<
     List<LiabilityHistoryData>,
-    ({int? accountId, TimeRange timeRange})>((ref, params) async* {
+    ({int? accountId, TimeRange timeRange})>((ref, params) async {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    yield [];
-    return;
+    return [];
   }
 
   DateTime endDate = DateTime.now();
@@ -106,7 +104,7 @@ final liabilityTrendProviderByTimeRange = StreamProvider.family<
       break;
   }
 
-  yield* repository.watchLiabilityHistoryByTimeRange(
+  return repository.getLiabilityHistoryByTimeRange(
     startDate,
     endDate,
     ledgerId: selectedLedger.ledgerId,
@@ -115,15 +113,14 @@ final liabilityTrendProviderByTimeRange = StreamProvider.family<
 });
 // 基于日期范围的负债趋势提供者
 final liabilityTrendProviderByDateRange =
-    StreamProvider.family<List<LiabilityHistoryData>, int?>(
-        (ref, accountId) async* {
+    FutureProvider.family<List<LiabilityHistoryData>, int?>(
+        (ref, accountId) async {
   final repository = ref.watch(liabilitiesRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
 
   if (selectedLedger == null) {
-    yield [];
-    return;
+    return [];
   }
 
   DateTime endDate = DateTime.now();
@@ -148,7 +145,7 @@ final liabilityTrendProviderByDateRange =
       break;
   }
 
-  yield* repository.watchLiabilityHistoryByTimeRange(
+  return repository.getLiabilityHistoryByTimeRange(
     startDate,
     endDate,
     ledgerId: selectedLedger.ledgerId,
@@ -207,7 +204,7 @@ class LiabilitiesRepository {
   }
 
   /// 获取UI展示所需的负债账户树
-  Future<List<account_ui.Account>> getLiabilitiesAccountTree(
+  Future<List<account_ui.Account>> getLiabilityAccountTree(
       {int? ledgerId}) async {
     try {
       // 获取账户树，先构建完整的层级关系
