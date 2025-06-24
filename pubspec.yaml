@@ -37,8 +37,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
   flutter_riverpod: ^2.6.1
-  socket_io_client: ^2.0.0
+  socket_io_client: ^3.1.2
   drift: ^2.26.1
+  sqlite3: ^2.4.0
   sqlite3_flutter_libs: ^0.5.20
   path_provider: ^2.1.2
   path: ^1.8.3
@@ -57,21 +58,23 @@ dependencies:
   home_widget: ^0.8.0
   app_links: ^6.3.4
   hooks_riverpod: ^2.6.1
-  flutter_hooks: ^0.20.5
+  flutter_hooks: ^0.21.2
   visibility_detector: ^0.4.0+2
   fl_chart: ^1.0.0
+  riverpod_annotation: ^2.3.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   drift_dev: ^2.26.1
   build_runner: ^2.4.8
+  riverpod_generator: ^2.4.1
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
