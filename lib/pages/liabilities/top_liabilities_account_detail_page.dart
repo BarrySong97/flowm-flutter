@@ -55,6 +55,8 @@ class _TopAssetsAccountDetailPageState
     final selectedDateRange = ref.watch(selectedDateRangeProvider);
     final subAccountsAsync =
         ref.watch(liabilitySubAccountTreeProvider(widget.account.id));
+    final liabilityTrendAsync =
+        ref.watch(liabilityTrendProviderByDateRange(widget.account.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -126,43 +128,58 @@ class _TopAssetsAccountDetailPageState
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          // Use widget.account.amount directly
-                          '¥${widget.account.amount.abs().toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                        child: liabilityTrendAsync.when(
+                          data: (liabilityData) {
+                            final amount = liabilityData.isNotEmpty
+                                ? liabilityData.last.totalLiabilities
+                                : widget.account.amount;
+                            return Text(
+                              '¥${amount.abs().toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          },
+                          loading: () => const Text(
+                            '加载中...',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          error: (err, stack) => Text(
+                            // Fallback to widget.account.amount on error
+                            '¥${widget.account.amount.abs().toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Colors.red, // Indicate error
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                       // AssetTrendChart()
                       // Watch the asset trend provider by date range
-                      Consumer(builder: (context, ref, child) {
-                        // Watch the new provider with null for now
-                        // TODO: Add accountId to Account model and use it here
-                        final liabilityTrendAsync = ref.watch(
-                            liabilityTrendProviderByDateRange(
-                                widget.account.id));
-                        return liabilityTrendAsync.when(
-                          data: (liabilityData) {
-                            if (liabilityData.isEmpty) {
-                              return const SizedBox(
-                                  height: 200,
-                                  child: Center(child: Text('暂无该时间段负债趋势数据')));
-                            }
-                            return LiabilityTrendChart(
-                                liabilityData: liabilityData);
-                          },
-                          loading: () => const SizedBox(
-                              height: 200,
-                              child:
-                                  Center(child: CircularProgressIndicator())),
-                          error: (error, stack) => SizedBox(
-                              height: 200,
-                              child: Center(child: Text('加载趋势图失败: $error'))),
-                        );
-                      }),
+                      liabilityTrendAsync.when(
+                        data: (liabilityData) {
+                          if (liabilityData.isEmpty) {
+                            return const SizedBox(
+                                height: 200,
+                                child: Center(child: Text('暂无该时间段负债趋势数据')));
+                          }
+                          return LiabilityTrendChart(
+                              liabilityData: liabilityData);
+                        },
+                        loading: () => const SizedBox(
+                            height: 200,
+                            child: Center(child: CircularProgressIndicator())),
+                        error: (error, stack) => SizedBox(
+                            height: 200,
+                            child: Center(child: Text('加载趋势图失败: $error'))),
+                      ),
                     ],
                   ),
                 ),

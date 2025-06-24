@@ -38,6 +38,7 @@ void invalidateProvidersForTransaction(
     ref.invalidate(assetTrendProviderByDateRange);
     ref.invalidate(assetTrendProviderByTimeRange);
     ref.invalidate(accountTransactionsProvider);
+    ref.invalidate(assetsSankeyChartDataProvider);
   }
 
   if (types.contains(AccountType.LIABILITY)) {
@@ -46,6 +47,9 @@ void invalidateProvidersForTransaction(
     ref.invalidate(liabilities.topLiabilityAccountsProvider);
     ref.invalidate(liabilities.liabilityTrendProviderByDateRange);
     ref.invalidate(liabilityAccountTreeProvider);
+    ref.invalidate(liabilities.liabilityTrendProviderByTimeRange);
+    ref.invalidate(liabilitySubAccountTreeProvider);
+    ref.invalidate(liabilities.sankeyChartDataProvider);
   }
 
   if (types.contains(AccountType.EXPENSE)) {

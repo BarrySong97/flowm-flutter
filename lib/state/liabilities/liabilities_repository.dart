@@ -13,6 +13,50 @@ import '../../components/account/account_item.dart' as account_ui;
 import '../database/database_provider.dart';
 import '../ledger/ledger_repository.dart';
 
+final sankeyChartDataProvider = FutureProvider.autoDispose.family<
+    SankeyChartData,
+    ({
+      int accountId,
+      String flow,
+      TimeRange timeRange,
+      int limit,
+    })>((ref, params) {
+  final liabilitiesRepository = ref.watch(liabilitiesRepositoryProvider);
+
+  DateTime getStartDateFromTimeRange(TimeRange timeRange) {
+    final now = DateTime.now();
+    switch (timeRange) {
+      case TimeRange.thisMonth:
+        return DateTime(now.year, now.month, 1);
+      case TimeRange.this3Months:
+        return now.subtract(const Duration(days: 60));
+      case TimeRange.this90Days:
+        return now.subtract(const Duration(days: 90));
+      case TimeRange.thisYear:
+        return DateTime(now.year, 1, 1);
+      case TimeRange.all:
+        return DateTime(now.year - 10, 1, 1);
+      default:
+        return now.subtract(const Duration(days: 30));
+    }
+  }
+
+  DateTime getEndDateFromTimeRange(TimeRange timeRange) {
+    return DateTime.now();
+  }
+
+  final startDate = getStartDateFromTimeRange(params.timeRange);
+  final endDate = getEndDateFromTimeRange(params.timeRange);
+
+  return liabilitiesRepository.getAccountFlowForSankey(
+    accountId: params.accountId,
+    flow: params.flow,
+    limit: params.limit,
+    startDate: startDate,
+    endDate: endDate,
+  );
+});
+
 // StateProvider for the selected date range string
 final selectedDateRangeProvider =
     StateProvider<String>((ref) => 'month'); // Default to 'month'

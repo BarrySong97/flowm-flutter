@@ -366,8 +366,6 @@ class AssetsDetailBody extends StatelessWidget {
 
   Widget _buildSankeyChart() {
     return SankeyChartWidget(
-      key:
-          ValueKey('sankey_${account.id}_${selectedFlow}_${selectedTimeRange}'),
       account: account,
       selectedFlow: selectedFlow,
       selectedTimeRange: selectedTimeRange,
@@ -383,60 +381,25 @@ class AssetsDetailBody extends StatelessWidget {
 }
 
 // 独立的 Sankey 图表 Widget
-class SankeyChartWidget extends ConsumerStatefulWidget {
+class SankeyChartWidget extends ConsumerWidget {
   final Account account;
   final String selectedFlow;
   final TimeRange selectedTimeRange;
 
   const SankeyChartWidget({
-    Key? key,
     required this.account,
     required this.selectedFlow,
     required this.selectedTimeRange,
-  }) : super(key: key);
+  });
 
   @override
-  ConsumerState<SankeyChartWidget> createState() => _SankeyChartWidgetState();
-}
-
-class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
-    with AutomaticKeepAliveClientMixin {
-  Future<SankeyChartData>? _futureData;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  @override
-  void didUpdateWidget(SankeyChartWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 只有当关键参数发生变化时才重新加载数据
-    if (oldWidget.account.id != widget.account.id ||
-        oldWidget.selectedFlow != widget.selectedFlow ||
-        oldWidget.selectedTimeRange != widget.selectedTimeRange) {
-      _loadData();
-    }
-  }
-
-  void _loadData() {
-    final assetsRepository = ref.read(assetsRepositoryProvider);
-    _futureData = assetsRepository.getAccountFlowForSankey(
-      accountId: widget.account.id,
-      flow: widget.selectedFlow,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sankeyChartDataAsync = ref.watch(assetsSankeyChartDataProvider((
+      accountId: account.id,
+      flow: selectedFlow,
+      timeRange: selectedTimeRange,
       limit: 50,
-      startDate: _getStartDateFromTimeRange(widget.selectedTimeRange),
-      endDate: _getEndDateFromTimeRange(widget.selectedTimeRange),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context); // 必须调用以启用 AutomaticKeepAliveClientMixin
+    )));
 
     return Container(
       decoration: BoxDecoration(
@@ -465,7 +428,7 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
                 ),
                 SizedBox(width: 8),
                 Text(
-                  widget.selectedFlow == 'in' ? '资金流入分析' : '资金流出分析',
+                  selectedFlow == 'in' ? '资金流入分析' : '资金流出分析',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -474,19 +437,102 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
                 ),
               ],
             ),
-            FutureBuilder<SankeyChartData>(
-              future: _futureData,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+              child: SizedBox(
+                key: ValueKey(selectedFlow),
+                child: sankeyChartDataAsync.when(
+                  data: (sankeyData) {
+                    if (sankeyData.nodes.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.analytics_outlined,
+                              color: Colors.grey.shade400,
+                              size: 48,
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              '暂无数据',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '该时间段内没有${selectedFlow == 'in' ? '流入' : '流出'}记录',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // 动态计算sankey图表的尺寸
+                    final containerWidth =
+                        MediaQuery.of(context).size.width; // 减去左右padding
+                    final availableWidth = containerWidth - 64; // 减去容器内部padding
+
+                    // 根据nodes数量计算高度
+                    final nodeCount = sankeyData.nodes.length;
+                    final linkCount = sankeyData.links.length;
+
+                    // 基础高度：每个node至少需要40像素高度，最小200，最大800
+                    double calculatedHeight = (nodeCount * 40).toDouble();
+                    calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
+
+                    // 如果links很多，适当增加高度
+                    if (linkCount > 10) {
+                      calculatedHeight += (linkCount - 10) * 20;
+                      calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
+                    }
+
+                    // 宽度使用容器可用宽度的90%，最小250，最大400
+                    double calculatedWidth = availableWidth;
+                    calculatedWidth = calculatedWidth.clamp(250.0, 400.0);
+
+                    // 创建 SankeyDataSet
+                    final sankeyDataSet = SankeyDataSet(
+                      nodes: sankeyData.nodes,
+                      links: sankeyData.links,
+                    );
+
+                    // 生成布局
+                    final sankey = generateSankeyLayout(
+                      width: calculatedWidth,
+                      height: calculatedHeight,
+                      nodeWidth: 12,
+                      nodePadding: nodeCount > 10 ? 15 : 20, // 节点多时减少间距
+                    );
+                    sankeyDataSet.layout(sankey);
+
+                    return SankeyDiagramWidget(
+                      data: sankeyDataSet,
+                      nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
+                      selectedNodeId: null,
+                      onNodeTap: (nodeId) {
+                        print('点击了节点: $nodeId');
+                        // 这里可以添加节点点击的处理逻辑
+                      },
+                      size: Size(calculatedWidth, calculatedHeight),
+                    );
+                  },
+                  loading: () => Center(
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                     ),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
+                  ),
+                  error: (error, stack) => Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -505,7 +551,7 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
                         ),
                         SizedBox(height: 4),
                         Text(
-                          '${snapshot.error}',
+                          '$error',
                           style: TextStyle(
                             color: Colors.grey.shade500,
                             fontSize: 12,
@@ -514,118 +560,14 @@ class _SankeyChartWidgetState extends ConsumerState<SankeyChartWidget>
                         ),
                       ],
                     ),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.nodes.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.analytics_outlined,
-                          color: Colors.grey.shade400,
-                          size: 48,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          '暂无数据',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '该时间段内没有${widget.selectedFlow == 'in' ? '流入' : '流出'}记录',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final sankeyData = snapshot.data!;
-
-                // 动态计算sankey图表的尺寸
-                final containerWidth =
-                    MediaQuery.of(context).size.width; // 减去左右padding
-                final availableWidth = containerWidth - 64; // 减去容器内部padding
-
-                // 根据nodes数量计算高度
-                final nodeCount = sankeyData.nodes.length;
-                final linkCount = sankeyData.links.length;
-
-                // 基础高度：每个node至少需要40像素高度，最小200，最大800
-                double calculatedHeight = (nodeCount * 40).toDouble();
-                calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
-
-                // 如果links很多，适当增加高度
-                if (linkCount > 10) {
-                  calculatedHeight += (linkCount - 10) * 20;
-                  calculatedHeight = calculatedHeight.clamp(200.0, 900.0);
-                }
-
-                // 宽度使用容器可用宽度的90%，最小250，最大400
-                double calculatedWidth = availableWidth;
-                calculatedWidth = calculatedWidth.clamp(250.0, 400.0);
-
-                // 创建 SankeyDataSet
-                final sankeyDataSet = SankeyDataSet(
-                  nodes: sankeyData.nodes,
-                  links: sankeyData.links,
-                );
-
-                // 生成布局
-                final sankey = generateSankeyLayout(
-                  width: calculatedWidth,
-                  height: calculatedHeight,
-                  nodeWidth: 12,
-                  nodePadding: nodeCount > 10 ? 15 : 20, // 节点多时减少间距
-                );
-                sankeyDataSet.layout(sankey);
-
-                return SankeyDiagramWidget(
-                  data: sankeyDataSet,
-                  nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
-                  selectedNodeId: null,
-                  onNodeTap: (nodeId) {
-                    print('点击了节点: $nodeId');
-                    // 这里可以添加节点点击的处理逻辑
-                  },
-                  size: Size(calculatedWidth, calculatedHeight),
-                );
-              },
+                  ),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  DateTime _getStartDateFromTimeRange(TimeRange timeRange) {
-    final now = DateTime.now();
-    switch (timeRange) {
-      case TimeRange.thisMonth:
-        return DateTime(now.year, now.month, 1);
-      case TimeRange.this3Months:
-        return now.subtract(Duration(days: 60));
-      case TimeRange.this90Days:
-        return now.subtract(Duration(days: 90));
-      case TimeRange.thisYear:
-        return DateTime(now.year, 1, 1);
-      case TimeRange.all:
-        return DateTime(now.year - 10, 1, 1); // 默认返回10年前
-      default:
-        return now.subtract(Duration(days: 30));
-    }
-  }
-
-  DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
-    return DateTime.now();
   }
 }
 
