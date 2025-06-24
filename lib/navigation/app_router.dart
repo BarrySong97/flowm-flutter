@@ -10,17 +10,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 // import 'package:flowm/pages/home_page.dart'; // No longer the initial route
 import 'package:flowm/pages/main_screen.dart'; // Import MainScreen
+import 'package:flowm/pages/splash_page.dart'; // Import SplashPage
 import 'package:flowm/pages/expense/top_expense_detail_page.dart';
 import 'package:flowm/pages/assets/top_assets_account_detail_page.dart'; // 引入页面
 import 'package:flowm/pages/add_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     routes: [
       GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
         path: '/',
-        // builder: (context, state) => const HomePage(), // Old route
+        // builder: (context, state) => const HomePage(); // Old route
         builder: (context, state) => const MainScreen(), // New route
       ),
       GoRoute(

@@ -23,6 +23,22 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
+/// 数据库初始化状态提供者
+///
+/// 检查数据库是否已经初始化完成（即是否有数据）
+final databaseInitializationProvider = FutureProvider<bool>((ref) async {
+  final database = ref.watch(databaseProvider);
+
+  try {
+    // 检查是否有账本数据，如果有则认为数据库已初始化
+    final ledgers = await database.ledgerDao.getAllLedgers();
+    return ledgers.isNotEmpty;
+  } catch (e) {
+    // 如果查询失败，认为数据库尚未初始化
+    return false;
+  }
+});
+
 /// 账户DAO提供者
 final accountDaoProvider = Provider<AccountDao>((ref) {
   final database = ref.watch(databaseProvider);

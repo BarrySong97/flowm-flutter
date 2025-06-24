@@ -12,43 +12,31 @@ class SeedData {
 
   /// Initialize the database with seed data
   Future<void> seedDatabase() async {
-    final ledgerIds = await _createDefaultLedgers();
-    await _createDefaultAccounts(ledgerIds[0]);
-    await _createDefaultAccounts(ledgerIds[1]);
-    await _createSampleTransactions(ledgerIds[0]);
-    await _createSampleTransactions(ledgerIds[1]);
-    await _generateYearlyTransactions(ledgerIds[0]);
-    await _generateYearlyTransactions(ledgerIds[1]);
+    final ledgerId = await _createDefaultLedger();
+    await _createDefaultAccounts(ledgerId);
+    await _createSampleTransactions(ledgerId);
+    await _generateMonthlyTransactions(ledgerId);
     await _createDefaultTags();
   }
 
-  /// Create default ledgers
-  Future<List<int>> _createDefaultLedgers() async {
-    // 创建个人账本
+  /// Create default ledger
+  Future<int> _createDefaultLedger() async {
+    // 只创建个人账本
     final personalLedgerId = await db.ledgerDao.insertLedger(
       LedgersCompanion.insert(
-        name: '个人账本',
+        name: '示例账本',
         isSelected: const Value(true),
         description: const Value('个人日常收支记录'),
       ),
     );
 
-    // 创建家庭账本
-    final familyLedgerId = await db.ledgerDao.insertLedger(
-      LedgersCompanion.insert(
-        name: '家庭账本',
-        description: const Value('家庭共同财务记录'),
-      ),
-    );
-
-    print(
-        'Created default ledgers with IDs: $personalLedgerId, $familyLedgerId');
-    return [personalLedgerId, familyLedgerId];
+    print('Created default ledger with ID: $personalLedgerId');
+    return personalLedgerId;
   }
 
   /// Create default account hierarchy following Chinese accounting standards
   Future<void> _createDefaultAccounts(int ledgerId) async {
-    // 使用第一个账本ID（个人账本）创建账户
+    // 使用账本ID创建账户
     final personalLedgerId = ledgerId;
 
     // Asset accounts
@@ -384,8 +372,6 @@ class SeedData {
       '支出:税费',
       AccountType.EXPENSE,
     );
-
-    // 如果有第二个账本（家庭账本），为其创建基本账户结构
   }
 
   /// Create sample transactions with postings that balance (debits = credits)
@@ -791,13 +777,13 @@ class SeedData {
     ]);
   }
 
-  /// Generates a large number of transactions for the previous year.
-  Future<void> _generateYearlyTransactions(int ledgerId) async {
+  /// Generates a large number of transactions for the previous month.
+  Future<void> _generateMonthlyTransactions(int ledgerId) async {
     final random = Random();
     final now = DateTime.now();
-    // Generate data for the past year, starting from today and going back one year.
+    // Generate data for the past month, starting from today and going back one month.
     final endOfPeriod = DateTime(now.year, now.month, now.day);
-    final startOfPeriod = endOfPeriod.subtract(const Duration(days: 365));
+    final startOfPeriod = DateTime(now.year, now.month - 1, now.day);
 
     final allAccounts = await db.accountDao.getAccountsByLedgerId(ledgerId);
 
@@ -1228,7 +1214,7 @@ class SeedData {
         }
       }
     }
-    print('Finished generating yearly transactions for the past year.');
+    print('Finished generating monthly transactions for the past month.');
   }
 
   /// Create default tags for transaction categorization
