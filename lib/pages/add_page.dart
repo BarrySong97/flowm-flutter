@@ -9,6 +9,7 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
+import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
@@ -16,6 +17,7 @@ import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 
 class AddPage extends ConsumerStatefulWidget {
   final int? transactionId;
@@ -498,21 +500,11 @@ class _AddPageState extends ConsumerState<AddPage>
         _clearForm();
         if (mounted) {
           // revalidate providers
-          ref.invalidate(monthlyOverviewDataProvider);
-          ref.invalidate(topAssetAccountsProvider);
-          ref.invalidate(latestTransactionsProvider);
-          ref.invalidate(totalLiabilitiesProvider);
-          ref.invalidate(expensePageDataProvider);
-          ref.invalidate(incomePageDataProvider);
-          ref.invalidate(assetsPageDataProvider);
-          ref.invalidate(uiLiabilityAccountsProvider);
-          ref.invalidate(topLiabilityAccountsProvider);
-          ref.invalidate(liabilityTrendProviderByDateRange);
-          ref.invalidate(assetsAccountTreeProvider);
-          ref.invalidate(liabilityAccountTreeProvider);
-          ref.invalidate(expenseAccountTreeProvider);
-          ref.invalidate(incomeAccountTreeProvider);
-          ref.invalidate(equityAccountTreeProvider);
+          invalidateProvidersForTransaction(
+            ref,
+            fromAccountType: _fromAccount!.type,
+            toAccountType: _toAccount!.type,
+          );
           Navigator.of(context).pop();
         }
       } else {
@@ -528,21 +520,11 @@ class _AddPageState extends ConsumerState<AddPage>
             );
 
         // revalidate providers
-        ref.invalidate(monthlyOverviewDataProvider);
-        ref.invalidate(topAssetAccountsProvider);
-        ref.invalidate(latestTransactionsProvider);
-        ref.invalidate(totalLiabilitiesProvider);
-        ref.invalidate(expensePageDataProvider);
-        ref.invalidate(incomePageDataProvider);
-        ref.invalidate(assetsPageDataProvider);
-        ref.invalidate(uiLiabilityAccountsProvider);
-        ref.invalidate(topLiabilityAccountsProvider);
-        ref.invalidate(liabilityTrendProviderByDateRange);
-        ref.invalidate(assetsAccountTreeProvider);
-        ref.invalidate(liabilityAccountTreeProvider);
-        ref.invalidate(expenseAccountTreeProvider);
-        ref.invalidate(incomeAccountTreeProvider);
-        ref.invalidate(equityAccountTreeProvider);
+        invalidateProvidersForTransaction(
+          ref,
+          fromAccountType: _fromAccount!.type,
+          toAccountType: _toAccount!.type,
+        );
 
         // 显示成功消息并返回
         ScaffoldMessenger.of(context).showSnackBar(

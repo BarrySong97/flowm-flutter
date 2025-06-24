@@ -71,3 +71,80 @@ final expensePageDataProvider = FutureProvider<ExpensePageData>((ref) async {
     accountTree: results[2] as List<AccountExpenseNode>,
   );
 });
+
+/// 上个月支出数据提供者 (family)
+final previousMonthExpenseProviderFamily =
+    FutureProvider.family<List<barchart.ChartData>, int?>(
+        (ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final selectedDate = ref.watch(selectedMonthProvider);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  // 计算上个月的开始和结束时间
+  final DateTime prevMonthStartDate =
+      DateTime(selectedDate.year, selectedDate.month - 1, 1);
+  final DateTime prevMonthEndDate =
+      DateTime(selectedDate.year, selectedDate.month, 0);
+
+  return repository.getExpenseChartData(
+    startDate: prevMonthStartDate,
+    endDate: prevMonthEndDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: accountId, // 传递 accountId
+  );
+});
+
+/// 支出图表数据提供者
+/// 修改为 .family 以接收 accountId (可以为 null)
+final expenseChartDataProvider =
+    FutureProvider.family<List<barchart.ChartData>, int?>(
+        (ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final selectedDate = ref.watch(selectedMonthProvider);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+  final DateTime endDate =
+      DateTime(selectedDate.year, selectedDate.month + 1, 0);
+
+  print(
+      '[expenseChartDataProvider] Fetching chart data with accountId: $accountId');
+
+  return repository.getExpenseChartData(
+    startDate: startDate,
+    endDate: endDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: accountId, // 传递 accountId
+  );
+});
+
+/// 指定账户当月总支出提供者
+final accountMonthlyExpenseProvider =
+    FutureProvider.family<double, int>((ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedDate = ref.watch(selectedMonthProvider);
+  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+  final DateTime endDate =
+      DateTime(selectedDate.year, selectedDate.month + 1, 0);
+
+  return repository.getAccountExpenseBalance(
+    accountId: accountId,
+    startDate: startDate,
+    endDate: endDate,
+  );
+});
+
+/// 指定账户累计总支出提供者 (不区分时间)
+final accountOverallExpenseProvider =
+    FutureProvider.family<double, int>((ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  return repository.getAccountExpenseTotalBalance(accountId: accountId);
+});

@@ -1,6 +1,6 @@
 import 'package:flowm/components/account/account_item.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
@@ -15,7 +15,7 @@ import 'package:intl/intl.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
   final Account account;
-  const AssetsDetailPage({Key? key, required this.account}) : super(key: key);
+  const AssetsDetailPage({super.key, required this.account});
 
   @override
   ConsumerState<AssetsDetailPage> createState() => _AssetsDetailPageState();
@@ -89,61 +89,70 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                         background: SafeArea(
                           child: Padding(
                             padding: const EdgeInsets.all(0),
-                            child: Column(
-                              spacing: 16,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Placeholder for app bar height
-                                SizedBox(height: kToolbarHeight),
+                            child: Consumer(builder: (context, ref, child) {
+                              final assetTrendAsync = ref.watch(
+                                  assetTrendProviderByTimeRange((
+                                accountId: widget.account.id,
+                                timeRange: _selectedTimeRange
+                              )));
 
-                                // VanEck title that shows only when expanded
-                                AnimatedOpacity(
-                                  opacity: _isCollapsed ? 0.0 : 1.0,
-                                  duration: const Duration(milliseconds: 250),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          widget.account.name,
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Balance amount
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16),
-                                  child: Text(
-                                    '${widget.account.currencySymbol}${widget.account.amount.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ),
+                              final amountToShow = assetTrendAsync.when(
+                                data: (assetData) => assetData.isEmpty
+                                    ? widget.account.amount
+                                    : assetData.last.totalAssets,
+                                loading: () => widget.account.amount,
+                                error: (e, s) => widget.account.amount,
+                              );
 
-                                // Chart area
-                                Expanded(
-                                  child: AnimatedOpacity(
+                              return Column(
+                                spacing: 16,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Placeholder for app bar height
+                                  const SizedBox(height: kToolbarHeight),
+
+                                  // VanEck title that shows only when expanded
+                                  AnimatedOpacity(
                                     opacity: _isCollapsed ? 0.0 : 1.0,
                                     duration: const Duration(milliseconds: 250),
                                     child: Container(
-                                      child: Consumer(
-                                          builder: (context, ref, child) {
-                                        final assetTrendAsync = ref.watch(
-                                            assetTrendProviderByTimeRange((
-                                          accountId: widget.account.id,
-                                          timeRange: _selectedTimeRange
-                                        )));
-                                        return assetTrendAsync.when(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            widget.account.name,
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Balance amount
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: Text(
+                                      '${widget.account.currencySymbol}${amountToShow.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Chart area
+                                  Expanded(
+                                    child: AnimatedOpacity(
+                                      opacity: _isCollapsed ? 0.0 : 1.0,
+                                      duration:
+                                          const Duration(milliseconds: 250),
+                                      child: Container(
+                                        child: assetTrendAsync.when(
                                           data: (assetData) {
                                             if (assetData.isEmpty) {
                                               return const Center(
@@ -157,30 +166,30 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                                                   CircularProgressIndicator()),
                                           error: (error, stack) => Center(
                                               child: Text('加载趋势图失败: $error')),
-                                        );
-                                      }),
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
 
-                                const SizedBox(height: 4),
-                                // Time range selector
-                                AnimatedOpacity(
-                                  opacity: _isCollapsed ? 0.0 : 1.0,
-                                  duration: const Duration(milliseconds: 250),
-                                  child: TimeRangeSelector(
-                                    value: _selectedTimeRange,
-                                    onChanged: (TimeRange timeRange) {
-                                      setState(() {
-                                        _selectedTimeRange = timeRange;
-                                      });
-                                      _onTimeRangeChanged(timeRange);
-                                    },
+                                  const SizedBox(height: 4),
+                                  // Time range selector
+                                  AnimatedOpacity(
+                                    opacity: _isCollapsed ? 0.0 : 1.0,
+                                    duration: const Duration(milliseconds: 250),
+                                    child: TimeRangeSelector(
+                                      value: _selectedTimeRange,
+                                      onChanged: (TimeRange timeRange) {
+                                        setState(() {
+                                          _selectedTimeRange = timeRange;
+                                        });
+                                        _onTimeRangeChanged(timeRange);
+                                      },
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                            ),
+                                  const SizedBox(height: 12),
+                                ],
+                              );
+                            }),
                           ),
                         ),
                       ),
@@ -826,25 +835,49 @@ class AccountTransactionList extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 0, vertical: 0),
                             child: TransactionListItem(
-                              title: transaction.description ?? '无描述',
-
-                              transactionId:
-                                  transaction.transactionId.toString(),
-                              subtitle:
-                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
-                              amount: formattedAmount,
-                              type: getTransactionFlowType(
-                                transactionWithAmount
-                                        .fromAccount?.accountType ??
-                                    AccountType.ASSET,
-                                transactionWithAmount.toAccount?.accountType ??
-                                    AccountType.ASSET,
-                              ),
-                              statusColor: isExpense
-                                  ? const Color(0xFF007AFF) // 蓝色表示支出
-                                  : const Color(0xFF34C759), // 绿色表示收入
-                              isExpense: isExpense,
-                            ),
+                                title: transaction.description ?? '无描述',
+                                fromAccountType: transactionWithAmount
+                                    .fromAccount?.accountType,
+                                toAccountType: transactionWithAmount
+                                    .toAccount?.accountType,
+                                transactionId:
+                                    transaction.transactionId.toString(),
+                                subtitle:
+                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                amount: formattedAmount,
+                                type: getTransactionFlowType(
+                                  transactionWithAmount
+                                          .fromAccount?.accountType ??
+                                      AccountType.ASSET,
+                                  transactionWithAmount
+                                          .toAccount?.accountType ??
+                                      AccountType.ASSET,
+                                ),
+                                statusColor: isExpense
+                                    ? const Color(0xFF007AFF) // 蓝色表示支出
+                                    : const Color(0xFF34C759), // 绿色表示收入
+                                isExpense: isExpense,
+                                onDelete: () => {
+                                      if (transactionWithAmount
+                                                  .fromAccount?.accountType !=
+                                              null &&
+                                          transactionWithAmount
+                                                  .toAccount?.accountType !=
+                                              null)
+                                        {
+                                          invalidateProvidersForTransaction(
+                                            ref,
+                                            fromAccountType:
+                                                transactionWithAmount
+                                                        .fromAccount
+                                                        ?.accountType ??
+                                                    AccountType.ASSET,
+                                            toAccountType: transactionWithAmount
+                                                    .toAccount?.accountType ??
+                                                AccountType.ASSET,
+                                          )
+                                        }
+                                    }),
                           );
                         },
                       ),

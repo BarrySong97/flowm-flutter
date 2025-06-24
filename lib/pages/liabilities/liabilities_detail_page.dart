@@ -1,6 +1,7 @@
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/components/chart/liability_trend_chart.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -870,24 +871,49 @@ class AccountTransactionList extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 0, vertical: 0),
                             child: TransactionListItem(
-                              transactionId:
-                                  transaction.transactionId.toString(),
-                              title: transaction.description ?? '无描述',
-                              subtitle:
-                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
-                              amount: formattedAmount,
-                              type: getTransactionFlowType(
-                                transactionWithAmount
-                                        .fromAccount?.accountType ??
-                                    AccountType.ASSET,
-                                transactionWithAmount.toAccount?.accountType ??
-                                    AccountType.ASSET,
-                              ),
-                              statusColor: isExpense
-                                  ? const Color(0xFF007AFF) // 蓝色表示支出
-                                  : const Color(0xFF34C759), // 绿色表示收入
-                              isExpense: isExpense,
-                            ),
+                                fromAccountType: transactionWithAmount
+                                    .fromAccount?.accountType,
+                                toAccountType: transactionWithAmount
+                                    .toAccount?.accountType,
+                                transactionId:
+                                    transaction.transactionId.toString(),
+                                title: transaction.description ?? '无描述',
+                                subtitle:
+                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                amount: formattedAmount,
+                                type: getTransactionFlowType(
+                                  transactionWithAmount
+                                          .fromAccount?.accountType ??
+                                      AccountType.ASSET,
+                                  transactionWithAmount
+                                          .toAccount?.accountType ??
+                                      AccountType.ASSET,
+                                ),
+                                statusColor: isExpense
+                                    ? const Color(0xFF007AFF) // 蓝色表示支出
+                                    : const Color(0xFF34C759), // 绿色表示收入
+                                isExpense: isExpense,
+                                onDelete: () => {
+                                      if (transactionWithAmount
+                                                  .fromAccount?.accountType !=
+                                              null &&
+                                          transactionWithAmount
+                                                  .toAccount?.accountType !=
+                                              null)
+                                        {
+                                          invalidateProvidersForTransaction(
+                                            ref,
+                                            fromAccountType:
+                                                transactionWithAmount
+                                                        .fromAccount
+                                                        ?.accountType ??
+                                                    AccountType.ASSET,
+                                            toAccountType: transactionWithAmount
+                                                    .toAccount?.accountType ??
+                                                AccountType.ASSET,
+                                          )
+                                        }
+                                    }),
                           );
                         },
                       ),

@@ -8,6 +8,7 @@ import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/number_format_utils.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -385,6 +386,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                               subtitle:
                                   '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
                               amount: formattedAmount,
+                              fromAccountType: transactionWithAmount
+                                  .fromAccount?.accountType,
+                              toAccountType:
+                                  transactionWithAmount.toAccount?.accountType,
                               type: getTransactionFlowType(
                                   transactionWithAmount
                                           .fromAccount?.accountType ??
@@ -396,6 +401,25 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                   ? const Color(0xFF007AFF) // Blue for expense
                                   : const Color(0xFF34C759), // Green for income
                               isExpense: isExpense,
+                              onDelete: () => {
+                                if (transactionWithAmount
+                                            .fromAccount?.accountType !=
+                                        null &&
+                                    transactionWithAmount
+                                            .toAccount?.accountType !=
+                                        null)
+                                  {
+                                    invalidateProvidersForTransaction(
+                                      ref,
+                                      fromAccountType: transactionWithAmount
+                                              .fromAccount?.accountType ??
+                                          AccountType.ASSET,
+                                      toAccountType: transactionWithAmount
+                                              .toAccount?.accountType ??
+                                          AccountType.ASSET,
+                                    )
+                                  }
+                              },
                             );
                           },
                         ),

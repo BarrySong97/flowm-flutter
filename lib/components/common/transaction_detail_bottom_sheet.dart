@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../db/tables/account_table.dart';
 import '../../state/transaction/transaction_repository.dart';
 import 'package:flowm/utils/snackbar_utils.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 
 class TransactionDetailBottomSheet extends ConsumerWidget {
   final String amount;

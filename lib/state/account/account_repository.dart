@@ -134,16 +134,15 @@ final yearlyAssetTrendProvider =
   }
 });
 
-// 基于TimeRange类型的资产趋势数据提供者，改为 Stream 形式
-final assetTrendProviderByTimeRange = StreamProvider.family<
+// 基于TimeRange类型的资产趋势数据提供者
+final assetTrendProviderByTimeRange = FutureProvider.family<
     List<AssetHistoryData>,
-    ({int? accountId, TimeRange timeRange})>((ref, params) async* {
+    ({int? accountId, TimeRange timeRange})>((ref, params) async {
   final repository = ref.watch(accountRepositoryProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger == null) {
-    yield [];
-    return;
+    return [];
   }
 
   DateTime endDate = DateTime.now();
@@ -171,7 +170,7 @@ final assetTrendProviderByTimeRange = StreamProvider.family<
       break;
   }
 
-  yield* repository.watchAssetHistoryByTimeRange(
+  return repository.getAssetHistoryByTimeRange(
     startDate,
     endDate,
     ledgerId: ledger.ledgerId,
