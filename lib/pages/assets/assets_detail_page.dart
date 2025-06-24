@@ -713,6 +713,7 @@ class AccountTransactionList extends ConsumerWidget {
                             fontSize: 12,
                           ),
                         ),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),

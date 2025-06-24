@@ -435,7 +435,7 @@ class AccountTransactionList extends ConsumerWidget {
                           color: Colors.grey.shade400,
                           size: 48,
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                         Text(
                           '暂无交易记录',
                           style: TextStyle(
@@ -443,7 +443,7 @@ class AccountTransactionList extends ConsumerWidget {
                             fontSize: 16,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           '该时间段内没有相关交易',
                           style: TextStyle(
@@ -451,6 +451,7 @@ class AccountTransactionList extends ConsumerWidget {
                             fontSize: 12,
                           ),
                         ),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -641,7 +642,7 @@ class AccountTransactionList extends ConsumerWidget {
                       color: Colors.grey.shade400,
                       size: 48,
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
                       '加载失败',
                       style: TextStyle(
@@ -649,7 +650,7 @@ class AccountTransactionList extends ConsumerWidget {
                         fontSize: 16,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       '$error',
                       style: TextStyle(
