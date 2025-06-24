@@ -661,70 +661,77 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   Future<int> deleteTransaction(int id) =>
       (delete(transactions)..where((t) => t.transactionId.equals(id))).go();
 
-  // 新的优化版本
-  Stream<List<TransactionWithAmount>> watchLatestTransactionsByLedgerId(
-      int ledgerId, int limit) {
-    print('watchLatestTransactionsByLedgerId: $ledgerId, $limit');
-    // Call watchAllTransactions, which now handles ordering and limiting at the DB level
-    return watchAllTransactions(ledgerId: ledgerId, limit: limit)
-        // The .map((transactionsList) => transactionsList.take(limit).toList()) is now removed
-        .asyncMap((latestTransactionsList) async {
-      // latestTransactionsList is already correctly ordered and limited
-      if (latestTransactionsList.isEmpty) {
-        return <TransactionWithAmount>[];
+  // Get latest transactions by ledger ID (Future version)
+  Future<List<TransactionWithAmount>> getLatestTransactionsByLedgerId(
+      int ledgerId, int limit) async {
+    // Similar logic to watchLatestTransactionsByLedgerId but returns a Future.
+    final query = select(transactions).join([
+      innerJoin(db.postings,
+          db.postings.transactionId.equalsExp(transactions.transactionId)),
+      innerJoin(
+          db.accounts, db.accounts.accountId.equalsExp(db.postings.accountId)),
+    ])
+      ..where(db.accounts.ledgerId.equals(ledgerId))
+      ..groupBy([
+        transactions.transactionId
+      ]) // Use groupBy to get distinct transactions
+      ..orderBy([
+        OrderingTerm(
+            expression: transactions.transactionDate, mode: OrderingMode.desc),
+        OrderingTerm(
+            expression: transactions.transactionId, mode: OrderingMode.desc)
+      ])
+      ..limit(limit);
+
+    final latestTransactionsList =
+        await query.map((row) => row.readTable(transactions)).get();
+
+    if (latestTransactionsList.isEmpty) {
+      return <TransactionWithAmount>[];
+    }
+    // ... rest of the logic is similar to watchLatestTransactions ...
+    final resultList = <TransactionWithAmount>[];
+
+    for (final transaction in latestTransactionsList) {
+      final postingsQuery = select(db.postings).join([
+        innerJoin(db.accounts,
+            db.accounts.accountId.equalsExp(db.postings.accountId)),
+      ])
+        ..where(db.postings.transactionId.equals(transaction.transactionId));
+
+      final postingsWithAccounts = await postingsQuery.get();
+
+      Account? fromAccountObj;
+      Account? toAccountObj;
+      double transactionAmount = 0;
+
+      if (postingsWithAccounts.isNotEmpty) {
+        final firstPosting = postingsWithAccounts.first.readTable(db.postings);
+        transactionAmount = firstPosting.amount.abs();
       }
-      for (final transaction in latestTransactionsList) {
-        print('Transaction ID: ${transaction.transactionId}');
-        print('Transaction Date: ${transaction.transactionDate}');
-        print('Transaction Description: ${transaction.description}');
-        print('Is Recurring: ${transaction.isRecurring}');
-        print('---');
-      }
 
-      final resultList = <TransactionWithAmount>[];
-
-      for (final transaction in latestTransactionsList) {
-        final postingsQuery = select(db.postings).join([
-          innerJoin(db.accounts,
-              db.accounts.accountId.equalsExp(db.postings.accountId)),
-        ])
-          ..where(db.postings.transactionId.equals(transaction.transactionId));
-
-        final postingsWithAccounts = await postingsQuery.get();
-
-        Account? fromAccountObj;
-        Account? toAccountObj;
-        double transactionAmount = 0;
-
-        if (postingsWithAccounts.isNotEmpty) {
-          final firstPosting =
-              postingsWithAccounts.first.readTable(db.postings);
-          transactionAmount = firstPosting.amount.abs();
-
-          for (final rowData in postingsWithAccounts) {
-            final posting = rowData.readTable(db.postings);
-            final account = rowData.readTable(db.accounts);
-            if (posting.amount < 0) {
-              fromAccountObj = account;
-            } else if (posting.amount > 0) {
-              toAccountObj = account;
-            }
-          }
+      for (final rowData in postingsWithAccounts) {
+        final posting = rowData.readTable(db.postings);
+        final account = rowData.readTable(db.accounts);
+        if (posting.amount < 0) {
+          fromAccountObj = account;
+        } else if (posting.amount > 0) {
+          toAccountObj = account;
         }
-
-        final nature = getTransactionNature(
-            fromAccountObj?.accountType, toAccountObj?.accountType);
-
-        resultList.add(TransactionWithAmount(
-          transaction: transaction,
-          amount: transactionAmount,
-          fromAccount: fromAccountObj,
-          toAccount: toAccountObj,
-          nature: nature,
-        ));
       }
-      return resultList;
-    });
+
+      final nature = getTransactionNature(
+          fromAccountObj?.accountType, toAccountObj?.accountType);
+
+      resultList.add(TransactionWithAmount(
+        transaction: transaction,
+        amount: transactionAmount,
+        fromAccount: fromAccountObj,
+        toAccount: toAccountObj,
+        nature: nature,
+      ));
+    }
+    return resultList;
   }
 
   // 根据账户ID和日期范围查询相关的所有交易记录

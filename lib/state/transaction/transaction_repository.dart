@@ -126,9 +126,15 @@ class TransactionRepository {
   }
 
   /// 获取最新的交易
-  Stream<List<TransactionWithAmount>> watchLatestTransactions(
+  // Stream<List<TransactionWithAmount>> watchLatestTransactions(
+  //     {int? ledgerId, int limit = 10}) {
+  //   return _transactionDao.watchLatestTransactionsByLedgerId(ledgerId!, limit);
+  // }
+
+  /// 获取最新的交易 (Future)
+  Future<List<TransactionWithAmount>> getLatestTransactions(
       {int? ledgerId, int limit = 10}) {
-    return _transactionDao.watchLatestTransactionsByLedgerId(ledgerId!, limit);
+    return _transactionDao.getLatestTransactionsByLedgerId(ledgerId!, limit);
   }
 
   /// 获取指定账本的最新交易
