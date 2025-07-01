@@ -3,14 +3,14 @@ import '../utils/status_bar_utils.dart';
 
 class AppTheme {
   // Primary colors
-  static const Color primaryColor = Color(0xFF2196F3); // 主色调
-  static const Color primaryLightColor = Color(0xFF64B5F6); // 主色调（轻）
-  static const Color primaryDarkColor = Color(0xFF1976D2); // 主色调（深）
+  static const Color primaryColor = Color(0xFF4CAF50); // 主色调
+  static const Color primaryLightColor = Color(0xFF81C784); // 主色调（轻）
+  static const Color primaryDarkColor = Color(0xFF388E3C); // 主色调（深）
 
   // Secondary colors
-  static const Color secondaryColor = Color(0xFF4CAF50); // 次要色调
-  static const Color secondaryLightColor = Color(0xFF81C784); // 次要色调（轻）
-  static const Color secondaryDarkColor = Color(0xFF388E3C); // 次要色调（深）
+  static const Color secondaryColor = Color(0xFF2196F3); // 次要色调
+  static const Color secondaryLightColor = Color(0xFF64B5F6); // 次要色调（轻）
+  static const Color secondaryDarkColor = Color(0xFF1976D2); // 次要色调（深）
 
   // Background colors
   static const Color backgroundColor = Color(0xFFFFFFFF); // 背景色

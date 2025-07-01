@@ -10,6 +10,7 @@ import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'package:flowm/utils/snackbar_utils.dart';
 import 'package:flowm/state/add_page_params_provider.dart';
+import 'package:go_router/go_router.dart';
 
 // Provider for MainScreen's selected tab index
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -49,7 +50,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   final List<Widget> _pages = [
     _MainScreenPage(child: HomePage(key: PageStorageKey('home_page'))),
     CalendarPage(),
-    AddPage(),
     FlowPage(),
     SettingsPage(),
   ];
@@ -58,7 +58,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(
-      initialPage: ref.read(mainScreenIndexProvider),
+      initialPage: _tabIndexToPageIndex(ref.read(mainScreenIndexProvider)),
       keepPage: false,
     );
 
@@ -71,6 +71,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     _pageController.dispose();
     _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  int _tabIndexToPageIndex(int tabIndex) {
+    if (tabIndex > 2) {
+      return tabIndex - 1;
+    }
+    return tabIndex;
+  }
+
+  int _pageIndexToTabIndex(int pageIndex) {
+    if (pageIndex >= 2) {
+      return pageIndex + 1;
+    }
+    return pageIndex;
   }
 
   /// 初始化app_links深度链接监听
@@ -129,7 +143,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         _navigateToTab(1, queryParams);
         break;
       case '/add':
-        _navigateToTab(2, queryParams);
+        _navigateToAddPage(queryParams);
         break;
       case '/flow':
       case '/transactions':
@@ -145,20 +159,22 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
   }
 
-  /// 导航到指定标签页并处理参数
-  void _navigateToTab(int tabIndex, Map<String, String> queryParams) {
-    // 如果是添加页面并且有参数，设置参数到Provider
-    if (tabIndex == 2 && queryParams.isNotEmpty) {
+  void _navigateToAddPage(Map<String, String> queryParams) {
+    if (queryParams.isNotEmpty) {
       final params = AddPageParams.fromMap(queryParams);
       ref.read(addPageParamsProvider.notifier).state = params;
       debugPrint('[AppLinks] 设置AddPage参数: $params');
     }
+    GoRouter.of(context).push('/add');
+  }
 
+  /// 导航到指定标签页并处理参数
+  void _navigateToTab(int tabIndex, Map<String, String> queryParams) {
     // 切换到指定标签页, 只更新 provider，让 listener 去驱动页面切换
     ref.read(mainScreenIndexProvider.notifier).state = tabIndex;
 
     // 如果有参数，显示给用户
-    if (queryParams.isNotEmpty && tabIndex != 2) {
+    if (queryParams.isNotEmpty) {
       _showParametersInfo(queryParams);
     }
   }
@@ -188,8 +204,11 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _onItemTapped(int index) {
-    // _pageController.jumpToPage(index);
-    ref.read(mainScreenIndexProvider.notifier).state = index;
+    if (index == 2) {
+      context.push('/add');
+    } else {
+      ref.read(mainScreenIndexProvider.notifier).state = index;
+    }
   }
 
   @override
@@ -197,8 +216,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final selectedIndex = ref.watch(mainScreenIndexProvider);
 
     ref.listen<int>(mainScreenIndexProvider, (previous, next) {
-      if (next != _pageController.page?.round()) {
-        _pageController.jumpToPage(next);
+      if (next != 2) {
+        final pageIndex = _tabIndexToPageIndex(next);
+        if (_pageController.hasClients &&
+            pageIndex != _pageController.page?.round()) {
+          _pageController.jumpToPage(pageIndex);
+        }
       }
     });
 
@@ -208,8 +231,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         physics: const NeverScrollableScrollPhysics(),
         children: _pages,
         onPageChanged: (index) {
-          if (index != selectedIndex) {
-            ref.read(mainScreenIndexProvider.notifier).state = index;
+          final tabIndex = _pageIndexToTabIndex(index);
+          if (tabIndex != selectedIndex) {
+            ref.read(mainScreenIndexProvider.notifier).state = tabIndex;
           }
         },
       ),

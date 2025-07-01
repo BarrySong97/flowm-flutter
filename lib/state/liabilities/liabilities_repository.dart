@@ -333,7 +333,6 @@ class LiabilitiesRepository {
         amount: totalAmountForUI, // The value is already positive
         children: uiChildren,
         currencySymbol: '¥',
-        icon: _getAccountIcon(acc.account.accountType),
       );
     }).toList();
   }

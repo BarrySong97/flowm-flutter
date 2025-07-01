@@ -197,7 +197,7 @@ class LedgerSelector extends ConsumerWidget {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(6),
                                 color: isSelected
-                                    ? Colors.blue[100]
+                                    ? Colors.green[100]
                                     : Colors.grey[200],
                               ),
                               child: Text(
@@ -206,7 +206,7 @@ class LedgerSelector extends ConsumerWidget {
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: isSelected
-                                      ? Colors.blue[800]
+                                      ? Colors.green[800]
                                       : Colors.grey[800],
                                 ),
                               ),
@@ -243,7 +243,7 @@ class LedgerSelector extends ConsumerWidget {
                               maintainState: true,
                               maintainSize: true,
                               child: const Icon(Icons.check_circle,
-                                  color: Colors.blue),
+                                  color: Colors.green),
                             ),
                           ],
                         ),
@@ -267,7 +267,7 @@ class LedgerSelector extends ConsumerWidget {
                     });
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Theme.of(context).primaryColor,
                     minimumSize: const Size(double.infinity, 48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),

@@ -230,8 +230,8 @@ class _AddPageState extends ConsumerState<AddPage>
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: ThemeData.light().copyWith(
-            primaryColor: Colors.blue,
-            colorScheme: const ColorScheme.light(primary: Colors.blue),
+            primaryColor: Colors.green,
+            colorScheme: const ColorScheme.light(primary: Colors.green),
             buttonTheme:
                 const ButtonThemeData(textTheme: ButtonTextTheme.primary),
             datePickerTheme: DatePickerThemeData(
@@ -239,11 +239,11 @@ class _AddPageState extends ConsumerState<AddPage>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              headerBackgroundColor: Colors.blue[600],
+              headerBackgroundColor: Colors.green[400],
               headerForegroundColor: Colors.white,
               dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
                 if (states.contains(MaterialState.selected)) {
-                  return Colors.blue[400];
+                  return Colors.green[200];
                 }
                 return Colors.transparent;
               }),
@@ -252,17 +252,17 @@ class _AddPageState extends ConsumerState<AddPage>
                   return Colors.grey[400];
                 }
                 if (states.contains(MaterialState.selected)) {
-                  return Colors.white;
+                  return Colors.black87;
                 }
                 return Colors.black87;
               }),
               dayOverlayColor: MaterialStateProperty.resolveWith((states) {
                 if (states.contains(MaterialState.selected)) {
-                  return Colors.blue[400];
+                  return Colors.green[200];
                 }
                 if (states.contains(MaterialState.hovered) ||
                     states.contains(MaterialState.pressed)) {
-                  return Colors.blue[100];
+                  return Colors.green[100];
                 }
                 return Colors.transparent;
               }),
@@ -558,20 +558,19 @@ class _AddPageState extends ConsumerState<AddPage>
     });
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
-      appBar: _isEditMode
-          ? AppBar(
-              backgroundColor: Colors.white,
-              title: const Text(
-                '编辑模式',
-                style: TextStyle(color: Colors.black87, fontSize: 18),
-              ),
-              leading: IconButton(
-                icon: const Icon(Icons.close, color: Colors.black87),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              elevation: 0,
-            )
-          : null,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        title: Text(
+          _isEditMode ? '编辑模式' : '添加',
+          style: const TextStyle(color: Colors.black87, fontSize: 18),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        titleSpacing: 0,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -87,7 +87,7 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
       ),
       focusedBorder: OutlineInputBorder(
         borderSide: BorderSide(
-          color: Theme.of(context).primaryColor,
+          color: Colors.green,
           width: 2,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -161,6 +161,8 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _submit,
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   child: Text(_isEditMode ? '更新' : '创建'),
                 ),
               ],
