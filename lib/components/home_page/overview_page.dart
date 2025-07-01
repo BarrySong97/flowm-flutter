@@ -10,6 +10,7 @@ import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
@@ -33,9 +34,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
   void initState() {
     super.initState();
     // 第一次加载时主动更新
-    _updateWidget(ref.read(monthlyOverviewDataProvider));
-    // 第一次加载时更新账户数据到 Home Widget
-    _updateAccountDataWidget();
+    if (!kIsWeb) {
+      print('update widget');
+      _updateWidget(ref.read(monthlyOverviewDataProvider));
+      _updateAccountDataWidget();
+    }
   }
 
   void _updateAccountDataWidget() async {
@@ -54,6 +57,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
 
   void _updateWidget(
       AsyncValue<({double balance, double expense, double income})> data) {
+    if (kIsWeb) {
+      return;
+    }
     data.whenData((value) {
       debugPrint(
           '[HomeWidget] Updating data: expense=${value.expense}, income=${value.income}, balance=${value.balance}');

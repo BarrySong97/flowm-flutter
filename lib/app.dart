@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flowm/navigation/app_router.dart';
 import 'package:flowm/config/theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter/services.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

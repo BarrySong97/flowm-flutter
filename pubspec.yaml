@@ -62,13 +62,16 @@ dependencies:
   visibility_detector: ^0.4.0+2
   fl_chart: ^1.0.0
   riverpod_annotation: ^2.3.5
+  shelf: ^1.4.0
+  shelf_router: ^1.1.4
+  shelf_static: ^1.1.2
+  network_info_plus: ^5.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   drift_dev: ^2.26.1
   build_runner: ^2.4.8
-  flutter_native_splash: ^2.4.1
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
@@ -116,28 +119,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
-
-# Flutter Native Splash配置
-flutter_native_splash:
-  # 背景颜色 - 使用渐变蓝色
-  color: "#667eea"
-
-  # 不使用图片，使用纯色背景
-  # image: assets/images/splash_logo.png
-
-  # 安卓相关配置
-  android: true
-  android_12:
-    # Android 12+ 的动态颜色
-    color: "#667eea"
-    # image: assets/images/splash_logo.png
-    # icon_background_color: "#667eea"
-
-  # iOS相关配置
-  ios: true
-
-  # Web相关配置
-  web: true
-
-  # 全屏模式
-  fullscreen: true

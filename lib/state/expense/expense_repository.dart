@@ -77,7 +77,6 @@ class ExpenseRepository {
           WHERE t.transaction_date BETWEEN ? AND ?
             AND a.ledger_id = ?
             AND a.account_type = ?
-            AND p.amount > 0
             ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
           GROUP BY expense_date
         )
@@ -320,7 +319,6 @@ class ExpenseRepository {
         JOIN accounts a ON p.account_id = a.account_id
         WHERE p.account_id = ? 
           AND a.account_type = ? 
-          AND p.amount > 0; -- Assuming expenses are positive amounts
         ''',
         variables: [
           Variable.withInt(accountId),

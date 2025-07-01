@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
@@ -621,6 +622,9 @@ class AccountRepository {
 
   /// 更新 App Group 账户数据
   Future<void> _updateHomeWidgetAccountData(int ledgerId) async {
+    if (kIsWeb) {
+      return;
+    }
     try {
       // 获取四种类型的账户（不包括 EQUITY）
       final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);

@@ -6,6 +6,7 @@ class SettingsDataItem {
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback onTap;
+  final Widget? customContent;
 
   SettingsDataItem({
     required this.icon,
@@ -13,6 +14,7 @@ class SettingsDataItem {
     this.subtitle,
     this.trailing,
     required this.onTap,
+    this.customContent,
   });
 }
 
@@ -60,27 +62,37 @@ class SettingsDataSection extends StatelessWidget {
               ),
               itemBuilder: (context, index) {
                 final item = items[index];
-                return ListTile(
-                  leading: Icon(
-                    item.icon,
-                    color: Colors.black87,
-                  ),
-                  title: Text(item.title),
-                  subtitle: item.subtitle != null
-                      ? Text(
-                          item.subtitle!,
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 12,
-                          ),
-                        )
-                      : null,
-                  trailing: item.trailing ??
-                      Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
+                return Column(
+                  children: [
+                    ListTile(
+                      leading: Icon(
+                        item.icon,
+                        color: Colors.black87,
                       ),
-                  onTap: item.onTap,
+                      title: Text(item.title),
+                      subtitle: item.subtitle != null
+                          ? Text(
+                              item.subtitle!,
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            )
+                          : null,
+                      trailing: item.trailing ??
+                          Icon(
+                            Icons.chevron_right,
+                            color: Colors.grey[400],
+                          ),
+                      onTap: item.onTap,
+                    ),
+                    if (item.customContent != null)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            left: 16, right: 16, bottom: 8),
+                        child: item.customContent!,
+                      ),
+                  ],
                 );
               },
             ),
