@@ -42,6 +42,13 @@ class AccountItem extends StatefulWidget {
 }
 
 class _AccountItemState extends State<AccountItem> {
+  late final ExpansibleController _controller;
+  @override
+  void initState() {
+    super.initState();
+    _controller = ExpansibleController();
+  }
+
   @override
   Widget build(BuildContext context) {
     bool hasChildren =
@@ -78,6 +85,15 @@ class _AccountItemState extends State<AccountItem> {
     Widget accountRowWidget = AccountRow(
       account: widget.account,
       percentage: widget.account.percentage,
+      onTap: (account) {
+        if (hasChildren) {
+          if (_controller.isExpanded) {
+            _controller.collapse();
+          } else {
+            _controller.expand();
+          }
+        }
+      },
       showCurrencySymbolInAmount: !hasChildren, // Logic for parent row
     );
 
@@ -89,10 +105,12 @@ class _AccountItemState extends State<AccountItem> {
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
+            // initiallyExpanded: true,
+            controller: _controller,
             key: PageStorageKey<Account>(
                 widget.account), // Preserve expansion state
             title: GestureDetector(
-              onDoubleTap: widget.onTap != null
+              onLongPress: widget.onTap != null
                   ? () => widget.onTap!(widget.account)
                   : null,
               child: accountRowWidget, // Use the new AccountRow widget
