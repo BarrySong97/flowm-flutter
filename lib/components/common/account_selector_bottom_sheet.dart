@@ -313,9 +313,10 @@ class _AccountSelectorBottomSheetState
 
                     final Color color = Color.lerp(
                         Colors.grey[600], Colors.black, selectedness)!;
-                    final double fontSize = lerpDouble(14, 18, selectedness)!;
                     final FontWeight fontWeight = FontWeight.lerp(
                         FontWeight.normal, FontWeight.bold, selectedness)!;
+                    final double scale =
+                        lerpDouble(14.0 / 18.0, 1.0, selectedness)!;
 
                     return Expanded(
                       child: GestureDetector(
@@ -324,13 +325,16 @@ class _AccountSelectorBottomSheetState
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12.0),
                           alignment: Alignment.center,
-                          child: Text(
-                            _tabLabels[index],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: fontWeight,
-                              color: color,
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Text(
+                              _tabLabels[index],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: fontWeight,
+                                color: color,
+                              ),
                             ),
                           ),
                         ),
