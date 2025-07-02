@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/account/account_item.dart';
@@ -70,7 +72,6 @@ class _AccountSelectorBottomSheetState
   late TabController _tabController;
   late List<AccountSelectorType> _accountTypes;
   late List<String> _tabLabels;
-  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -100,13 +101,6 @@ class _AccountSelectorBottomSheetState
       initialIndex: initialIndex,
     );
 
-    // 添加监听器以触发动画更新
-    _tabController.addListener(() {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-
     // 如果有selectedAccount，异步确定正确的tab并切换
     if (widget.selectedAccount != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -122,16 +116,10 @@ class _AccountSelectorBottomSheetState
       final correctIndex = await _findAccountTypeIndex(widget.selectedAccount!);
       if (mounted && _tabController.index != correctIndex) {
         _tabController.animateTo(correctIndex);
-        setState(() {
-          _isInitialized = true;
-        });
       }
     } catch (e) {
       print('切换账户类型tab失败: $e');
       // 失败时保持当前tab
-      setState(() {
-        _isInitialized = true;
-      });
     }
   }
 
@@ -266,7 +254,7 @@ class _AccountSelectorBottomSheetState
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline,
-                      color: Colors.blue, size: 28),
+                      color: Colors.grey, size: 28),
                   onPressed: () async {
                     final currentAccountType =
                         _accountTypes[_tabController.index];
@@ -282,39 +270,76 @@ class _AccountSelectorBottomSheetState
           ),
 
           // Tab Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(
-                _tabLabels.length,
-                (index) => GestureDetector(
-                  onTap: () {
-                    _tabController.animateTo(index);
-                  },
-                  child: Container(
-                    alignment: Alignment.center,
-                    width: 50,
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontSize: _tabController.index == index ? 18 : 14,
-                        fontWeight: _tabController.index == index
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: _tabController.index == index
-                            ? Colors.black
-                            : Colors.grey[600],
+          AnimatedBuilder(
+            animation: _tabController.animation!,
+            builder: (context, child) {
+              final targetIndex = _tabController.index;
+              final previousIndex = _tabController.previousIndex;
+              final animationValue = _tabController.animation!.value;
+
+              // A "jump" is when we animate between non-adjacent tabs.
+              final isJump = (targetIndex - previousIndex).abs() > 1;
+
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  children: List.generate(_tabLabels.length, (index) {
+                    double selectedness;
+
+                    if (isJump) {
+                      // For jumps, we only want to animate the departing and arriving tabs.
+                      if (targetIndex == previousIndex) {
+                        // Before the jump animation starts, stay still.
+                        selectedness = index == targetIndex ? 1.0 : 0.0;
+                      } else {
+                        final double progress =
+                            (animationValue - previousIndex) /
+                                (targetIndex - previousIndex);
+                        if (index == targetIndex) {
+                          selectedness = progress;
+                        } else if (index == previousIndex) {
+                          selectedness = 1.0 - progress;
+                        } else {
+                          selectedness = 0.0;
+                        }
+                      }
+                    } else {
+                      // For swipes or adjacent taps, the default behavior is fine.
+                      selectedness = (1.0 - (animationValue - index).abs());
+                    }
+
+                    selectedness = selectedness.clamp(0.0, 1.0);
+
+                    final Color color = Color.lerp(
+                        Colors.grey[600], Colors.black, selectedness)!;
+                    final double fontSize = lerpDouble(14, 18, selectedness)!;
+                    final FontWeight fontWeight = FontWeight.lerp(
+                        FontWeight.normal, FontWeight.bold, selectedness)!;
+
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => _tabController.animateTo(index),
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          alignment: Alignment.center,
+                          child: Text(
+                            _tabLabels[index],
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: fontWeight,
+                              color: color,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        _tabLabels[index],
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
+                    );
+                  }),
                 ),
-              ),
-            ),
+              );
+            },
           ),
 
           // 分割线
@@ -328,112 +353,18 @@ class _AccountSelectorBottomSheetState
             child: TabBarView(
               controller: _tabController,
               children: _accountTypes.map((accountType) {
-                return _buildAccountListTab(accountType);
+                return _AccountListTabView(
+                  accountType: accountType,
+                  selectedAccount: widget.selectedAccount,
+                  selectableAccount: widget.selectableAccount,
+                  onAccountSelected: widget.onAccountSelected,
+                );
               }).toList(),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildAccountListTab(AccountSelectorType accountType) {
-    final accountsAsync = _getAccountProvider(accountType);
-
-    return accountsAsync.when(
-      data: (accounts) {
-        if (accounts.isEmpty) {
-          return const Center(
-            child: Text('暂无账户数据'),
-          );
-        }
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: _buildAccountList(accounts),
-        );
-      },
-      loading: () => const Center(
-        child: CircularProgressIndicator(),
-      ),
-      error: (error, stackTrace) => Center(
-        child: Text('加载失败: $error'),
-      ),
-    );
-  }
-
-  // 根据账户类型选择对应的provider
-  AsyncValue<List<Account>> _getAccountProvider(
-      AccountSelectorType accountType) {
-    switch (accountType) {
-      case AccountSelectorType.asset:
-        return ref.watch(assetsAccountTreeProvider);
-      case AccountSelectorType.liability:
-        return ref.watch(liabilityAccountTreeProvider);
-      case AccountSelectorType.expense:
-        return ref.watch(expenseAccountTreeProvider);
-      case AccountSelectorType.income:
-        return ref.watch(incomeAccountTreeProvider);
-      case AccountSelectorType.equity:
-        return ref.watch(equityAccountTreeProvider);
-    }
-  }
-
-  List<Widget> _buildAccountList(List<Account> accounts) {
-    return accounts.map((account) {
-      // 检查当前账户是否被选中（只有叶子节点才能被选中）
-      final bool hasChildren =
-          account.children != null && account.children!.isNotEmpty;
-      final bool isAccountSelected =
-          !hasChildren && _isAccountSelected(account);
-      // 检查是否需要自动展开（当选中的账户是该账户的子账户时）
-      final bool shouldAutoExpand = _shouldAutoExpand(account);
-
-      return AccountSelectorItem(
-        account: account,
-        isSelected: isAccountSelected,
-        shouldAutoExpand: shouldAutoExpand,
-        selectedAccount: widget.selectedAccount, // 传递选中账户用于子账户选中状态判断
-        onTap: (selectedAccount) {
-          if (widget.selectableAccount == SelectableAccount.leafOnly &&
-              hasChildren) {
-            // 如果只允许选择叶子节点，且当前是父节点，则不响应点击
-            return;
-          }
-          widget.onAccountSelected(selectedAccount);
-        },
-      );
-    }).toList();
-  }
-
-  // 检查账户是否被选中
-  bool _isAccountSelected(Account account) {
-    if (widget.selectedAccount == null) return false;
-    return widget.selectedAccount!.id == account.id;
-  }
-
-  // 检查是否需要自动展开（如果选中的账户是该账户的子账户）
-  bool _shouldAutoExpand(Account account) {
-    if (widget.selectedAccount == null) return false;
-    if (account.children == null) return false;
-
-    // 递归检查子账户中是否包含选中的账户
-    return _containsSelectedAccount(account.children!, widget.selectedAccount!);
-  }
-
-  // 递归检查子账户列表中是否包含指定的账户
-  bool _containsSelectedAccount(
-      List<Account> children, Account selectedAccount) {
-    for (final child in children) {
-      if (child.id == selectedAccount.id) {
-        return true;
-      }
-      if (child.children != null) {
-        if (_containsSelectedAccount(child.children!, selectedAccount)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 }
 
@@ -461,3 +392,116 @@ final selectedAccount = await AccountSelectorBottomSheet.show(
   title: '选择账户',
 );
 */
+
+class _AccountListTabView extends ConsumerWidget {
+  final AccountSelectorType accountType;
+  final Account? selectedAccount;
+  final SelectableAccount selectableAccount;
+  final Function(Account) onAccountSelected;
+
+  const _AccountListTabView({
+    required this.accountType,
+    this.selectedAccount,
+    required this.selectableAccount,
+    required this.onAccountSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountsAsync = _getAccountProvider(ref, accountType);
+
+    return accountsAsync.when(
+      data: (accounts) {
+        if (accounts.isEmpty) {
+          return const Center(
+            child: Text('暂无账户数据'),
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: _buildAccountList(context, accounts),
+        );
+      },
+      loading: () => const Center(
+        child: CircularProgressIndicator(),
+      ),
+      error: (error, stackTrace) => Center(
+        child: Text('加载失败: $error'),
+      ),
+    );
+  }
+
+  // 根据账户类型选择对应的provider
+  AsyncValue<List<Account>> _getAccountProvider(
+      WidgetRef ref, AccountSelectorType accountType) {
+    switch (accountType) {
+      case AccountSelectorType.asset:
+        return ref.watch(assetsAccountTreeProvider);
+      case AccountSelectorType.liability:
+        return ref.watch(liabilityAccountTreeProvider);
+      case AccountSelectorType.expense:
+        return ref.watch(expenseAccountTreeProvider);
+      case AccountSelectorType.income:
+        return ref.watch(incomeAccountTreeProvider);
+      case AccountSelectorType.equity:
+        return ref.watch(equityAccountTreeProvider);
+    }
+  }
+
+  List<Widget> _buildAccountList(BuildContext context, List<Account> accounts) {
+    return accounts.map((account) {
+      // 检查当前账户是否被选中（只有叶子节点才能被选中）
+      final bool hasChildren =
+          account.children != null && account.children!.isNotEmpty;
+      final bool isAccountSelected =
+          !hasChildren && _isAccountSelected(account);
+      // 检查是否需要自动展开（当选中的账户是该账户的子账户时）
+      final bool shouldAutoExpand = _shouldAutoExpand(account);
+
+      return AccountSelectorItem(
+        account: account,
+        isSelected: isAccountSelected,
+        shouldAutoExpand: shouldAutoExpand,
+        selectedAccount: selectedAccount, // 传递选中账户用于子账户选中状态判断
+        onTap: (selectedAccount) {
+          if (selectableAccount == SelectableAccount.leafOnly && hasChildren) {
+            // 如果只允许选择叶子节点，且当前是父节点，则不响应点击
+            return;
+          }
+          onAccountSelected(selectedAccount);
+        },
+      );
+    }).toList();
+  }
+
+  // 检查账户是否被选中
+  bool _isAccountSelected(Account account) {
+    if (selectedAccount == null) return false;
+    return selectedAccount!.id == account.id;
+  }
+
+  // 检查是否需要自动展开（如果选中的账户是该账户的子账户时）
+  bool _shouldAutoExpand(Account account) {
+    if (selectedAccount == null) return false;
+    if (account.children == null) return false;
+
+    // 递归检查子账户中是否包含选中的账户
+    return _containsSelectedAccount(account.children!, selectedAccount!);
+  }
+
+  // 递归检查子账户列表中是否包含指定的账户
+  bool _containsSelectedAccount(
+      List<Account> children, Account selectedAccount) {
+    for (final child in children) {
+      if (child.id == selectedAccount.id) {
+        return true;
+      }
+      if (child.children != null) {
+        if (_containsSelectedAccount(child.children!, selectedAccount)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+}

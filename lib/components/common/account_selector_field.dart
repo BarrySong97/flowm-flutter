@@ -55,14 +55,6 @@ class AccountSelectorField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                if (selectedAccount?.icon != null) ...[
-                  Icon(
-                    selectedAccount!.icon,
-                    size: 24,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(width: 12),
-                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
