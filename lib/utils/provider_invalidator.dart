@@ -24,7 +24,6 @@ void invalidateProvidersForTransaction(
   required AccountType toAccountType,
 }) {
   final types = {fromAccountType, toAccountType};
-  print(2);
   // 总是刷新通用 providers
   ref.invalidate(monthlyOverviewDataProvider);
   ref.invalidate(latestTransactionsProvider);

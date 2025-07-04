@@ -1,4 +1,5 @@
 import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/account/account_item.dart';
@@ -131,11 +132,11 @@ class _AccountCreationBottomSheetState
               parentId: _selectedParentAccount?.id,
             );
 
-        ref.invalidate(assetsAccountTreeProvider);
-        ref.invalidate(liabilityAccountTreeProvider);
-        ref.invalidate(expenseAccountTreeProvider);
-        ref.invalidate(incomeAccountTreeProvider);
-        ref.invalidate(equityAccountTreeProvider);
+        invalidateProvidersForTransaction(ref,
+            fromAccountType: _getAccountTypeFromSelector(
+                _accountTypes[_tabController.index]),
+            toAccountType: _getAccountTypeFromSelector(
+                _accountTypes[_tabController.index]));
 
         if (mounted) {
           Navigator.of(context).pop(true); // Success

@@ -20,13 +20,13 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:intl/intl.dart'; // For currency formatting
 
 /// 当前选中的月份提供者
-final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final selectedMonthProvider =
+    StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 支出图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
-final expenseChartDataProvider =
-    FutureProvider.family<List<barchart.ChartData>, int?>(
-        (ref, accountId) async {
+final expenseChartDataProvider = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -52,7 +52,7 @@ final expenseChartDataProvider =
 
 /// 指定账户当月总支出提供者
 final accountMonthlyExpenseProvider =
-    FutureProvider.family<double, int>((ref, accountId) async {
+    FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedDate = ref.watch(selectedMonthProvider);
   final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
@@ -68,7 +68,7 @@ final accountMonthlyExpenseProvider =
 
 /// 指定账户累计总支出提供者 (不区分时间)
 final accountOverallExpenseProvider =
-    FutureProvider.family<double, int>((ref, accountId) async {
+    FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   return repository.getAccountExpenseTotalBalance(accountId: accountId);
 });

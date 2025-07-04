@@ -18,9 +18,10 @@ class AssetsPageData {
 
 /// 日期范围选择器的StateProvider
 final selectedDateRangeProvider =
-    StateProvider<String>((ref) => 'month'); // Default to 'month'
+    StateProvider.autoDispose<String>((ref) => 'month'); // Default to 'month'
 
-final assetsPageDataProvider = FutureProvider<AssetsPageData>((ref) async {
+final assetsPageDataProvider =
+    FutureProvider.autoDispose<AssetsPageData>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);
@@ -67,8 +68,8 @@ final assetsPageDataProvider = FutureProvider<AssetsPageData>((ref) async {
   );
 });
 
-final assetTrendProviderByDateRange =
-    FutureProvider.family<List<AssetHistoryData>, int?>((ref, accountId) async {
+final assetTrendProviderByDateRange = FutureProvider.autoDispose
+    .family<List<AssetHistoryData>, int?>((ref, accountId) async {
   final repository = ref.watch(accountRepositoryProvider);
   final selectedRange = ref.watch(selectedDateRangeProvider);
   final ledger = await ref.watch(selectedLedgerProvider.future);

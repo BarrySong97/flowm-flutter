@@ -14,12 +14,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 /// 当前选中的月份提供者
-final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final selectedMonthProvider =
+    StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 上个月收入数据提供者 (family)
-final previousMonthIncomeProviderFamily =
-    FutureProvider.family<List<barchart.ChartData>, int?>(
-        (ref, accountId) async {
+final previousMonthIncomeProviderFamily = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -44,9 +44,8 @@ final previousMonthIncomeProviderFamily =
 
 /// 收入图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
-final incomeChartDataProviderFamily =
-    FutureProvider.family<List<barchart.ChartData>, int?>(
-        (ref, accountId) async {
+final incomeChartDataProviderFamily = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -72,7 +71,7 @@ final incomeChartDataProviderFamily =
 
 /// 收入账户树数据提供者 - This might not be directly used for the stats but kept for consistency if page structure is similar
 final incomeAccountTreeDataProvider =
-    FutureProvider<List<AccountExpenseNode>>((ref) async {
+    FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -166,6 +165,8 @@ class TopIncomeDetailPage extends ConsumerWidget {
         ref.watch(incomeChartDataProviderFamily(currentAccountId));
     final previousMonthDataAsync =
         ref.watch(previousMonthIncomeProviderFamily(currentAccountId));
+    // 添加对 incomeAccountTreeDataProvider 的 watch
+    final accountTreeAsync = ref.watch(incomeAccountTreeDataProvider);
 
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
 
@@ -184,9 +185,6 @@ class TopIncomeDetailPage extends ConsumerWidget {
       Colors.brown,
       Colors.green.shade400
     ];
-
-    final List<AccountExpenseNode> childrenNodes = account.children;
-    final double parentAccountBalance = account.balance;
 
     return Scaffold(
         appBar: AppBar(
@@ -418,67 +416,90 @@ class TopIncomeDetailPage extends ConsumerWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Builder(builder: (context) {
-                  if (childrenNodes.isEmpty) {
-                    return const Center(
-                        child: Padding(
+                child: accountTreeAsync.when(
+                  data: (accountTreeNodes) {
+                    // 过滤出当前账户的子账户
+                    final List<AccountExpenseNode> childrenNodes =
+                        accountTreeNodes.toList();
+
+                    if (childrenNodes.isEmpty) {
+                      return const Center(
+                          child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text('此分类下无子分类数据'),
+                      ));
+                    }
+
+                    // 计算父账户总金额（所有子账户余额之和）
+                    final double parentAccountBalance = childrenNodes.fold(
+                        0.0, (sum, node) => sum + node.balance);
+
+                    final List<Map<String, dynamic>> pieChartIncomeData = [];
+                    for (int i = 0; i < childrenNodes.length; i++) {
+                      final node = childrenNodes[i];
+                      pieChartIncomeData.add({
+                        'category': node.accountData.accountName,
+                        'amount': node.balance,
+                        'color': pieColors[i % pieColors.length],
+                      });
+                    }
+
+                    final List<StyledAccount> styledAccounts = [];
+                    for (int i = 0; i < childrenNodes.length; i++) {
+                      final node = childrenNodes[i];
+                      final double percentageOfParent = parentAccountBalance > 0
+                          ? (node.balance / parentAccountBalance) * 100
+                          : 0.0;
+                      styledAccounts.add(StyledAccount(
+                        name: node.accountData.accountName,
+                        rawAmount: node.balance,
+                        currencySymbol: '¥',
+                        iconData: Icons.label_outline,
+                        leadingColor: pieColors[i % pieColors.length],
+                        percentageText:
+                            '${percentageOfParent.toStringAsFixed(0)}%',
+                      ));
+                    }
+
+                    return Column(
+                      children: [
+                        SizedBox(
+                          height: 260,
+                          child:
+                              CustomPieChart(expenseData: pieChartIncomeData),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: StyledAccountList(
+                            accounts: styledAccounts,
+                            onItemTap: (index) {
+                              final selectedNode = childrenNodes[index];
+                              GoRouter.of(context).pushNamed(
+                                'incomeDetail',
+                                extra: {'account': selectedNode},
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Text('此分类下无子分类数据'),
-                    ));
-                  }
-
-                  final List<Map<String, dynamic>> pieChartIncomeData = [];
-                  for (int i = 0; i < childrenNodes.length; i++) {
-                    final node = childrenNodes[i];
-                    pieChartIncomeData.add({
-                      'category': node.accountData.accountName,
-                      'amount': node.balance,
-                      'color': pieColors[i % pieColors.length],
-                    });
-                  }
-
-                  final List<StyledAccount> styledAccounts = [];
-                  for (int i = 0; i < childrenNodes.length; i++) {
-                    final node = childrenNodes[i];
-                    final double percentageOfParent = parentAccountBalance > 0
-                        ? (node.balance / parentAccountBalance) * 100
-                        : 0.0;
-                    styledAccounts.add(StyledAccount(
-                      name: node.accountData.accountName,
-                      rawAmount: node.balance,
-                      currencySymbol: '¥',
-                      iconData: Icons.label_outline,
-                      leadingColor: pieColors[i % pieColors.length],
-                      percentageText:
-                          '${percentageOfParent.toStringAsFixed(0)}%',
-                    ));
-                  }
-
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: 260,
-                        child: CustomPieChart(expenseData: pieChartIncomeData),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: StyledAccountList(
-                          accounts: styledAccounts,
-                          onItemTap: (index) {
-                            final selectedNode = childrenNodes[index];
-                            GoRouter.of(context).pushNamed(
-                              'incomeDetail',
-                              extra: {'account': selectedNode},
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (error, stack) => Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('加载失败: $error'),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

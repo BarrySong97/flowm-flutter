@@ -1,6 +1,7 @@
 import 'package:flowm/components/home_page/expenses_page.dart';
 import 'package:flowm/components/home_page/income_page.dart';
 import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/account/account_item.dart';
@@ -188,13 +189,10 @@ class _AccountUpdateBottomSheetState
         print('账户更新成功');
 
         // 刷新所有账户相关的provider
-        ref.invalidate(assetsAccountTreeProvider);
-        ref.invalidate(liabilityAccountTreeProvider);
-        ref.invalidate(expenseAccountTreeProvider);
-        ref.invalidate(incomeAccountTreeProvider);
-        ref.invalidate(equityAccountTreeProvider);
-        // ref.invalidate(expenseAccountTreeDataProvider);
-        // ref.invalidate(incomeAccountTreeDataProvider);
+        invalidateProvidersForTransaction(ref,
+            fromAccountType: widget.accountToUpdate.type,
+            toAccountType: _getAccountTypeFromSelector(
+                _accountTypes[_tabController.index]));
 
         if (mounted) {
           Navigator.of(context).pop(true); // Success

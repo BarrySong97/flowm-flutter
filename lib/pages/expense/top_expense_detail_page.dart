@@ -14,12 +14,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart'; // Added for formatting
 
 /// 当前选中的月份提供者
-final selectedMonthProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final selectedMonthProvider =
+    StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 上个月支出数据提供者 (family)
-final previousMonthExpenseProviderFamily =
-    FutureProvider.family<List<barchart.ChartData>, int?>(
-        (ref, accountId) async {
+final previousMonthExpenseProviderFamily = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -44,13 +44,12 @@ final previousMonthExpenseProviderFamily =
 
 /// 支出图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
-final expenseChartDataProvider =
-    FutureProvider.family<List<barchart.ChartData>, int?>(
-        (ref, accountId) async {
+final expenseChartDataProvider = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
-
+  print(selectedDate);
   if (selectedLedger == null) {
     return [];
   }
@@ -72,7 +71,7 @@ final expenseChartDataProvider =
 
 /// 支出账户树数据提供者
 final expenseAccountTreeDataProvider =
-    FutureProvider<List<AccountExpenseNode>>((ref) async {
+    FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
@@ -84,7 +83,8 @@ final expenseAccountTreeDataProvider =
   final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
   final DateTime endDate =
       DateTime(selectedDate.year, selectedDate.month + 1, 0);
-
+  print('startDate: $startDate');
+  print('endDate: $endDate');
   return repository.getExpenseAccountTree(
     startDate: startDate,
     endDate: endDate,
@@ -175,6 +175,8 @@ class TopExpensesDetailPage extends ConsumerWidget {
     // Watch the new provider for previous month's data
     final previousMonthDataAsync =
         ref.watch(previousMonthExpenseProviderFamily(currentAccountId));
+    // 添加对 expenseAccountTreeDataProvider 的 watch
+    final accountTreeAsync = ref.watch(expenseAccountTreeDataProvider);
 
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
 
@@ -194,11 +196,6 @@ class TopExpensesDetailPage extends ConsumerWidget {
       Colors.brown,
       Colors.red.shade400
     ];
-
-    // Use children of the passed account for PieChart and List
-    final List<AccountExpenseNode> childrenNodes = account.children;
-    final double parentAccountBalance =
-        account.balance; // Parent total for new percentage calculation
 
     return Scaffold(
         appBar: AppBar(
@@ -433,73 +430,92 @@ class TopExpensesDetailPage extends ConsumerWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Builder(
-                    // Using Builder to handle cases where childrenNodes might be empty
-                    builder: (context) {
-                  if (childrenNodes.isEmpty) {
-                    return const Center(
-                        child: Padding(
+                child: accountTreeAsync.when(
+                  data: (accountTreeNodes) {
+                    // 过滤出当前账户的子账户
+                    final List<AccountExpenseNode> childrenNodes =
+                        accountTreeNodes.toList();
+
+                    if (childrenNodes.isEmpty) {
+                      return const Center(
+                          child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text('此分类下无子分类数据'),
+                      ));
+                    }
+
+                    // 计算父账户总金额（所有子账户余额之和）
+                    final double parentAccountBalance = childrenNodes.fold(
+                        0.0, (sum, node) => sum + node.balance);
+
+                    // 1. 转换数据给 CustomPieChart
+                    final List<Map<String, dynamic>> pieChartExpenseData = [];
+                    for (int i = 0; i < childrenNodes.length; i++) {
+                      final node = childrenNodes[i];
+                      pieChartExpenseData.add({
+                        'category': node.accountData.accountName,
+                        'amount': node.balance,
+                        'color': pieColors[i % pieColors.length],
+                      });
+                    }
+
+                    // 2. 转换数据给 StyledAccountList
+                    final List<StyledAccount> styledAccounts = [];
+                    for (int i = 0; i < childrenNodes.length; i++) {
+                      final node = childrenNodes[i];
+                      final double percentageOfParent = parentAccountBalance > 0
+                          ? (node.balance / parentAccountBalance) * 100
+                          : 0.0;
+                      styledAccounts.add(StyledAccount(
+                        name: node.accountData.accountName,
+                        rawAmount: node.balance,
+                        currencySymbol: '¥',
+                        iconData: Icons.label_outline,
+                        leadingColor: pieColors[i % pieColors.length],
+                        percentageText:
+                            '${percentageOfParent.toStringAsFixed(0)}%',
+                      ));
+                    }
+
+                    return Column(
+                      children: [
+                        SizedBox(
+                          height: 260,
+                          child:
+                              CustomPieChart(expenseData: pieChartExpenseData),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: StyledAccountList(
+                            accounts: styledAccounts,
+                            onItemTap: (index) {
+                              final selectedNode = childrenNodes[index];
+                              GoRouter.of(context).pushNamed(
+                                'expensesDetail',
+                                extra: {'account': selectedNode},
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Text('此分类下无子分类数据'), // Updated message
-                    ));
-                  }
-
-                  // 1. 转换数据给 CustomPieChart using childrenNodes
-                  final List<Map<String, dynamic>> pieChartExpenseData = [];
-                  for (int i = 0; i < childrenNodes.length; i++) {
-                    final node = childrenNodes[i];
-                    pieChartExpenseData.add({
-                      'category': node.accountData.accountName,
-                      'amount': node.balance,
-                      'color': pieColors[i % pieColors.length],
-                    });
-                  }
-
-                  // 2. 转换数据给 StyledAccountList using childrenNodes
-                  // Percentages will be recalculated relative to the parent account's balance
-                  final List<StyledAccount> styledAccounts = [];
-                  for (int i = 0; i < childrenNodes.length; i++) {
-                    final node = childrenNodes[i];
-                    final double percentageOfParent = parentAccountBalance > 0
-                        ? (node.balance / parentAccountBalance) * 100
-                        : 0.0;
-                    styledAccounts.add(StyledAccount(
-                      name: node.accountData.accountName,
-                      rawAmount: node.balance,
-                      currencySymbol: '¥',
-                      iconData: Icons.label_outline,
-                      leadingColor: pieColors[i % pieColors.length],
-                      // Use the newly calculated percentage relative to parent
-                      percentageText:
-                          '${percentageOfParent.toStringAsFixed(0)}%',
-                    ));
-                  }
-
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: 260,
-                        child: CustomPieChart(expenseData: pieChartExpenseData),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: StyledAccountList(
-                          accounts: styledAccounts,
-                          onItemTap: (index) {
-                            final selectedNode = childrenNodes[index];
-                            GoRouter.of(context).pushNamed(
-                              'expensesDetail',
-                              extra: {'account': selectedNode},
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  error: (error, stack) => Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('加载失败: $error'),
+                    ),
+                  ),
+                ),
               ),
               // Add a title for the accounts section
 
