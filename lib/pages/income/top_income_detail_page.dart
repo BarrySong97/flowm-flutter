@@ -419,9 +419,16 @@ class TopIncomeDetailPage extends ConsumerWidget {
                 child: accountTreeAsync.when(
                   data: (accountTreeNodes) {
                     // 过滤出当前账户的子账户
-                    final List<AccountExpenseNode> childrenNodes =
-                        accountTreeNodes.toList();
 
+                    final List<AccountExpenseNode> childrenNodes =
+                        accountTreeNodes
+                            .where((node) => node.children.any((childnode) =>
+                                childnode.accountData.parentAccountId ==
+                                currentAccountId))
+                            .toList()
+                            .map((v) => v.children)
+                            .expand((v) => v)
+                            .toList();
                     if (childrenNodes.isEmpty) {
                       return const Center(
                           child: Padding(
