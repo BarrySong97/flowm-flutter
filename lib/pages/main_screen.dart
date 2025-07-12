@@ -149,9 +149,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       case '/transactions':
         _navigateToTab(3, queryParams);
         break;
-      case '/settings':
-        _navigateToTab(4, queryParams);
-        break;
+      // case '/settings':
+      //   _navigateToTab(4, queryParams);
+      //   break;
       default:
         // 如果路径不匹配，显示参数信息
         _showLinkInfo(path, queryParams);
@@ -280,13 +280,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               ),
               title: Text('流水'),
             ),
-            FlashyTabBarItem(
-              icon: Icon(
-                Icons.settings,
-                size: 24,
-              ),
-              title: Text('设置'),
-            ),
+            // FlashyTabBarItem(
+            //   icon: Icon(
+            //     Icons.settings,
+            //     size: 24,
+            //   ),
+            //   title: Text('设置'),
+            // ),
           ],
         ),
       ),
