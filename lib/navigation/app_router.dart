@@ -6,8 +6,8 @@ import 'package:flowm/pages/expense/expense_detail_page.dart';
 import 'package:flowm/pages/income/income_detail_page.dart';
 import 'package:flowm/pages/income/top_income_detail_page.dart';
 import 'package:flowm/pages/liabilities/top_liabilities_account_detail_page.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:swipeable_page_route/swipeable_page_route.dart';
 // import 'package:flowm/pages/home_page.dart'; // No longer the initial route
 import 'package:flowm/pages/main_screen.dart'; // Import MainScreen
 import 'package:flowm/pages/splash_page.dart'; // Import SplashPage
@@ -35,21 +35,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: TopExpensesDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => TopExpensesDetailPage(account: account),
           );
         },
       ),
@@ -60,21 +47,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: TopIncomeDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => TopIncomeDetailPage(account: account),
           );
         },
       ),
@@ -85,21 +59,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: ExpensesDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => ExpensesDetailPage(account: account),
           );
         },
       ),
@@ -110,21 +71,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as AccountExpenseNode;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: IncomeDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => IncomeDetailPage(account: account),
           );
         },
       ),
@@ -135,21 +83,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as Account;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: AssetsDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => AssetsDetailPage(account: account),
           );
         },
       ),
@@ -160,21 +95,8 @@ class AppRouter {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
           final account = extra?['account'] as Account;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: LiabilitiesDetailPage(account: account),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => LiabilitiesDetailPage(account: account),
           );
         },
       ),
@@ -184,26 +106,9 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account']; // 获取account参数
-          // TODO: 后续需要将 account 传给 TopAssetsAccountDetailPage
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            // child: const TopAssetsAccountDetailPage(), // 修改为传入account
-
-            child: TopAssetsAccountDetailPage(
-                account: account as Account), // 传入account
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          final account = extra?['account'] as Account;
+          return SwipeablePage(
+            builder: (context) => TopAssetsAccountDetailPage(account: account),
           );
         },
       ),
@@ -213,26 +118,9 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account']; // 获取account参数
-          // TODO: 后续需要将 account 传给 TopAssetsAccountDetailPage
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            // child: const TopAssetsAccountDetailPage(), // 修改为传入account
-
-            child: TopLiabilitiesAccountDetailPage(
-                account: account as Account), // 传入account
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(1.0, 0.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          final account = extra?['account'] as Account;
+          return SwipeablePage(
+            builder: (context) => TopLiabilitiesAccountDetailPage(account: account),
           );
         },
       ),
@@ -241,21 +129,8 @@ class AppRouter {
         name: 'add',
         pageBuilder: (context, state) {
           final transactionId = state.extra as int?;
-          return CustomTransitionPage<void>(
-            key: state.pageKey,
-            child: AddPage(transactionId: transactionId),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              const begin = Offset(0.0, 1.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              var offsetAnimation = animation.drive(tween);
-
-              return SlideTransition(position: offsetAnimation, child: child);
-            },
+          return SwipeablePage(
+            builder: (context) => AddPage(transactionId: transactionId),
           );
         },
       ),

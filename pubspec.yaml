@@ -66,6 +66,7 @@ dependencies:
   shelf_router: ^1.1.4
   shelf_static: ^1.1.2
   network_info_plus: ^5.0.0
+  swipeable_page_route: ^0.4.2
 
 dev_dependencies:
   flutter_test:
