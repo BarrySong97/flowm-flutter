@@ -73,7 +73,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           return Colors.teal;
         case '个人提取':
           return Colors.deepOrange;
-        case '费用退款':
+        case '支出退款':
           return Colors.lightGreen;
         case '贷款支出':
           return Colors.redAccent;

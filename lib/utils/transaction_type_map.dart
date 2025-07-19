@@ -10,7 +10,7 @@ enum TransactionType {
   LOAN_RECEIVED('获得贷款'),
   PERSONAL_INVESTMENT('个人投入'),
   PERSONAL_WITHDRAWAL('个人提取'),
-  EXPENSE_REFUND('费用退款'),
+  EXPENSE_REFUND('支出退款'),
   LOAN_EXPENSE('贷款支出');
 
   const TransactionType(this.displayName);

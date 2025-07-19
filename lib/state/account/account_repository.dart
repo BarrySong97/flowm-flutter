@@ -83,7 +83,7 @@ final liabilityAccountTreeProvider =
   }
 });
 
-/// 提供费用账户树，改为 Future 形式
+/// 提供支出账户树，改为 Future 形式
 final expenseAccountTreeProvider =
     FutureProvider<List<account_ui.Account>>((ref) async {
   final repository = ref.watch(accountRepositoryProvider);
@@ -281,7 +281,7 @@ class AccountRepository {
     });
   }
 
-  /// 监听费用账户树
+  /// 监听支出账户树
   Stream<List<account_ui.Account>> watchExpenseAccountTree({int? ledgerId}) {
     if (ledgerId == null) {
       return Stream.value(<account_ui.Account>[]);
@@ -979,7 +979,7 @@ class AccountRepository {
         .watchAllTransactions(ledgerId: ledgerId)
         .asyncMap((transactions) async {
       try {
-        // 获取所有与该账本相关的费用账户
+        // 获取所有与该账本相关的支出账户
         final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
         final expenseAccountIds = allAccounts
             .where((account) => account.accountType == AccountType.EXPENSE)
@@ -990,7 +990,7 @@ class AccountRepository {
           return 0.0;
         }
 
-        // 计算费用账户在此期间的总金额
+        // 计算支出账户在此期间的总金额
         final result = await _accountDao.customSelect(
           '''
           SELECT SUM(p.amount) as total
@@ -1565,7 +1565,7 @@ class AccountRepository {
     }
   }
 
-  /// 获取费用账户树
+  /// 获取支出账户树
   Future<List<account_ui.Account>> getExpenseAccountTree(
       {int? ledgerId}) async {
     try {

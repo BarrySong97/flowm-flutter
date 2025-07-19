@@ -85,7 +85,7 @@ class _AccountSelectorBottomSheetState
       AccountSelectorType.equity,
     ];
 
-    _tabLabels = ['资产', '负债', '费用', '收入', '权益'];
+    _tabLabels = ['资产', '负债', '支出', '收入', '权益'];
 
     // 确定初始tab索引
     int initialIndex = 0;
@@ -191,12 +191,12 @@ class _AccountSelectorBottomSheetState
         accountName.contains('负债')) {
       return 1; // 负债
     } else if (accountName.contains('支出') ||
-        accountName.contains('费用') ||
+        accountName.contains('支出') ||
         accountName.contains('开销') ||
         accountName.contains('餐饮') ||
         accountName.contains('交通') ||
         accountName.contains('购物')) {
-      return 2; // 费用
+      return 2; // 支出
     } else if (accountName.contains('收入') ||
         accountName.contains('薪资') ||
         accountName.contains('奖金') ||
@@ -383,7 +383,7 @@ final selectedAccount = await AccountSelectorBottomSheet.show(
   selectedAccount: currentAccount, // 可选的当前选中账户  
 );
 
-// 显示账户选择器，默认选中费用类型
+// 显示账户选择器，默认选中支出类型
 final selectedAccount = await AccountSelectorBottomSheet.show(
   context,
   title: '选择账户',

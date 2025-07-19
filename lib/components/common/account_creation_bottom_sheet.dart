@@ -62,7 +62,7 @@ class _AccountCreationBottomSheetState
       AccountSelectorType.income,
       AccountSelectorType.equity,
     ];
-    _tabLabels = ['资产', '负债', '费用', '收入', '权益'];
+    _tabLabels = ['资产', '负债', '支出', '收入', '权益'];
 
     int initialIndex = _accountTypes.indexOf(widget.defaultAccountType);
     if (initialIndex == -1) initialIndex = 0;

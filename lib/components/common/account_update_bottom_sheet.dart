@@ -68,7 +68,7 @@ class _AccountUpdateBottomSheetState
       AccountSelectorType.income,
       AccountSelectorType.equity,
     ];
-    _tabLabels = ['资产', '负债', '费用', '收入', '权益'];
+    _tabLabels = ['资产', '负债', '支出', '收入', '权益'];
 
     // 根据当前账户类型确定初始tab
     _currentAccountType = _getAccountSelectorType(widget.accountToUpdate.type);
