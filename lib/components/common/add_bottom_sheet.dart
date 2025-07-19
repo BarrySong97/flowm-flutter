@@ -30,42 +30,26 @@ class AddBottomSheet extends StatelessWidget {
             padding: EdgeInsets.all(20),
             child: Column(
               children: [
-                Text(
-                  '添加记录',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 24),
+                SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildActionButton(
-                      icon: Icons.add_circle,
-                      label: '收入',
+                      icon: Icons.receipt_long,
+                      label: '添加流水',
+                      color: Colors.grey[600]!,
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/add');
+                      },
+                    ),
+                    _buildActionButton(
+                      icon: Icons.account_balance_wallet,
+                      label: '添加账户',
                       color: Colors.green,
                       onTap: () {
                         Navigator.pop(context);
-                        context.push('/add?type=income');
-                      },
-                    ),
-                    _buildActionButton(
-                      icon: Icons.remove_circle,
-                      label: '支出',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/add?type=expense');
-                      },
-                    ),
-                    _buildActionButton(
-                      icon: Icons.swap_horiz,
-                      label: '转账',
-                      color: Colors.blue,
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/add?type=transfer');
+                        context.push('/add-account');
                       },
                     ),
                   ],
@@ -94,7 +78,7 @@ class AddBottomSheet extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
               icon,
