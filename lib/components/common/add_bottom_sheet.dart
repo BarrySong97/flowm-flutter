@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flowm/components/common/account_creation_bottom_sheet.dart';
+import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 
 class AddBottomSheet extends StatelessWidget {
-  const AddBottomSheet({super.key});
+  final int currentIndex;
+
+  const AddBottomSheet({super.key, required this.currentIndex});
 
   @override
   Widget build(BuildContext context) {
@@ -45,11 +49,14 @@ class AddBottomSheet extends StatelessWidget {
                     ),
                     _buildActionButton(
                       icon: Icons.account_balance_wallet,
-                      label: '添加账户',
+                      label: _getAccountButtonLabel(),
                       color: Colors.green,
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        context.push('/add-account');
+                        await AccountCreationBottomSheet.show(
+                          context,
+                          defaultAccountType: _getDefaultAccountType(),
+                        );
                       },
                     ),
                   ],
@@ -61,6 +68,36 @@ class AddBottomSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getAccountButtonLabel() {
+    switch (currentIndex) {
+      case 1: // 资产
+        return '添加资产账户';
+      case 2: // 支出
+        return '添加支出分类(账户)';
+      case 3: // 收入
+        return '添加收入分类(账户)';
+      case 4: // 负债
+        return '添加负债账户';
+      default:
+        return '添加账户';
+    }
+  }
+
+  AccountSelectorType _getDefaultAccountType() {
+    switch (currentIndex) {
+      case 1: // 资产
+        return AccountSelectorType.asset;
+      case 2: // 支出
+        return AccountSelectorType.expense;
+      case 3: // 收入
+        return AccountSelectorType.income;
+      case 4: // 负债
+        return AccountSelectorType.liability;
+      default:
+        return AccountSelectorType.asset;
+    }
   }
 
   Widget _buildActionButton({

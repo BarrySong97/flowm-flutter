@@ -11,6 +11,7 @@ import 'package:flowm/utils/snackbar_utils.dart';
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/common/add_bottom_sheet.dart';
+import 'package:flowm/state/home/page_controller_provider.dart';
 
 // Provider for MainScreen's selected tab index
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -204,12 +205,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _showAddBottomSheet() {
+    final currentHomePageIndex = ref.read(currentPageIndexProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return const AddBottomSheet();
+        return AddBottomSheet(currentIndex: currentHomePageIndex);
       },
     );
   }
