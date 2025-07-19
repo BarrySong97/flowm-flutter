@@ -7,6 +7,7 @@ class SettingsDataItem {
   final Widget? trailing;
   final VoidCallback onTap;
   final Widget? customContent;
+  final bool showArrow;
 
   SettingsDataItem({
     required this.icon,
@@ -15,6 +16,7 @@ class SettingsDataItem {
     this.trailing,
     required this.onTap,
     this.customContent,
+    this.showArrow = true,
   });
 }
 
@@ -80,10 +82,12 @@ class SettingsDataSection extends StatelessWidget {
                             )
                           : null,
                       trailing: item.trailing ??
-                          Icon(
-                            Icons.chevron_right,
-                            color: Colors.grey[400],
-                          ),
+                          (item.showArrow
+                              ? Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.grey[400],
+                                )
+                              : null),
                       onTap: item.onTap,
                     ),
                     if (item.customContent != null)

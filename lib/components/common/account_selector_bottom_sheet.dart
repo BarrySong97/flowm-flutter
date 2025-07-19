@@ -47,7 +47,7 @@ class AccountSelectorBottomSheet extends ConsumerStatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
       ),
       builder: (context) => AccountSelectorBottomSheet(
         title: title,
@@ -224,7 +224,7 @@ class _AccountSelectorBottomSheetState
       height: screenHeight * 0.8,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
       ),
       child: Column(
         children: [

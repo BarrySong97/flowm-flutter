@@ -338,7 +338,7 @@ class _AccountUpdateBottomSheetState
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

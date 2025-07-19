@@ -97,7 +97,7 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Container(
         width: 320,
