@@ -1,4 +1,3 @@
-import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ import 'dart:async';
 import 'package:flowm/utils/snackbar_utils.dart';
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flowm/components/common/add_bottom_sheet.dart';
 
 // Provider for MainScreen's selected tab index
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -203,9 +203,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     SnackBarUtils.showInfo(context, message);
   }
 
+  void _showAddBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return const AddBottomSheet();
+      },
+    );
+  }
+
+
   void _onItemTapped(int index) {
     if (index == 2) {
-      context.push('/add');
+      _showAddBottomSheet();
     } else {
       ref.read(mainScreenIndexProvider.notifier).state = index;
     }
@@ -280,13 +292,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               ),
               title: Text('流水'),
             ),
-            // FlashyTabBarItem(
-            //   icon: Icon(
-            //     Icons.settings,
-            //     size: 24,
-            //   ),
-            //   title: Text('设置'),
-            // ),
+            FlashyTabBarItem(
+              icon: Icon(
+                Icons.settings,
+                size: 24,
+              ),
+              title: Text('设置'),
+            ),
           ],
         ),
       ),
