@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
@@ -158,6 +159,7 @@ class _AccountCreationBottomSheetState
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: MediaQuery.of(context).size.height * 0.45,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
@@ -178,39 +180,80 @@ class _AccountCreationBottomSheetState
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text('创建新账户', style: Theme.of(context).textTheme.titleLarge),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(
-                _tabLabels.length,
-                (index) => GestureDetector(
-                  onTap: () {
-                    _tabController.animateTo(index);
-                  },
-                  child: Container(
-                    alignment: Alignment.center,
-                    width: 50,
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontSize: _tabController.index == index ? 18 : 14,
-                        fontWeight: _tabController.index == index
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: _tabController.index == index
-                            ? Colors.black
-                            : Colors.grey[600],
+          AnimatedBuilder(
+            animation: _tabController.animation!,
+            builder: (context, child) {
+              final targetIndex = _tabController.index;
+              final previousIndex = _tabController.previousIndex;
+              final animationValue = _tabController.animation!.value;
+
+              final isJump = (targetIndex - previousIndex).abs() > 1;
+
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(_tabLabels.length, (index) {
+                    double selectedness;
+
+                    if (isJump) {
+                      if (targetIndex == previousIndex) {
+                        selectedness = index == targetIndex ? 1.0 : 0.0;
+                      } else {
+                        final double progress =
+                            (animationValue - previousIndex) /
+                                (targetIndex - previousIndex);
+                        if (index == targetIndex) {
+                          selectedness = progress;
+                        } else if (index == previousIndex) {
+                          selectedness = 1.0 - progress;
+                        } else {
+                          selectedness = 0.0;
+                        }
+                      }
+                    } else {
+                      selectedness = (1.0 - (animationValue - index).abs());
+                    }
+
+                    selectedness = selectedness.clamp(0.0, 1.0);
+
+                    final Color color = Color.lerp(
+                        Colors.grey[600], Colors.black, selectedness)!;
+                    final FontWeight fontWeight = FontWeight.lerp(
+                        FontWeight.w500, FontWeight.bold, selectedness)!;
+                    final double scale =
+                        lerpDouble(14.0 / 16.0, 1.0, selectedness)!;
+
+                    return GestureDetector(
+                      onTap: () {
+                        _tabController.animateTo(index);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        alignment: Alignment.center,
+                        width: 60,
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 8),
+                        child: Transform.scale(
+                          scale: scale,
+                          child: Text(
+                            _tabLabels[index],
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: fontWeight,
+                              color: color,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        _tabLabels[index],
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
+                    );
+                  }),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           Divider(height: 1, color: Colors.grey[200]),
           Padding(
