@@ -1,9 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flowm/components/settings/settings_data_section.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  String version = '加载中...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      version = packageInfo.version;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +42,7 @@ class SettingsPage extends StatelessWidget {
                   SettingsDataItem(
                     icon: Icons.info_outline,
                     title: '版本',
-                    subtitle: '1.0.0',
+                    subtitle: version,
                     onTap: () {
                       context.pushNamed('version');
                     },
