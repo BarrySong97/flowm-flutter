@@ -13,6 +13,7 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 
@@ -97,6 +98,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             expense: formattedExpense,
             income: formattedIncome,
             balance: formattedBalance,
+            onTap: () {
+              context.pushNamed('monthlyDetails', extra: {
+                'month': '${DateTime.now().month}月',
+              });
+            },
           );
         },
         loading: () => const MonthlyOverviewCard(

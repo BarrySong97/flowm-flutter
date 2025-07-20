@@ -15,6 +15,7 @@ import 'package:flowm/pages/assets/top_assets_account_detail_page.dart'; // 引�
 import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/version_page.dart';
 import 'package:flowm/pages/developer_page.dart';
+import 'package:flowm/pages/monthly_details_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -174,6 +175,18 @@ class AppRouter {
         pageBuilder: (context, state) {
           return SwipeablePage(
             builder: (context) => const DeveloperPage(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/monthly-details',
+        name: 'monthlyDetails',
+        pageBuilder: (context, state) {
+          final Map<String, dynamic>? extra =
+              state.extra as Map<String, dynamic>?;
+          final month = extra?['month'] as String? ?? '未知月份';
+          return SwipeablePage(
+            builder: (context) => MonthlyDetailsPage(month: month),
           );
         },
       ),
