@@ -173,6 +173,15 @@ class _AccountUpdateBottomSheetState
         return;
       }
 
+      // 验证父账户类型
+      final currentAccountType = _getAccountTypeFromSelector(_accountTypes[_tabController.index]);
+      if (_selectedParentAccount != null && _selectedParentAccount!.type != currentAccountType) {
+        if (mounted) {
+          SnackBarUtils.showOverlayWarning(context, '父账户类型必须与当前账户类型一致');
+        }
+        return;
+      }
+
       try {
         print(
             '开始更新账户: ID=${widget.accountToUpdate.id}, 名称=${_nameController.text.trim()}');
@@ -471,6 +480,9 @@ class _AccountUpdateBottomSheetState
                         child: OutlinedButton(
                           onPressed: () => Navigator.of(context).pop(false),
                           style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             textStyle: const TextStyle(fontSize: 16),
                           ),

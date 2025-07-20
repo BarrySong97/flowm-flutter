@@ -12,6 +12,7 @@ import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:sankey_flutter/sankey_helpers.dart';
 import 'package:intl/intl.dart';
+import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
   final Account account;
@@ -206,7 +207,12 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                 IconButton(
                   icon: const Icon(Icons.more_vert,
                       color: Colors.black87, size: 22),
-                  onPressed: () {},
+                  onPressed: () async {
+                    await AccountUpdateBottomSheet.show(
+                      context,
+                      accountToUpdate: widget.account,
+                    );
+                  },
                 ),
               ],
               centerTitle: true,
