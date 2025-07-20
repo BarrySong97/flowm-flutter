@@ -7,6 +7,7 @@ import 'package:flowm/components/account/account_item.dart'; // Import AccountIt
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
+import 'package:el_tooltip/el_tooltip.dart';
 
 class LiabilitiesPage extends ConsumerStatefulWidget {
   const LiabilitiesPage({super.key});
@@ -185,16 +186,32 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
 
   /// 构建负债分布标题
   Widget _buildLiabilitiesDistributionTitle() {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
+        const Text(
           '负债分布',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.black54,
+          ),
+        ),
+        ElTooltip(
+          content: const Text(
+            '单点：查看详细信息\n长按：下钻到子分类\n双击：进入账户详情页',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+            textAlign: TextAlign.left,
+          ),
+          color: Colors.black87,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            child: Icon(
+              Icons.help_outline,
+              size: 16,
+              color: Colors.grey[600],
+            ),
           ),
         ),
       ],

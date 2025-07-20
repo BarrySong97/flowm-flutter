@@ -252,6 +252,18 @@ class LedgerSelector extends ConsumerWidget {
                   },
                 ),
               ),
+              // 操作提示
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  '单点切换 • 长按编辑',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: ElevatedButton(

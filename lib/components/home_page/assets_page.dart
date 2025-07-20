@@ -10,6 +10,7 @@ import 'package:flowm/components/chart/treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
 import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
+import 'package:el_tooltip/el_tooltip.dart';
 
 class AssetsPage extends ConsumerStatefulWidget {
   const AssetsPage({super.key});
@@ -153,16 +154,32 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
 
   /// 构建资产分布标题
   Widget _buildAssetDistributionTitle() {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
+        const Text(
           '资产分布',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.black54,
+          ),
+        ),
+        ElTooltip(
+          content: const Text(
+            '单点：查看详细信息\n长按：下钻到子分类\n双击：进入账户详情页',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+            textAlign: TextAlign.left,
+          ),
+          color: Colors.black87,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            child: Icon(
+              Icons.help_outline,
+              size: 16,
+              color: Colors.grey[600],
+            ),
           ),
         ),
       ],
