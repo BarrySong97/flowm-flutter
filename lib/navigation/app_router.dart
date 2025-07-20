@@ -1,4 +1,3 @@
-import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/pages/assets/assets_detail_page.dart';
 import 'package:flowm/pages/liabilities/liabilities_detail_page.dart';
@@ -35,9 +34,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as AccountExpenseNode;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => TopExpensesDetailPage(account: account),
+            builder: (context) => TopExpensesDetailPage(accountId: accountId),
           );
         },
       ),
@@ -47,9 +49,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as AccountExpenseNode;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => TopIncomeDetailPage(account: account),
+            builder: (context) => TopIncomeDetailPage(accountId: accountId),
           );
         },
       ),
@@ -59,9 +64,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as AccountExpenseNode;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => ExpensesDetailPage(account: account),
+            builder: (context) => ExpensesDetailPage(accountId: accountId),
           );
         },
       ),
@@ -71,9 +79,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as AccountExpenseNode;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => IncomeDetailPage(account: account),
+            builder: (context) => IncomeDetailPage(accountId: accountId),
           );
         },
       ),
@@ -83,9 +94,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as Account;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => AssetsDetailPage(account: account),
+            builder: (context) => AssetsDetailPage(accountId: accountId),
           );
         },
       ),
@@ -95,9 +109,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as Account;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => LiabilitiesDetailPage(account: account),
+            builder: (context) => LiabilitiesDetailPage(accountId: accountId),
           );
         },
       ),
@@ -107,9 +124,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as Account;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => TopAssetsAccountDetailPage(account: account),
+            builder: (context) => TopAssetsAccountDetailPage(accountId: accountId),
           );
         },
       ),
@@ -119,9 +139,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final Map<String, dynamic>? extra =
               state.extra as Map<String, dynamic>?;
-          final account = extra?['account'] as Account;
+          final accountId = extra?['accountId'] as int?;
+          if (accountId == null) {
+            throw ArgumentError('Missing required accountId parameter');
+          }
           return SwipeablePage(
-            builder: (context) => TopLiabilitiesAccountDetailPage(account: account),
+            builder: (context) => TopLiabilitiesAccountDetailPage(accountId: accountId),
           );
         },
       ),

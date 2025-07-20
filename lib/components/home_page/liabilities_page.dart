@@ -308,10 +308,10 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                   if (hasChildren) {
                     GoRouter.of(context).pushNamed(
                         'topLiabilitiesAccountDetail',
-                        extra: {'account': selectedAccountToNavigate});
+                        extra: {'accountId': selectedAccountToNavigate.id});
                   } else {
-                    GoRouter.of(context).pushNamed('assetsLiabilityDetail',
-                        extra: {'account': selectedAccountToNavigate});
+                    GoRouter.of(context).pushNamed('liabilitiesDetail',
+                        extra: {'accountId': selectedAccountToNavigate.id});
                   }
                 }
               },
@@ -360,10 +360,10 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                   tappedAccount.children!.isNotEmpty;
               if (hasChildren) {
                 GoRouter.of(context).pushNamed('topLiabilitiesAccountDetail',
-                    extra: {'account': tappedAccount});
+                    extra: {'accountId': tappedAccount.id});
               } else {
                 GoRouter.of(context).pushNamed('liabilitiesDetail',
-                    extra: {'account': tappedAccount});
+                    extra: {'accountId': tappedAccount.id});
               }
             },
           ),

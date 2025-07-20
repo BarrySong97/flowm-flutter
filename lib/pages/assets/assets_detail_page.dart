@@ -6,6 +6,7 @@ import 'package:flowm/components/chart/asset_trend_chart.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
@@ -15,8 +16,8 @@ import 'package:intl/intl.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
-  final Account account;
-  const AssetsDetailPage({super.key, required this.account});
+  final int accountId;
+  const AssetsDetailPage({super.key, required this.accountId});
 
   @override
   ConsumerState<AssetsDetailPage> createState() => _AssetsDetailPageState();
@@ -66,6 +67,23 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
 
   @override
   Widget build(BuildContext context) {
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPage(BuildContext context, Account account) {
     return Scaffold(
       body: NestedScrollView(
         controller: _scrollController,
@@ -93,16 +111,16 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                             child: Consumer(builder: (context, ref, child) {
                               final assetTrendAsync = ref.watch(
                                   assetTrendProviderByTimeRange((
-                                accountId: widget.account.id,
+                                accountId: account.id,
                                 timeRange: _selectedTimeRange
                               )));
 
                               final amountToShow = assetTrendAsync.when(
                                 data: (assetData) => assetData.isEmpty
-                                    ? widget.account.amount
+                                    ? account.amount
                                     : assetData.last.totalAssets,
-                                loading: () => widget.account.amount,
-                                error: (e, s) => widget.account.amount,
+                                loading: () => account.amount,
+                                error: (e, s) => account.amount,
                               );
 
                               return Column(
@@ -122,7 +140,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                                       child: Row(
                                         children: [
                                           Text(
-                                            widget.account.name,
+                                            account.name,
                                             style: const TextStyle(
                                               fontSize: 20,
                                               color: Colors.black54,
@@ -137,7 +155,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 16),
                                     child: Text(
-                                      '${widget.account.currencySymbol}${amountToShow.toStringAsFixed(2)}',
+                                      '${account.currencySymbol}${amountToShow.toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 32,
                                         fontWeight: FontWeight.bold,
@@ -210,7 +228,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                   onPressed: () async {
                     await AccountUpdateBottomSheet.show(
                       context,
-                      accountToUpdate: widget.account,
+                      accountToUpdate: account,
                     );
                   },
                 ),
@@ -223,7 +241,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      widget.account.name,
+                      account.name,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -238,7 +256,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
           ];
         },
         body: AssetsDetailBody(
-          account: widget.account,
+          account: account,
           selectedFlow: _selectedFlow,
           selectedTimeRange: _selectedTimeRange,
           onFlowChanged: (flow) {

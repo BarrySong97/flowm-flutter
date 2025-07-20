@@ -245,7 +245,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     : 'expensesDetail';
                 GoRouter.of(context).pushNamed(
                   routeName,
-                  extra: {'account': selectedNode},
+                  extra: {'accountId': selectedNode.accountData.accountId},
                 );
               },
             ),

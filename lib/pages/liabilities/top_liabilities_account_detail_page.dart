@@ -5,18 +5,18 @@ import 'package:flowm/components/chart/liability_trend_chart.dart';
 import 'package:flowm/components/chart/liability_treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Re-add for Account model
 import 'package:flowm/components/account/account_row.dart'; // Import AccountRow
-import 'package:flowm/state/account/account_repository.dart'
-    hide selectedDateRangeProvider;
+import 'package:flowm/state/account/account_info_provider.dart';
+import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class TopLiabilitiesAccountDetailPage extends ConsumerStatefulWidget {
-  final Account account; // 接收 account 参数
+  final int accountId; // 接收 accountId 参数
 
   const TopLiabilitiesAccountDetailPage(
-      {super.key, required this.account}); // 修改构造函数
+      {super.key, required this.accountId}); // 修改构造函数
 
   @override
   ConsumerState<TopLiabilitiesAccountDetailPage> createState() =>
@@ -27,23 +27,38 @@ class _TopAssetsAccountDetailPageState
     extends ConsumerState<TopLiabilitiesAccountDetailPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
-  // dynamic _currentAccount; // _currentAccount is assigned widget.account but widget.account is used directly.
+  // dynamic _currentAccount; // _currentAccount is assigned account but account is used directly.
 
   @override
   void initState() {
     super.initState();
-    // _currentAccount = widget.account; // widget.account is directly accessible
-    // if (widget.account != null) { // Constructor requires account, so it should not be null.
-    //   print('TopAssetsAccountDetailPage received account: ${widget.account.name}');
+    // _currentAccount = account; // account is directly accessible
+    // if (account != null) { // Constructor requires account, so it should not be null.
+    //   print('TopAssetsAccountDetailPage received account: ${account.name}');
     // }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
-    // final topAssetsAsync = ref.watch(topAssetAccountsProvider); // Removed
-    // final uiAccountsAsync = ref.watch(uiAccountsProvider); // Removed
+    
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
 
+  Widget _buildDetailPage(BuildContext context, Account account) {
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
       PopoverSelectItem(value: '15days', label: '最近15天'),
@@ -55,9 +70,9 @@ class _TopAssetsAccountDetailPageState
 
     final selectedDateRange = ref.watch(selectedDateRangeProvider);
     final subAccountsAsync =
-        ref.watch(liabilitySubAccountTreeProvider(widget.account.id));
+        ref.watch(liabilitySubAccountTreeProvider(account.id));
     final liabilityTrendAsync =
-        ref.watch(liabilityTrendProviderByDateRange(widget.account.id));
+        ref.watch(liabilityTrendProviderByDateRange(account.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +83,7 @@ class _TopAssetsAccountDetailPageState
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          widget.account.name,
+          account.name,
           style: TextStyle(
             color: Colors.black,
             fontSize: 18,
@@ -82,7 +97,7 @@ class _TopAssetsAccountDetailPageState
             onPressed: () async {
               await AccountUpdateBottomSheet.show(
                 context,
-                accountToUpdate: widget.account,
+                accountToUpdate: account,
               );
             },
           ),
@@ -144,7 +159,7 @@ class _TopAssetsAccountDetailPageState
                           data: (liabilityData) {
                             final amount = liabilityData.isNotEmpty
                                 ? liabilityData.last.totalLiabilities
-                                : widget.account.amount;
+                                : account.amount;
                             return Text(
                               '¥${amount.abs().toStringAsFixed(2)}',
                               style: const TextStyle(
@@ -163,8 +178,8 @@ class _TopAssetsAccountDetailPageState
                             ),
                           ),
                           error: (err, stack) => Text(
-                            // Fallback to widget.account.amount on error
-                            '¥${widget.account.amount.abs().toStringAsFixed(2)}',
+                            // Fallback to account.amount on error
+                            '¥${account.amount.abs().toStringAsFixed(2)}',
                             style: const TextStyle(
                               color: Colors.red, // Indicate error
                               fontSize: 32,
@@ -215,7 +230,7 @@ class _TopAssetsAccountDetailPageState
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 48),
                           child: Center(
-                              child: Text('${widget.account.name} 无下级账户')));
+                              child: Text('${account.name} 无下级账户')));
                     }
 
                     final double totalTopLevelAmount = subAccounts.fold(
@@ -276,7 +291,7 @@ class _TopAssetsAccountDetailPageState
                               if (treemapBaseData.isEmpty) {
                                 return Center(
                                     child: Text(
-                                        '${widget.account.name} 无下级账户可供分布展示'));
+                                        '${account.name} 无下级账户可供分布展示'));
                               }
 
                               List<Account> displayedAccounts;
@@ -287,7 +302,7 @@ class _TopAssetsAccountDetailPageState
                               if (!isDrilledDown) {
                                 displayedAccounts = treemapBaseData;
                                 currentTreemapTitle =
-                                    '${widget.account.name} - 负债构成';
+                                    '${account.name} - 负债构成';
                               } else {
                                 final parentAccount =
                                     treemapBaseData.firstWhereOrNull((acc) =>
@@ -303,7 +318,7 @@ class _TopAssetsAccountDetailPageState
                                   // Fallback: If parent not found or has no children, show base level and reset drill-down
                                   displayedAccounts = treemapBaseData;
                                   currentTreemapTitle =
-                                      '${widget.account.name} - 负债构成';
+                                      '${account.name} - 负债构成';
                                   _drilledDownAccountName = null;
                                   isDrilledDown = false;
                                   WidgetsBinding.instance
@@ -347,7 +362,7 @@ class _TopAssetsAccountDetailPageState
                                 return Center(
                                     child: Text(isDrilledDown
                                         ? '此分类下无子账户数据'
-                                        : '${widget.account.name} 无可显示的下级负债数据'));
+                                        : '${account.name} 无可显示的下级负债数据'));
                               }
 
                               return Column(
@@ -366,7 +381,7 @@ class _TopAssetsAccountDetailPageState
                                                 Icons.arrow_back_ios,
                                                 size: 16),
                                             label: Text(
-                                                '返回 ${widget.account.name}'), // Clarify back destination
+                                                '返回 ${account.name}'), // Clarify back destination
                                             onPressed: () {
                                               setState(() {
                                                 _drilledDownAccountName = null;
@@ -393,7 +408,7 @@ class _TopAssetsAccountDetailPageState
                                       },
                                       child: LiabilityTreemapWidget(
                                         key: ValueKey(_drilledDownAccountName ??
-                                            widget.account.name), // Simpler key
+                                            account.name), // Simpler key
                                         title: currentTreemapTitle,
                                         dataItems: treeMapData,
                                         tooltipValueSuffix: ' ¥',
@@ -480,11 +495,11 @@ class _TopAssetsAccountDetailPageState
                                     if (hasChildren) {
                                       GoRouter.of(context).pushNamed(
                                           'topLiabilitiesAccountDetail',
-                                          extra: {'account': account});
+                                          extra: {'accountId': account.id});
                                     } else {
                                       GoRouter.of(context).pushNamed(
                                           'liabilitiesDetail', // Navigate to assetsDetail if no children
-                                          extra: {'account': account});
+                                          extra: {'accountId': account.id});
                                     }
                                   },
                                   account: accountsWithPercentage[index],

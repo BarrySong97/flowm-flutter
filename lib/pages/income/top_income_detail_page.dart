@@ -10,13 +10,14 @@ import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart' as ui;
 
 /// 当前选中的月份提供者
-final selectedMonthProvider =
+final incomeSelectedMonthProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 上个月收入数据提供者 (family)
@@ -24,7 +25,7 @@ final previousMonthIncomeProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(incomeSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -50,7 +51,7 @@ final incomeChartDataProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(incomeSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -76,7 +77,7 @@ final incomeAccountTreeDataProvider =
     FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(incomeSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -94,9 +95,9 @@ final incomeAccountTreeDataProvider =
 });
 
 class TopIncomeDetailPage extends ConsumerWidget {
-  final AccountExpenseNode account;
+  final int accountId;
 
-  const TopIncomeDetailPage({super.key, required this.account});
+  const TopIncomeDetailPage({super.key, required this.accountId});
 
   // 辅助方法格式化数字
   String _formatCurrency(double amount) {
@@ -124,7 +125,7 @@ class TopIncomeDetailPage extends ConsumerWidget {
         ),
         child: asyncData.when(
           data: (data) {
-            final selectedMonth = ref.watch(selectedMonthProvider);
+            final selectedMonth = ref.watch(incomeSelectedMonthProvider);
             final value = calculateValue(data, selectedMonth);
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -161,6 +162,23 @@ class TopIncomeDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountExpenseNodeProvider(accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, ref, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPage(BuildContext context, WidgetRef ref, AccountExpenseNode account) {
     final int currentAccountId = account.accountData.accountId;
 
     final chartDataAsync =
@@ -170,7 +188,7 @@ class TopIncomeDetailPage extends ConsumerWidget {
     // 添加对 incomeAccountTreeDataProvider 的 watch
     final accountTreeAsync = ref.watch(incomeAccountTreeDataProvider);
 
-    final currentSelectedMonth = ref.watch(selectedMonthProvider);
+    final currentSelectedMonth = ref.watch(incomeSelectedMonthProvider);
 
     final List<Color> pieColors = [
       Colors.green.shade800,
@@ -244,7 +262,7 @@ class TopIncomeDetailPage extends ConsumerWidget {
                       MonthSelectorHeader(
                         initialDate: currentSelectedMonth,
                         onDateChanged: (newDate) {
-                          ref.read(selectedMonthProvider.notifier).state =
+                          ref.read(incomeSelectedMonthProvider.notifier).state =
                               newDate;
                         },
                       ),
@@ -508,7 +526,7 @@ class TopIncomeDetailPage extends ConsumerWidget {
                               final selectedNode = childrenNodes[index];
                               GoRouter.of(context).pushNamed(
                                 'incomeDetail',
-                                extra: {'account': selectedNode},
+                                extra: {'accountId': selectedNode.accountData.accountId},
                               );
                             },
                           ),

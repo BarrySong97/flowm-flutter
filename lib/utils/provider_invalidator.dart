@@ -1,14 +1,13 @@
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/pages/expense/expense_detail_page.dart'
     as detail_page_providers;
 import 'package:flowm/pages/income/income_detail_page.dart'
     as income_detail_page_providers;
-import 'package:flowm/state/expense/expense_repository.dart'
-    as expense_repository;
 import 'package:flowm/state/home_page/assets_page_providers.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/icome/income_providers.dart';
@@ -24,9 +23,15 @@ void invalidateProvidersForTransaction(
   required AccountType toAccountType,
 }) {
   final types = {fromAccountType, toAccountType};
+  
   // 总是刷新通用 providers
   ref.invalidate(monthlyOverviewDataProvider);
   ref.invalidate(latestTransactionsProvider);
+  
+  // 失效新的动态账户信息 providers - 这些是核心的账户数据提供者
+  ref.invalidate(accountInfoProvider);
+  ref.invalidate(accountExpenseNodeProvider);
+  ref.invalidate(accountTreeInfoProvider);
 
   // 根据账户类型刷新特定 providers
   if (types.contains(AccountType.ASSET)) {

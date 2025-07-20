@@ -144,7 +144,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
             currencySymbol: asset.symbol,
           );
           GoRouter.of(context)
-              .pushNamed('assetsDetail', extra: {'account': account});
+              .pushNamed('assetsDetail', extra: {'accountId': account.id});
         },
         child: Container(
           decoration: BoxDecoration(

@@ -8,6 +8,7 @@ import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/state/expense/expense_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +17,7 @@ import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart' as ui;
 
 /// 当前选中的月份提供者
-final selectedMonthProvider =
+final expenseSelectedMonthProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 上个月支出数据提供者 (family)
@@ -24,7 +25,7 @@ final previousMonthExpenseProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(expenseSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -50,7 +51,7 @@ final expenseChartDataProvider = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(expenseSelectedMonthProvider);
   print(selectedDate);
   if (selectedLedger == null) {
     return [];
@@ -76,7 +77,7 @@ final expenseAccountTreeDataProvider =
     FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(expenseSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -95,9 +96,9 @@ final expenseAccountTreeDataProvider =
 });
 
 class TopExpensesDetailPage extends ConsumerWidget {
-  final AccountExpenseNode account; // 接收 account 参数
+  final int accountId; // 接收 accountId 参数
 
-  const TopExpensesDetailPage({super.key, required this.account}); // 修改构造函数
+  const TopExpensesDetailPage({super.key, required this.accountId}); // 修改构造函数
 
   // 辅助方法格式化数字 (Copied from ExpensesPage)
   String _formatCurrency(double amount) {
@@ -126,7 +127,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
         ),
         child: asyncData.when(
           data: (data) {
-            final selectedMonth = ref.watch(selectedMonthProvider);
+            final selectedMonth = ref.watch(expenseSelectedMonthProvider);
             final value = calculateValue(data, selectedMonth);
             return Column(
               mainAxisAlignment: MainAxisAlignment.center, // Center content
@@ -163,12 +164,29 @@ class TopExpensesDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountExpenseNodeProvider(accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, ref, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPage(BuildContext context, WidgetRef ref, AccountExpenseNode account) {
     // Sample data for the pie chart - 这部分将被动态数据替代
     // final List<Map<String, dynamic>> expenseData = [...];
     // final double totalExpenseAmount = ...;
     // final List<StyledAccount> accountsFromExpenseData = ...;
 
-    // 从 widget.account 获取 accountId
+    // 从 account 获取 accountId
     final int currentAccountId = account.accountData.accountId;
 
     // 使用 .family 传递 accountId
@@ -180,7 +198,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
     // 添加对 expenseAccountTreeDataProvider 的 watch
     final accountTreeAsync = ref.watch(expenseAccountTreeDataProvider);
 
-    final currentSelectedMonth = ref.watch(selectedMonthProvider);
+    final currentSelectedMonth = ref.watch(expenseSelectedMonthProvider);
 
     // 定义一组颜色供饼图使用
     final List<Color> pieColors = [
@@ -255,7 +273,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
                       MonthSelectorHeader(
                         initialDate: currentSelectedMonth,
                         onDateChanged: (newDate) {
-                          ref.read(selectedMonthProvider.notifier).state =
+                          ref.read(expenseSelectedMonthProvider.notifier).state =
                               newDate;
                         },
                       ),
@@ -524,7 +542,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
                               final selectedNode = childrenNodes[index];
                               GoRouter.of(context).pushNamed(
                                 'expensesDetail',
-                                extra: {'account': selectedNode},
+                                extra: {'accountId': selectedNode.accountData.accountId},
                               );
                             },
                           ),

@@ -1,5 +1,6 @@
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/components/chart/liability_trend_chart.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
@@ -16,8 +17,8 @@ import 'package:intl/intl.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class LiabilitiesDetailPage extends ConsumerStatefulWidget {
-  final Account account;
-  const LiabilitiesDetailPage({Key? key, required this.account})
+  final int accountId;
+  const LiabilitiesDetailPage({Key? key, required this.accountId})
       : super(key: key);
 
   @override
@@ -69,6 +70,23 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
 
   @override
   Widget build(BuildContext context) {
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPage(BuildContext context, Account account) {
     return Scaffold(
       body: NestedScrollView(
         controller: _scrollController,
@@ -110,7 +128,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                     child: Row(
                                       children: [
                                         Text(
-                                          widget.account.name,
+                                          account.name,
                                           style: TextStyle(
                                             fontSize: 20,
                                             color: Colors.black54,
@@ -124,21 +142,21 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                 Consumer(builder: (context, ref, _) {
                                   final liabilityTrendAsync = ref.watch(
                                       liabilityTrendProviderByTimeRange((
-                                    accountId: widget.account.id,
+                                    accountId: account.id,
                                     timeRange: _selectedTimeRange
                                   )));
                                   final amount = liabilityTrendAsync.when(
                                     data: (data) => data.isNotEmpty
                                         ? data.last.totalLiabilities
-                                        : widget.account.amount,
-                                    loading: () => widget.account.amount,
-                                    error: (_, __) => widget.account.amount,
+                                        : account.amount,
+                                    loading: () => account.amount,
+                                    error: (_, __) => account.amount,
                                   );
                                   return Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 16),
                                     child: Text(
-                                      '${widget.account.currencySymbol}${amount.toStringAsFixed(2)}',
+                                      '${account.currencySymbol}${amount.toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 32,
                                         fontWeight: FontWeight.bold,
@@ -158,7 +176,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                           builder: (context, ref, child) {
                                         final liabilityTrendAsync = ref.watch(
                                             liabilityTrendProviderByTimeRange((
-                                          accountId: widget.account.id,
+                                          accountId: account.id,
                                           timeRange: _selectedTimeRange
                                         )));
                                         return liabilityTrendAsync.when(
@@ -218,7 +236,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                   onPressed: () async {
                     await AccountUpdateBottomSheet.show(
                       context,
-                      accountToUpdate: widget.account,
+                      accountToUpdate: account,
                     );
                   },
                 ),
@@ -231,7 +249,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      widget.account.name,
+                      account.name,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -246,7 +264,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
           ];
         },
         body: AssetsDetailBody(
-          account: widget.account,
+          account: account,
           selectedFlow: _selectedFlow,
           selectedTimeRange: _selectedTimeRange,
           onFlowChanged: (flow) {

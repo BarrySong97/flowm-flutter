@@ -8,6 +8,7 @@ import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/state/icome/income_repository.dart';
+import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
@@ -21,7 +22,7 @@ import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart' as ui;
 
 /// 当前选中的月份提供者
-final selectedMonthProvider =
+final incomeSelectedMonthProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 收入图表数据提供者
@@ -30,7 +31,7 @@ final incomeChartDataProvider = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(incomeSelectedMonthProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -55,7 +56,7 @@ final incomeChartDataProvider = FutureProvider.autoDispose
 final accountMonthlyIncomeProvider =
     FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
-  final selectedDate = ref.watch(selectedMonthProvider);
+  final selectedDate = ref.watch(incomeSelectedMonthProvider);
   final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
   final DateTime endDate =
       DateTime(selectedDate.year, selectedDate.month + 1, 0);
@@ -75,9 +76,9 @@ final accountOverallIncomeProvider =
 });
 
 class IncomeDetailPage extends ConsumerStatefulWidget {
-  final AccountExpenseNode account;
+  final int accountId;
 
-  const IncomeDetailPage({super.key, required this.account});
+  const IncomeDetailPage({super.key, required this.accountId});
 
   @override
   ConsumerState<IncomeDetailPage> createState() => _IncomeDetailPageState();
@@ -132,13 +133,30 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 动态获取账户信息
+    final accountAsync = ref.watch(accountExpenseNodeProvider(widget.accountId));
+    
+    return accountAsync.when(
+      data: (account) => _buildDetailPage(context, account),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
     final chartDataAsync = ref
-        .watch(incomeChartDataProvider(widget.account.accountData.accountId));
-    final currentSelectedMonth = ref.watch(selectedMonthProvider);
+        .watch(incomeChartDataProvider(account.accountData.accountId));
+    final currentSelectedMonth = ref.watch(incomeSelectedMonthProvider);
     final monthlyIncomeAsync = ref.watch(
-        accountMonthlyIncomeProvider(widget.account.accountData.accountId));
+        accountMonthlyIncomeProvider(account.accountData.accountId));
     final overallIncomeAsync = ref.watch(
-        accountOverallIncomeProvider(widget.account.accountData.accountId));
+        accountOverallIncomeProvider(account.accountData.accountId));
     final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
 
     Widget buildValueText(double value) {
@@ -215,7 +233,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                   opacity: _isCollapsed ? 0.0 : 1.0,
                                   duration: const Duration(milliseconds: 250),
                                   child: Text(
-                                    widget.account.accountData.accountName,
+                                    account.accountData.accountName,
                                     style: const TextStyle(
                                       fontSize: 24, // Larger when expanded
                                       fontWeight: FontWeight.bold,
@@ -268,10 +286,10 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                   onPressed: () async {
                     // Convert database Account to UI Account
                     final uiAccount = ui.Account(
-                      id: widget.account.accountData.accountId,
-                      name: widget.account.accountData.accountName,
-                      amount: widget.account.balance,
-                      type: widget.account.accountData.accountType,
+                      id: account.accountData.accountId,
+                      name: account.accountData.accountName,
+                      amount: account.balance,
+                      type: account.accountData.accountType,
                       currencySymbol: '¥',
                     );
                     
@@ -287,7 +305,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                 opacity: _isCollapsed ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 250),
                 child: Text(
-                  widget.account.accountData.accountName,
+                  account.accountData.accountName,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -325,7 +343,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                             MonthSelectorHeader(
                               initialDate: currentSelectedMonth,
                               onDateChanged: (newDate) {
-                                ref.read(selectedMonthProvider.notifier).state =
+                                ref.read(incomeSelectedMonthProvider.notifier).state =
                                     newDate;
                               },
                             ),
@@ -367,7 +385,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
 
                     // 添加交易列表
                     AccountTransactionList(
-                      account: widget.account,
+                      account: account,
                       startDate: DateTime(currentSelectedMonth.year,
                           currentSelectedMonth.month, 1),
                       endDate: DateTime(currentSelectedMonth.year,

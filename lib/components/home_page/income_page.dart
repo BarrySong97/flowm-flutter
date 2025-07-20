@@ -246,7 +246,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
                     : 'incomeDetail';
                 GoRouter.of(context).pushNamed(
                   routeName,
-                  extra: {'account': selectedNode},
+                  extra: {'accountId': selectedNode.accountData.accountId},
                 );
               },
             ),

@@ -276,10 +276,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                           selectedAccountToNavigate.children!.isNotEmpty;
                   if (hasChildren) {
                     GoRouter.of(context).pushNamed('topAssetsAccountDetail',
-                        extra: {'account': selectedAccountToNavigate});
+                        extra: {'accountId': selectedAccountToNavigate.id});
                   } else {
                     GoRouter.of(context).pushNamed('assetsDetail',
-                        extra: {'account': selectedAccountToNavigate});
+                        extra: {'accountId': selectedAccountToNavigate.id});
                   }
                 }
               },
@@ -325,10 +325,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   tappedAccount.children!.isNotEmpty;
               if (hasChildren) {
                 GoRouter.of(context).pushNamed('topAssetsAccountDetail',
-                    extra: {'account': tappedAccount});
+                    extra: {'accountId': tappedAccount.id});
               } else {
                 GoRouter.of(context).pushNamed('assetsDetail',
-                    extra: {'account': tappedAccount});
+                    extra: {'accountId': tappedAccount.id});
               }
             },
           ),
