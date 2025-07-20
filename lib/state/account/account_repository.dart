@@ -1233,7 +1233,7 @@ class AccountRepository {
   Future<List<AccountWithBalance>> _getTopAssetAccountsByLedgerOptimized(
       {int? limit, required int ledgerId}) async {
     try {
-      // 使用单个 SQL 查询一次性获取所有资产账户及其余额
+      // 使用单个 SQL 查询一次性获取所有叶子资产账户及其余额
       final result = await _accountDao.customSelect(
         '''
         SELECT 
@@ -1251,6 +1251,11 @@ class AccountRepository {
         WHERE a.ledger_id = ? 
           AND a.account_type = ? 
           AND a.is_active = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM accounts child 
+            WHERE child.parent_account_id = a.account_id 
+            AND child.ledger_id = a.ledger_id
+          )
         GROUP BY a.account_id, a.ledger_id, a.parent_account_id, a.account_name, 
                  a.full_path, a.account_type, a.is_active, a.created_at
         ORDER BY balance DESC
