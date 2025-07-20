@@ -14,6 +14,7 @@ import 'package:flowm/pages/expense/top_expense_detail_page.dart';
 import 'package:flowm/pages/assets/top_assets_account_detail_page.dart'; // 引入页面
 import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/version_page.dart';
+import 'package:flowm/pages/developer_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -164,6 +165,15 @@ class AppRouter {
         pageBuilder: (context, state) {
           return SwipeablePage(
             builder: (context) => const VersionPage(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/developer',
+        name: 'developer',
+        pageBuilder: (context, state) {
+          return SwipeablePage(
+            builder: (context) => const DeveloperPage(),
           );
         },
       ),

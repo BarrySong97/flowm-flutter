@@ -51,8 +51,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.person,
                     title: '开发者',
                     subtitle: '4RE△L Studio',
-                    showArrow: false,
-                    onTap: () {},
+                    showArrow: true,
+                    onTap: () {
+                      context.pushNamed('developer');
+                    },
                   ),
                 ],
               ),
