@@ -1,0 +1,44 @@
+{
+  "version": "1.2.0",
+  "date": "2025-07-20",
+  "title": "重大功能更新",
+  "features": [
+    {
+      "type": "新功能",
+      "description": "实现详情页面实时数据更新机制",
+      "icon": "🔄"
+    },
+    {
+      "type": "新功能", 
+      "description": "添加收入和负债账户详情页面的编辑功能",
+      "icon": "📝"
+    },
+    {
+      "type": "新功能",
+      "description": "添加支出账户详情页面的编辑功能", 
+      "icon": "💰"
+    },
+    {
+      "type": "新功能",
+      "description": "添加账户编辑功能到详情页面并完善类型验证",
+      "icon": "✏️"
+    }
+  ],
+  "improvements": [
+    {
+      "type": "修复",
+      "description": "修复创建交易后TreeMap不更新的问题",
+      "icon": "🐛"
+    },
+    {
+      "type": "优化",
+      "description": "优化趋势图表零值数据显示和API兼容性",
+      "icon": "📊"
+    },
+    {
+      "type": "修复", 
+      "description": "修复顶级资产账户查询返回父节点问题",
+      "icon": "🔧"
+    }
+  ]
+}

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
 
 class VersionPage extends StatefulWidget {
   const VersionPage({super.key});
@@ -10,11 +13,14 @@ class VersionPage extends StatefulWidget {
 
 class _VersionPageState extends State<VersionPage> {
   PackageInfo? packageInfo;
+  List<Map<String, dynamic>> versionHistory = [];
+  Set<int> expandedVersions = {0}; // 默认展开第一个（最新）版本
 
   @override
   void initState() {
     super.initState();
     _loadPackageInfo();
+    _loadVersionHistory();
   }
 
   Future<void> _loadPackageInfo() async {
@@ -22,6 +28,29 @@ class _VersionPageState extends State<VersionPage> {
     setState(() {
       packageInfo = info;
     });
+  }
+
+  Future<void> _loadVersionHistory() async {
+    try {
+      final versions = ['1.2.0', '1.1.0'];
+      List<Map<String, dynamic>> history = [];
+      
+      for (String version in versions) {
+        try {
+          final String response = await rootBundle.loadString('lib/version/version_$version.json');
+          final Map<String, dynamic> versionData = json.decode(response);
+          history.add(versionData);
+        } catch (e) {
+          print('Error loading version $version: $e');
+        }
+      }
+      
+      setState(() {
+        versionHistory = history;
+      });
+    } catch (e) {
+      print('Error loading version history: $e');
+    }
   }
 
   @override
@@ -127,6 +156,10 @@ class _VersionPageState extends State<VersionPage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              // Version history
+              ...versionHistory.asMap().entries.map((entry) => 
+                _buildVersionCard(entry.value, entry.key)).toList(),
             ],
           ),
         ),
@@ -153,6 +186,163 @@ class _VersionPageState extends State<VersionPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildVersionCard(Map<String, dynamic> version, int index) {
+    final bool isExpanded = expandedVersions.contains(index);
+    
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 16.0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header - always visible
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      expandedVersions.remove(index);
+                    } else {
+                      expandedVersions.add(index);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(6.0),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'v${version['version']}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              AnimatedRotation(
+                                turns: isExpanded ? 0.5 : 0.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            version['date'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        version['title'],
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Expandable content
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                height: isExpanded ? null : 0,
+                child: isExpanded ? Padding(
+                  padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      
+                      // Features section
+                      if (version['features'] != null && version['features'].isNotEmpty) ...[
+                        const Text(
+                          '✨ 新功能',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...version['features'].map<Widget>((feature) => _buildFeatureItem(feature)).toList(),
+                        const SizedBox(height: 12),
+                      ],
+                      
+                      // Improvements section
+                      if (version['improvements'] != null && version['improvements'].isNotEmpty) ...[
+                        const Text(
+                          '🔧 改进优化',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...version['improvements'].map<Widget>((improvement) => _buildFeatureItem(improvement)).toList(),
+                      ],
+                    ],
+                  ),
+                ) : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureItem(Map<String, dynamic> item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item['icon'] ?? '•',
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              item['description'],
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
