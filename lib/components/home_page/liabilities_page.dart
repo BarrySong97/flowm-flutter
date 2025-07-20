@@ -281,7 +281,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
               return FadeTransition(opacity: animation, child: child);
             },
             child: LiabilityTreemapWidget(
-              key: ValueKey(_drilledDownAccountName ?? '__treemap_root__'),
+              key: ValueKey('${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
               title: isDrilledDown ? '负债分布 > $_drilledDownAccountName' : '负债分布',
               dataItems: treeMapData,
               tooltipValueSuffix: ' ¥',

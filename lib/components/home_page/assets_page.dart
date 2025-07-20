@@ -249,7 +249,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               return FadeTransition(opacity: animation, child: child);
             },
             child: TreemapWidget(
-              key: ValueKey(_drilledDownAccountName ?? '__treemap_root__'),
+              key: ValueKey('${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
               title: isDrilledDown ? '资产分布 > $_drilledDownAccountName' : '资产分布',
               dataItems: treeMapData,
               tooltipValueSuffix: ' ¥',
