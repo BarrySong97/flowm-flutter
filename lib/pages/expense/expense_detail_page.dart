@@ -1,4 +1,4 @@
-import 'package:flowm/components/account/account_item.dart';
+import 'package:flowm/components/account/account_item.dart' as ui;
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for SystemChrome
@@ -18,6 +18,7 @@ import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:intl/intl.dart'; // For currency formatting
+import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 /// 当前选中的月份提供者
 final selectedMonthProvider =
@@ -262,6 +263,26 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                     size: 22, color: Colors.white),
                 onPressed: () => Navigator.of(context).pop(),
               ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  onPressed: () async {
+                    // Convert database Account to UI Account
+                    final uiAccount = ui.Account(
+                      id: widget.account.accountData.accountId,
+                      name: widget.account.accountData.accountName,
+                      amount: widget.account.balance,
+                      type: widget.account.accountData.accountType,
+                      currencySymbol: '¥',
+                    );
+                    
+                    await AccountUpdateBottomSheet.show(
+                      context,
+                      accountToUpdate: uiAccount,
+                    );
+                  },
+                ),
+              ],
               centerTitle: true,
               title: AnimatedOpacity(
                 opacity: _isCollapsed ? 1.0 : 0.0,
