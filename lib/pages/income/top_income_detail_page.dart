@@ -12,6 +12,8 @@ import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:flowm/components/common/account_update_bottom_sheet.dart';
+import 'package:flowm/components/account/account_item.dart' as ui;
 
 /// 当前选中的月份提供者
 final selectedMonthProvider =
@@ -204,6 +206,26 @@ class TopIncomeDetailPage extends ConsumerWidget {
             ),
           ),
           centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.more_vert, color: Colors.black),
+              onPressed: () async {
+                // Convert database Account to UI Account
+                final uiAccount = ui.Account(
+                  id: account.accountData.accountId,
+                  name: account.accountData.accountName,
+                  amount: account.balance,
+                  type: account.accountData.accountType,
+                  currencySymbol: '¥',
+                );
+                
+                await AccountUpdateBottomSheet.show(
+                  context,
+                  accountToUpdate: uiAccount,
+                );
+              },
+            ),
+          ],
         ),
         backgroundColor: const Color(0xFFF5F6FB),
         body: SafeArea(

@@ -10,6 +10,7 @@ import 'package:flowm/state/account/account_repository.dart'
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 class TopLiabilitiesAccountDetailPage extends ConsumerStatefulWidget {
   final Account account; // 接收 account 参数
@@ -75,6 +76,17 @@ class _TopAssetsAccountDetailPageState
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.black),
+            onPressed: () async {
+              await AccountUpdateBottomSheet.show(
+                context,
+                accountToUpdate: widget.account,
+              );
+            },
+          ),
+        ],
       ),
       backgroundColor: const Color(0xFFF5F6FB),
       body: SafeArea(
