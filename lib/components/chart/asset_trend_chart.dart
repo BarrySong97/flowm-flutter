@@ -28,6 +28,9 @@ class AssetTrendChart extends StatelessWidget {
           // 格式化货币显示
           final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
 
+          // 检测是否所有数据都为0
+          final bool allDataIsZero = assetData.every((data) => data.totalAssets == 0.0);
+
           return SfCartesianChart(
             plotAreaBorderWidth: 0,
             margin: const EdgeInsets.only(top: 12), // 只在顶部加边距，防止曲线被截断
@@ -71,36 +74,47 @@ class AssetTrendChart extends StatelessWidget {
               // The custom axisLabelFormatter is removed as desiredIntervals: 1 and numberFormat should suffice.
             ),
             series: <CartesianSeries>[
-              // 折线图+面积图组合展示
-              SplineAreaSeries<AssetHistoryData, String>(
-                dataSource: assetData,
-                xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalAssets,
-                splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
-                cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    gradientColor.withOpacity(1.0), // 顶部颜色更深
-                    gradientColor.withOpacity(0.4), // 底部颜色加深
-                  ],
+              // 根据数据情况选择图表类型
+              if (allDataIsZero) ...[
+                // 当所有数据为0时使用直线图
+                LineSeries<AssetHistoryData, String>(
+                  dataSource: assetData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalAssets,
+                  color: primaryColor.withValues(alpha: 0.3),
+                  width: 2,
                 ),
-                borderColor: primaryColor,
-                borderWidth: 2,
-              ),
-              // 添加折线和数据点
-              SplineSeries<AssetHistoryData, String>(
-                dataSource: assetData,
-                xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalAssets,
-                color: primaryColor,
-                width: 2,
-                splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
-                cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
-                markerSettings:
-                    const MarkerSettings(isVisible: false), // 隐藏数据点标记
-              ),
+              ] else ...[
+                // 有非零数据时使用样条曲线图
+                SplineAreaSeries<AssetHistoryData, String>(
+                  dataSource: assetData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalAssets,
+                  splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
+                  cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      gradientColor.withValues(alpha: 1.0), // 顶部颜色更深
+                      gradientColor.withValues(alpha: 0.4), // 底部颜色加深
+                    ],
+                  ),
+                  borderColor: primaryColor,
+                  borderWidth: 2,
+                ),
+                SplineSeries<AssetHistoryData, String>(
+                  dataSource: assetData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalAssets,
+                  color: primaryColor,
+                  width: 2,
+                  splineType: SplineType.cardinal, // 使用cardinal样条，更贴近数据点
+                  cardinalSplineTension: 0.5, // 增加张力值，让波峰波谷更圆滑
+                  markerSettings:
+                      const MarkerSettings(isVisible: false), // 隐藏数据点标记
+                ),
+              ],
             ],
             trackballBehavior: TrackballBehavior(
               enable: true,
@@ -118,7 +132,7 @@ class AssetTrendChart extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(5),
                       boxShadow: const [
                         BoxShadow(
@@ -138,14 +152,14 @@ class AssetTrendChart extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${formatter.format(currentY)}',
+                          formatter.format(currentY),
                           style: const TextStyle(
                               color: Colors.black,
                               fontSize: 14,
                               fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '$formattedDate',
+                          formattedDate,
                           style: const TextStyle(
                               color: Colors.black45, fontSize: 12),
                         ),

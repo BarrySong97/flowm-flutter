@@ -27,6 +27,9 @@ class LiabilityTrendChart extends StatelessWidget {
           // 格式化货币显示
           final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
 
+          // 检测是否所有数据都为0
+          final bool allDataIsZero = liabilityData.every((data) => data.totalLiabilities == 0.0);
+
           return SfCartesianChart(
             plotAreaBorderWidth: 0,
             margin: const EdgeInsets.only(top: 12),
@@ -63,35 +66,46 @@ class LiabilityTrendChart extends StatelessWidget {
               desiredIntervals: 1,
             ),
             series: <CartesianSeries>[
-              // 折线图+面积图组合展示
-              SplineAreaSeries<LiabilityHistoryData, String>(
-                dataSource: liabilityData,
-                xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalLiabilities,
-                splineType: SplineType.cardinal,
-                cardinalSplineTension: 0.5,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    primaryColor.withOpacity(0.3),
-                    primaryColor.withOpacity(0.05),
-                  ],
+              // 根据数据情况选择图表类型
+              if (allDataIsZero) ...[
+                // 当所有数据为0时使用直线图
+                LineSeries<LiabilityHistoryData, String>(
+                  dataSource: liabilityData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalLiabilities,
+                  color: primaryColor.withValues(alpha: 0.3),
+                  width: 2,
                 ),
-                borderColor: primaryColor,
-                borderWidth: 2,
-              ),
-              // 添加折线和数据点
-              SplineSeries<LiabilityHistoryData, String>(
-                dataSource: liabilityData,
-                xValueMapper: (data, _) => data.formattedDate,
-                yValueMapper: (data, _) => data.totalLiabilities,
-                color: primaryColor,
-                width: 2,
-                splineType: SplineType.cardinal,
-                cardinalSplineTension: 0.5,
-                markerSettings: const MarkerSettings(isVisible: false),
-              ),
+              ] else ...[
+                // 有非零数据时使用样条曲线图
+                SplineAreaSeries<LiabilityHistoryData, String>(
+                  dataSource: liabilityData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalLiabilities,
+                  splineType: SplineType.cardinal,
+                  cardinalSplineTension: 0.5,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      primaryColor.withValues(alpha: 0.3),
+                      primaryColor.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  borderColor: primaryColor,
+                  borderWidth: 2,
+                ),
+                SplineSeries<LiabilityHistoryData, String>(
+                  dataSource: liabilityData,
+                  xValueMapper: (data, _) => data.formattedDate,
+                  yValueMapper: (data, _) => data.totalLiabilities,
+                  color: primaryColor,
+                  width: 2,
+                  splineType: SplineType.cardinal,
+                  cardinalSplineTension: 0.5,
+                  markerSettings: const MarkerSettings(isVisible: false),
+                ),
+              ],
             ],
             trackballBehavior: TrackballBehavior(
               enable: true,
@@ -109,7 +123,7 @@ class LiabilityTrendChart extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(5),
                       boxShadow: const [
                         BoxShadow(
@@ -124,14 +138,14 @@ class LiabilityTrendChart extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${formatter.format(currentY)}',
+                          formatter.format(currentY),
                           style: const TextStyle(
                               color: Colors.black,
                               fontSize: 14,
                               fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '$formattedDate',
+                          formattedDate,
                           style: const TextStyle(
                               color: Colors.black45, fontSize: 12),
                         ),
