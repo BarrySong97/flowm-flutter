@@ -27,7 +27,7 @@ class AssetItem {
   });
 }
 
-class AssetsOverviewGrid extends ConsumerWidget {
+class AssetsOverviewGrid extends ConsumerStatefulWidget {
   final List<AssetItem> assets;
   final String netAssets;
   final String totalAssets;
@@ -40,6 +40,18 @@ class AssetsOverviewGrid extends ConsumerWidget {
     required this.totalAssets,
     required this.totalLiabilities,
   });
+
+  @override
+  ConsumerState<AssetsOverviewGrid> createState() => _AssetsOverviewGridState();
+}
+
+class _AssetsOverviewGridState extends ConsumerState<AssetsOverviewGrid> {
+  bool _isVisible = true;
+
+  String _maskAmount(String amount) {
+    if (_isVisible) return amount;
+    return '****';
+  }
 
   Widget _buildOverviewItem(String label, String amount, Color color) {
     return Column(
@@ -54,7 +66,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          amount,
+          _maskAmount(amount),
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -66,23 +78,35 @@ class AssetsOverviewGrid extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
-        const Padding(
-            padding: EdgeInsets.only(left: 4.0, bottom: 16.0),
+        Padding(
+            padding: const EdgeInsets.only(left: 4.0, bottom: 16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   '资产概览',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.black54,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isVisible = !_isVisible;
+                    });
+                  },
+                  child: Icon(
+                    _isVisible ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.black54,
+                    size: 16,
                   ),
                 ),
               ],
@@ -104,9 +128,9 @@ class AssetsOverviewGrid extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildOverviewItem('净资产', netAssets, Colors.purple),
-                    _buildOverviewItem('总资产', totalAssets, Colors.blue),
-                    _buildOverviewItem('总负债', totalLiabilities, Colors.orange),
+                    _buildOverviewItem('净资产', widget.netAssets, Colors.purple),
+                    _buildOverviewItem('总资产', widget.totalAssets, Colors.blue),
+                    _buildOverviewItem('总负债', widget.totalLiabilities, Colors.orange),
                   ],
                 ),
               ),
@@ -120,7 +144,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
                 mainAxisSpacing: 1,
                 crossAxisSpacing: 1,
                 childAspectRatio: 2,
-                children: assets
+                children: widget.assets
                     .map((asset) => _buildAssetCard(asset, context))
                     .toList(),
               ),
@@ -188,7 +212,7 @@ class AssetsOverviewGrid extends ConsumerWidget {
                 ],
               ),
               Text(
-                asset.amount,
+                _maskAmount(asset.amount),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

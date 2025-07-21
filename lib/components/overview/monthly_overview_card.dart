@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class MonthlyOverviewCard extends StatelessWidget {
+class MonthlyOverviewCard extends StatefulWidget {
   final String month;
   final String expense;
   final String income;
@@ -17,9 +17,21 @@ class MonthlyOverviewCard extends StatelessWidget {
   });
 
   @override
+  State<MonthlyOverviewCard> createState() => _MonthlyOverviewCardState();
+}
+
+class _MonthlyOverviewCardState extends State<MonthlyOverviewCard> {
+  bool _isVisible = true;
+
+  String _maskAmount(String amount) {
+    if (_isVisible) return amount;
+    return '****';
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -44,14 +56,31 @@ class MonthlyOverviewCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '$month支出',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '${widget.month}支出',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isVisible = !_isVisible;
+                          });
+                        },
+                        child: Icon(
+                          _isVisible ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ],
                   ),
-                  // if (onTap != null)
+                  // if (widget.onTap != null)
                   // Row(
                   //   children: [
                   //     Text(
@@ -73,7 +102,7 @@ class MonthlyOverviewCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                expense,
+                _maskAmount(widget.expense),
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -83,9 +112,9 @@ class MonthlyOverviewCard extends StatelessWidget {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  _buildMonthlyItem('本月收入', income),
+                  _buildMonthlyItem('本月收入', widget.income),
                   const SizedBox(width: 16),
-                  _buildMonthlyItem('本月结余', balance),
+                  _buildMonthlyItem('本月结余', widget.balance),
                 ],
               ),
             ],
@@ -108,7 +137,7 @@ class MonthlyOverviewCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          amount,
+          _maskAmount(amount),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
