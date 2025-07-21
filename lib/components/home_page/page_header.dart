@@ -254,9 +254,10 @@ class LedgerSelector extends ConsumerWidget {
               ),
               // 操作提示
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
-                  '单点切换 • 长按编辑',
+                  '单点切换 • 长按编辑，创建账本会自动复制当前账本的账户（分类），并且每个账本的数据都是独立的。',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
