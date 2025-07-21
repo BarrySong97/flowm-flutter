@@ -38,7 +38,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
     // 初始化页面构建函数列表
     _pageBuilders = [
-      () => const OverviewPage(),
+      () => OverviewPage(onPageTap: _onPageTap),
       () => const AssetsPage(),
       () => const ExpensesPage(),
       () => const IncomePage(),

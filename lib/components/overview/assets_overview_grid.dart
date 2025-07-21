@@ -32,6 +32,7 @@ class AssetsOverviewGrid extends ConsumerStatefulWidget {
   final String netAssets;
   final String totalAssets;
   final String totalLiabilities;
+  final VoidCallback? onViewMoreTap;
 
   const AssetsOverviewGrid({
     super.key,
@@ -39,6 +40,7 @@ class AssetsOverviewGrid extends ConsumerStatefulWidget {
     required this.netAssets,
     required this.totalAssets,
     required this.totalLiabilities,
+    this.onViewMoreTap,
   });
 
   @override
@@ -89,24 +91,52 @@ class _AssetsOverviewGridState extends ConsumerState<AssetsOverviewGrid> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
-                  '资产概览',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54,
-                  ),
+                Row(
+                  children: [
+                    const Text(
+                      '资产概览',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isVisible = !_isVisible;
+                        });
+                      },
+                      child: Icon(
+                        _isVisible ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.black54,
+                        size: 16,
+                      ),
+                    ),
+                  ],
                 ),
                 GestureDetector(
                   onTap: () {
-                    setState(() {
-                      _isVisible = !_isVisible;
-                    });
+                    print('查看更多 clicked!'); // Debug log
+                    widget.onViewMoreTap?.call(); // Navigate to assets page
                   },
-                  child: Icon(
-                    _isVisible ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.black54,
-                    size: 16,
+                  child: Row(
+                    children: [
+                      Text(
+                        '查看更多',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right,
+                        color: Colors.grey[600],
+                        size: 16,
+                      ),
+                    ],
                   ),
                 ),
               ],

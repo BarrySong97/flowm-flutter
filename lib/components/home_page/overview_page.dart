@@ -20,7 +20,9 @@ import 'package:intl/intl.dart';
 import '../../pages/main_screen.dart';
 
 class OverviewPage extends ConsumerStatefulWidget {
-  const OverviewPage({super.key});
+  final Function(int)? onPageTap;
+  
+  const OverviewPage({super.key, this.onPageTap});
 
   @override
   ConsumerState<OverviewPage> createState() => _OverviewPageState();
@@ -200,6 +202,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
               netAssets: formattedNetAssets,
               totalAssets: formattedTotalAssets,
               totalLiabilities: formattedTotalLiabilities,
+              onViewMoreTap: () {
+                print('onViewMoreTap called'); // Debug log
+                widget.onPageTap?.call(1); // Navigate to assets page (index 1)
+              },
             );
           },
           loading: () => const Center(
