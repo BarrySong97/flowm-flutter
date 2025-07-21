@@ -51,24 +51,24 @@ class MonthlyOverviewCard extends StatelessWidget {
                       color: Colors.white70,
                     ),
                   ),
-                  if (onTap != null)
-                    Row(
-                      children: [
-                        Text(
-                          '查看详情',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                      ],
-                    ),
+                  // if (onTap != null)
+                  // Row(
+                  //   children: [
+                  //     Text(
+                  //       '查看详情',
+                  //       style: const TextStyle(
+                  //         fontSize: 12,
+                  //         color: Colors.white70,
+                  //       ),
+                  //     ),
+                  //     const SizedBox(width: 4),
+                  //     Icon(
+                  //       Icons.chevron_right,
+                  //       color: Colors.white70,
+                  //       size: 16,
+                  //     ),
+                  //   ],
+                  // ),
                 ],
               ),
               const SizedBox(height: 8),
