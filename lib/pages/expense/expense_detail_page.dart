@@ -5,6 +5,7 @@ import 'package:flutter/services.dart'; // Added for SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
+import 'package:flowm/components/chart/fl_line_chart.dart' as fl_linechart;
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/state/expense/expense_providers.dart';
@@ -88,6 +89,7 @@ class ExpensesDetailPage extends ConsumerStatefulWidget {
 class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
+  bool _isLineChart = false; // false for bar chart, true for line chart
 
   @override
   void initState() {
@@ -357,28 +359,89 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: chartDataAsync.when(
-                                data: (chartData) {
-                                  final daysInMonth = DateTime(
-                                          currentSelectedMonth.year,
-                                          currentSelectedMonth.month + 1,
-                                          0)
-                                      .day;
-                                  return fl_barchart.FlBarChart(
-                                    barColor: Colors.red,
-                                    chartData: chartData
-                                        .map((e) => fl_barchart.ChartData(
-                                            e.x, e.y, e.day))
-                                        .toList(),
-                                    daysInMonth: daysInMonth,
-                                  );
-                                },
-                                loading: () => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                error: (error, stack) => Center(
-                                  child: Text('加载失败: $error'),
-                                ),
+                              child: Column(
+                                children: [
+                                  // Chart title and switch button
+                                  Container(
+                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          '支出统计图',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _isLineChart = !_isLineChart;
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.shade100,
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  _isLineChart ? Icons.show_chart : Icons.bar_chart,
+                                                  size: 16,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _isLineChart ? '折线图' : '柱状图',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Chart content
+                                  chartDataAsync.when(
+                                    data: (chartData) {
+                                      final daysInMonth = DateTime(
+                                              currentSelectedMonth.year,
+                                              currentSelectedMonth.month + 1,
+                                              0)
+                                          .day;
+                                      return _isLineChart
+                                          ? fl_linechart.FlLineChart(
+                                              lineColor: Colors.red,
+                                              chartData: chartData
+                                                  .map((e) => fl_linechart.ChartData(e.x, e.y, e.day))
+                                                  .toList(),
+                                              daysInMonth: daysInMonth,
+                                            )
+                                          : fl_barchart.FlBarChart(
+                                              barColor: Colors.red,
+                                              chartData: chartData
+                                                  .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
+                                                  .toList(),
+                                              daysInMonth: daysInMonth,
+                                            );
+                                    },
+                                    loading: () => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                    error: (error, stack) => Center(
+                                      child: Text('加载失败: $error'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             )
                           ],
