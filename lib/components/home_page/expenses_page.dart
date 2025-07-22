@@ -161,7 +161,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     final selectedMonth = ref.watch(selectedMonthProvider);
     final daysInMonth =
         DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -190,7 +190,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(4),

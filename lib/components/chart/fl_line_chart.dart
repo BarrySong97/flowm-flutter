@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class ChartData {
   ChartData(this.x, this.y, this.day);
@@ -42,25 +41,24 @@ class FlLineChart extends StatelessWidget {
       maxY = 1800;
     }
 
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(
-              left: 10.0, right: 24.0, top: 32.0, bottom: 16),
-          child: LineChart(
-            LineChartData(
-              maxY: maxY,
-              lineTouchData: _buildLineTouchData(),
-              titlesData: _buildTitlesData(maxY),
-              borderData: FlBorderData(show: false),
-              lineBarsData: _buildLineBarsData(),
-              gridData: const FlGridData(show: false),
-            ),
+    return Container(
+      width: double.infinity,
+      height: 240,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(
+            left: 0.0, right: 24.0, top: 32.0, bottom: 16),
+        child: LineChart(
+          LineChartData(
+            maxY: maxY,
+            lineTouchData: _buildLineTouchData(),
+            titlesData: _buildTitlesData(maxY),
+            borderData: FlBorderData(show: false),
+            lineBarsData: _buildLineBarsData(),
+            gridData: const FlGridData(show: false),
           ),
         ),
       ),
@@ -74,7 +72,8 @@ class FlLineChart extends StatelessWidget {
         getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
           return touchedBarSpots.map((barSpot) {
             final dataIndex = barSpot.x.toInt();
-            final data = dataIndex < chartData.length ? chartData[dataIndex] : null;
+            final data =
+                dataIndex < chartData.length ? chartData[dataIndex] : null;
             return LineTooltipItem(
               '${data?.day ?? (dataIndex + 1).toString()}\n',
               const TextStyle(
@@ -96,7 +95,8 @@ class FlLineChart extends StatelessWidget {
           }).toList();
         },
       ),
-      getTouchedSpotIndicator: (LineChartBarData barData, List<int> spotIndexes) {
+      getTouchedSpotIndicator:
+          (LineChartBarData barData, List<int> spotIndexes) {
         return spotIndexes.map((spotIndex) {
           return TouchedSpotIndicatorData(
             FlLine(
@@ -104,7 +104,8 @@ class FlLineChart extends StatelessWidget {
               strokeWidth: 0,
             ),
             FlDotData(
-              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+              getDotPainter: (spot, percent, barData, index) =>
+                  FlDotCirclePainter(
                 radius: 3,
                 color: lineColor,
                 strokeWidth: 1,
@@ -146,15 +147,25 @@ class FlLineChart extends StatelessWidget {
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 42,
+          reservedSize: 70,
           interval: maxY / 5,
           getTitlesWidget: (value, meta) {
+            String formattedValue;
+            if (value >= 10000) {
+              formattedValue = '${(value / 10000).toStringAsFixed(1)}万';
+            } else if (value >= 1000) {
+              formattedValue = '${(value / 1000).toStringAsFixed(1)}k';
+            } else {
+              formattedValue = value.toInt().toString();
+            }
             return Container(
               alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 8.0),
+              padding: const EdgeInsets.only(right: 16.0),
               child: Text(
-                NumberFormat.compact().format(value),
-                style: const TextStyle(color: Color(0xff7589a2), fontSize: 12),
+                formattedValue,
+                style: const TextStyle(color: Color(0xff7589a2), fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             );
           },
@@ -168,9 +179,10 @@ class FlLineChart extends StatelessWidget {
   List<LineChartBarData> _buildLineBarsData() {
     final count = daysInMonth ?? chartData.length;
     final spots = <FlSpot>[];
-    
+
     for (int i = 0; i < count; i++) {
-      final data = i < chartData.length ? chartData[i] : ChartData(i.toDouble(), 0, '');
+      final data =
+          i < chartData.length ? chartData[i] : ChartData(i.toDouble(), 0, '');
       spots.add(FlSpot(i.toDouble(), data.y));
     }
 

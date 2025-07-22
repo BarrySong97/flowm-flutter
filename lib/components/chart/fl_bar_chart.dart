@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class ChartData {
   ChartData(this.x, this.y, this.day);
@@ -42,26 +41,25 @@ class FlBarChart extends StatelessWidget {
       maxY = 1800;
     }
 
-    return AspectRatio(
-      aspectRatio: 1.6,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(
-              left: 10.0, right: 24.0, top: 32.0, bottom: 16),
-          child: BarChart(
-            BarChartData(
-              maxY: maxY,
-              barTouchData: _buildBarTouchData(),
-              titlesData: _buildTitlesData(maxY),
-              borderData: FlBorderData(show: false),
-              barGroups: _buildBarGroups(),
-              gridData: const FlGridData(show: false),
-              alignment: BarChartAlignment.spaceAround,
-            ),
+    return Container(
+      width: double.infinity,
+      height: 240,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(
+            left: 0.0, right: 24.0, top: 32.0, bottom: 16),
+        child: BarChart(
+          BarChartData(
+            maxY: maxY,
+            barTouchData: _buildBarTouchData(),
+            titlesData: _buildTitlesData(maxY),
+            borderData: FlBorderData(show: false),
+            barGroups: _buildBarGroups(),
+            gridData: const FlGridData(show: false),
+            alignment: BarChartAlignment.spaceAround,
           ),
         ),
       ),
@@ -126,15 +124,25 @@ class FlBarChart extends StatelessWidget {
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 42,
+          reservedSize: 70,
           interval: maxY / 5,
           getTitlesWidget: (value, meta) {
+            String formattedValue;
+            if (value >= 10000) {
+              formattedValue = '${(value / 10000).toStringAsFixed(1)}万';
+            } else if (value >= 1000) {
+              formattedValue = '${(value / 1000).toStringAsFixed(1)}k';
+            } else {
+              formattedValue = value.toInt().toString();
+            }
             return Container(
               alignment: Alignment.centerRight,
-              padding: const EdgeInsets.only(right: 8.0),
+              padding: const EdgeInsets.only(right: 16.0),
               child: Text(
-                NumberFormat.compact().format(value),
-                style: const TextStyle(color: Color(0xff7589a2), fontSize: 12),
+                formattedValue,
+                style: const TextStyle(color: Color(0xff7589a2), fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             );
           },
