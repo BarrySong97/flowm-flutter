@@ -2,6 +2,7 @@ import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/state/expense/expense_providers.dart' as expense_providers;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 当前选中的月份提供者
@@ -23,6 +24,7 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
+  final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
 
   if (selectedLedger == null) {
     return IncomePageData(
@@ -34,16 +36,61 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
 
   final ledgerId = selectedLedger.ledgerId;
 
-  // Current month date range
-  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
-  final DateTime endDate =
-      DateTime(selectedDate.year, selectedDate.month + 1, 0);
+  // Current period date range
+  DateTime startDate, endDate;
+  
+  switch (timeRangeType) {
+    case '90days':
+      startDate = DateTime.now().subtract(const Duration(days: 90));
+      endDate = DateTime.now();
+      break;
+    case '60days':
+      startDate = DateTime.now().subtract(const Duration(days: 60));
+      endDate = DateTime.now();
+      break;
+    case 'year':
+      startDate = DateTime(selectedDate.year, 1, 1);
+      endDate = DateTime(selectedDate.year, 12, 31);
+      break;
+    case 'all':
+      startDate = DateTime(2020, 1, 1);
+      endDate = DateTime.now();
+      break;
+    case 'month':
+    default:
+      startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+      endDate = DateTime(selectedDate.year, selectedDate.month + 1, 0);
+      break;
+  }
 
-  // Previous month date range
-  final DateTime prevMonthStartDate =
-      DateTime(selectedDate.year, selectedDate.month - 1, 1);
-  final DateTime prevMonthEndDate =
-      DateTime(selectedDate.year, selectedDate.month, 0);
+  // Previous period date range
+  DateTime prevStartDate, prevEndDate;
+  
+  switch (timeRangeType) {
+    case '90days':
+      prevEndDate = DateTime.now().subtract(const Duration(days: 90));
+      prevStartDate = prevEndDate.subtract(const Duration(days: 90));
+      break;
+    case '60days':
+      prevEndDate = DateTime.now().subtract(const Duration(days: 60));
+      prevStartDate = prevEndDate.subtract(const Duration(days: 60));
+      break;
+    case 'year':
+      final prevYear = selectedDate.year - 1;
+      prevStartDate = DateTime(prevYear, 1, 1);
+      prevEndDate = DateTime(prevYear, 12, 31);
+      break;
+    case 'all':
+      // No previous period for 'all'
+      prevStartDate = DateTime(2020, 1, 1);
+      prevEndDate = DateTime(2020, 1, 1);
+      break;
+    case 'month':
+    default:
+      prevStartDate = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+      prevEndDate = DateTime(selectedDate.year, selectedDate.month, 0);
+      break;
+  }
 
   final results = await Future.wait([
     repository.getIncomeChartData(
@@ -52,8 +99,8 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
       ledgerId: ledgerId,
     ),
     repository.getIncomeChartData(
-      startDate: prevMonthStartDate,
-      endDate: prevMonthEndDate,
+      startDate: prevStartDate,
+      endDate: prevEndDate,
       ledgerId: ledgerId,
     ),
     repository.getIncomeAccountTree(
@@ -113,8 +160,6 @@ final incomeChartDataProviderFamily =
   final DateTime endDate =
       DateTime(selectedDate.year, selectedDate.month + 1, 0);
 
-  print(
-      '[incomeChartDataProviderFamily] Fetching chart data with accountId: $accountId');
 
   return repository.getIncomeChartData(
     startDate: startDate,

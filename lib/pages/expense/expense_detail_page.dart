@@ -1,29 +1,24 @@
 import 'package:flowm/components/account/account_item.dart' as ui;
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
-import 'package:flowm/components/account/styled_account_item.dart';
-import 'package:flowm/components/account/styled_account_list.dart';
+import 'package:flowm/components/chart/fl_line_chart.dart' as fl_linechart;
 import 'package:flowm/state/expense/expense_providers.dart';
+import 'package:flowm/components/chart/fullscreen_chart_page.dart';
 import 'package:flowm/state/expense/expense_repository.dart';
 import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
-import 'package:flowm/components/common/time_range_selector.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:intl/intl.dart'; // For currency formatting
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
-/// 当前选中的月份提供者
-final expenseSelectedMonthProvider =
-    StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 /// 支出图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
@@ -31,35 +26,79 @@ final expenseChartDataProvider = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
-  final selectedDate = ref.watch(expenseSelectedMonthProvider);
+  final selectedDate = ref.watch(selectedMonthProvider);
+  final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
 
   if (selectedLedger == null) {
     return [];
   }
 
-  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
-  final DateTime endDate =
-      DateTime(selectedDate.year, selectedDate.month + 1, 0);
-
-  print(
-      '[expenseChartDataProvider] Fetching chart data with accountId: $accountId');
+  DateTime startDate, endDate;
+  
+  switch (timeRangeType) {
+    case '90days':
+      startDate = DateTime.now().subtract(const Duration(days: 90));
+      endDate = DateTime.now();
+      break;
+    case '60days':
+      startDate = DateTime.now().subtract(const Duration(days: 60));
+      endDate = DateTime.now();
+      break;
+    case 'year':
+      startDate = DateTime(selectedDate.year, 1, 1);
+      endDate = DateTime(selectedDate.year, 12, 31);
+      break;
+    case 'all':
+      startDate = DateTime(2020, 1, 1);
+      endDate = DateTime.now();
+      break;
+    case 'month':
+    default:
+      startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+      endDate = DateTime(selectedDate.year, selectedDate.month + 1, 0);
+      break;
+  }
 
   return repository.getExpenseChartData(
     startDate: startDate,
     endDate: endDate,
     ledgerId: selectedLedger.ledgerId,
-    accountId: accountId, // 传递 accountId
+    accountId: accountId,
   );
 });
 
-/// 指定账户当月总支出提供者
+/// 指定账户当期总支出提供者
 final accountMonthlyExpenseProvider =
     FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
   final repository = ref.watch(expenseRepositoryProvider);
-  final selectedDate = ref.watch(expenseSelectedMonthProvider);
-  final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
-  final DateTime endDate =
-      DateTime(selectedDate.year, selectedDate.month + 1, 0);
+  final selectedDate = ref.watch(selectedMonthProvider);
+  final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
+  
+  DateTime startDate, endDate;
+  
+  switch (timeRangeType) {
+    case '90days':
+      startDate = DateTime.now().subtract(const Duration(days: 90));
+      endDate = DateTime.now();
+      break;
+    case '60days':
+      startDate = DateTime.now().subtract(const Duration(days: 60));
+      endDate = DateTime.now();
+      break;
+    case 'year':
+      startDate = DateTime(selectedDate.year, 1, 1);
+      endDate = DateTime(selectedDate.year, 12, 31);
+      break;
+    case 'all':
+      startDate = DateTime(2020, 1, 1);
+      endDate = DateTime.now();
+      break;
+    case 'month':
+    default:
+      startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+      endDate = DateTime(selectedDate.year, selectedDate.month + 1, 0);
+      break;
+  }
 
   return repository.getAccountExpenseBalance(
     accountId: accountId,
@@ -88,6 +127,100 @@ class ExpensesDetailPage extends ConsumerStatefulWidget {
 class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
   final ScrollController _scrollController = ScrollController();
   bool _isCollapsed = false;
+  bool _isLineChart = false; // false for bar chart, true for line chart
+
+  DateTime? _getStartDateForChart() {
+    final selectedMonth = ref.read(selectedMonthProvider);
+    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+    
+    switch (timeRangeType) {
+      case '90days':
+        return DateTime.now().subtract(const Duration(days: 90));
+      case '60days':
+        return DateTime.now().subtract(const Duration(days: 60));
+      case 'year':
+        return DateTime(selectedMonth.year, 1, 1);
+      case 'all':
+        return DateTime(2020, 1, 1);
+      case 'month':
+      default:
+        return DateTime(selectedMonth.year, selectedMonth.month, 1);
+    }
+  }
+
+  DateTime? _getEndDateForChart() {
+    final selectedMonth = ref.read(selectedMonthProvider);
+    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+    
+    switch (timeRangeType) {
+      case '90days':
+      case '60days':
+      case 'year':
+      case 'all':
+        return DateTime.now();
+      case 'month':
+      default:
+        return DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
+    }
+  }
+
+  String _getCurrentTimeRangeTitle() {
+    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+    switch (timeRangeType) {
+      case '90days':
+        return '最近90天';
+      case '60days':
+        return '最近60天';
+      case 'year':
+        return '全年';
+      case 'all':
+        return '全部';
+      case 'month':
+      default:
+        return '当月';
+    }
+  }
+
+  String _getCurrentPeriodTitle() {
+    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+    switch (timeRangeType) {
+      case '90days':
+        return '90天总支出';
+      case '60days':
+        return '60天总支出';
+      case 'year':
+        return '全年总支出';
+      case 'all':
+        return '累计总支出';
+      case 'month':
+      default:
+        return '当月总支出';
+    }
+  }
+
+  int _getCurrentDaysInPeriod() {
+    final selectedMonth = ref.read(selectedMonthProvider);
+    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+    
+    switch (timeRangeType) {
+      case '90days':
+        return 90;
+      case '60days':
+        return 60;
+      case 'year':
+        final year = selectedMonth.year;
+        final yearStart = DateTime(year, 1, 1);
+        final yearEnd = DateTime(year, 12, 31);
+        return yearEnd.difference(yearStart).inDays + 1;
+      case 'all':
+        final startDate = DateTime(2020, 1, 1);
+        final endDate = DateTime.now();
+        return endDate.difference(startDate).inDays + 1;
+      case 'month':
+      default:
+        return DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+    }
+  }
 
   @override
   void initState() {
@@ -153,7 +286,8 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
   Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
     final chartDataAsync = ref
         .watch(expenseChartDataProvider(account.accountData.accountId));
-    final currentSelectedMonth = ref.watch(expenseSelectedMonthProvider);
+    final currentSelectedMonth = ref.watch(selectedMonthProvider);
+    ref.watch(selectedTimeRangeTypeProvider); // Watch for state changes
     final monthlyExpenseAsync = ref.watch(
         accountMonthlyExpenseProvider(account.accountData.accountId));
     final overallExpenseAsync = ref.watch(
@@ -248,12 +382,12 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                                   children: [
                                     monthlyExpenseAsync.when(
                                       data: (total) => _buildStatisticItem(
-                                          '当月总支出', buildValueText(total)),
+                                          _getCurrentPeriodTitle(), buildValueText(total)),
                                       loading: () => _buildStatisticItem(
-                                          '当月总支出', buildLoadingIndicator()),
+                                          _getCurrentPeriodTitle(), buildLoadingIndicator()),
                                       error: (err, stack) =>
                                           _buildStatisticItem(
-                                              '当月总支出', buildErrorText()),
+                                              _getCurrentPeriodTitle(), buildErrorText()),
                                     ),
                                     overallExpenseAsync.when(
                                       data: (total) => _buildStatisticItem(
@@ -344,8 +478,37 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                             MonthSelectorHeader(
                               initialDate: currentSelectedMonth,
                               onDateChanged: (newDate) {
-                                ref.read(expenseSelectedMonthProvider.notifier).state =
+                                ref.read(selectedMonthProvider.notifier).state =
                                     newDate;
+                              },
+                              onLongRangeSelected: () async {
+                                await Future.delayed(const Duration(milliseconds: 100));
+                                
+                                try {
+                                  final chartDataValue = ref.read(expenseChartDataProvider(account.accountData.accountId));
+                                  if (!chartDataValue.hasValue) return;
+                                  final chartData = chartDataValue.value!;
+                                  
+                                  String title = _getCurrentTimeRangeTitle();
+                                  int daysInPeriod = _getCurrentDaysInPeriod();
+                                  
+                                  if (context.mounted) {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => FullscreenChartPage(
+                                          chartData: chartData,
+                                          daysInPeriod: daysInPeriod,
+                                          startDate: _getStartDateForChart(),
+                                          endDate: _getEndDateForChart(),
+                                          timeRangeTitle: title,
+                                          isLineChart: _isLineChart,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (error) {
+                                  // Handle error silently
+                                }
                               },
                             ),
                             const SizedBox(
@@ -357,28 +520,140 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: chartDataAsync.when(
-                                data: (chartData) {
-                                  final daysInMonth = DateTime(
-                                          currentSelectedMonth.year,
-                                          currentSelectedMonth.month + 1,
-                                          0)
-                                      .day;
-                                  return fl_barchart.FlBarChart(
-                                    barColor: Colors.red,
-                                    chartData: chartData
-                                        .map((e) => fl_barchart.ChartData(
-                                            e.x, e.y, e.day))
-                                        .toList(),
-                                    daysInMonth: daysInMonth,
-                                  );
-                                },
-                                loading: () => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                error: (error, stack) => Center(
-                                  child: Text('加载失败: $error'),
-                                ),
+                              child: Column(
+                                children: [
+                                  // Chart title and switch button
+                                  Container(
+                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          '支出统计图',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // 图表类型切换按钮
+                                            GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  _isLineChart = !_isLineChart;
+                                                });
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade100,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      _isLineChart ? Icons.show_chart : Icons.bar_chart,
+                                                      size: 16,
+                                                      color: Colors.grey.shade600,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      _isLineChart ? '折线图' : '柱状图',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey.shade600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // 全屏按钮
+                                            GestureDetector(
+                                              onTap: () async {
+                                                if (!mounted) return;
+                                                
+                                                try {
+                                                  final chartDataValue = ref.read(expenseChartDataProvider(account.accountData.accountId));
+                                                  if (!chartDataValue.hasValue) return;
+                                                  final chartData = chartDataValue.value!;
+                                                  
+                                                  String title = _getCurrentTimeRangeTitle();
+                                                  int daysInPeriod = _getCurrentDaysInPeriod();
+                                                  
+                                                  if (context.mounted) {
+                                                    Navigator.of(context).push(
+                                                      MaterialPageRoute(
+                                                        builder: (context) => FullscreenChartPage(
+                                                          chartData: chartData,
+                                                          daysInPeriod: daysInPeriod,
+                                                          startDate: _getStartDateForChart(),
+                                                          endDate: _getEndDateForChart(),
+                                                          timeRangeTitle: title,
+                                                          isLineChart: _isLineChart,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                } catch (error) {
+                                                  // Handle error silently
+                                                }
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue.shade50,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Icon(
+                                                  Icons.fullscreen,
+                                                  size: 16,
+                                                  color: Colors.blue.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Chart content
+                                  chartDataAsync.when(
+                                    data: (chartData) {
+                                      final daysInPeriod = _getCurrentDaysInPeriod();
+                                      return _isLineChart
+                                          ? fl_linechart.FlLineChart(
+                                              lineColor: Colors.red,
+                                              chartData: chartData
+                                                  .map((e) => fl_linechart.ChartData(e.x, e.y, e.day))
+                                                  .toList(),
+                                              daysInMonth: daysInPeriod,
+                                              startDate: _getStartDateForChart(),
+                                              endDate: _getEndDateForChart(),
+                                            )
+                                          : fl_barchart.FlBarChart(
+                                              barColor: Colors.red,
+                                              chartData: chartData
+                                                  .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
+                                                  .toList(),
+                                              daysInMonth: daysInPeriod,
+                                              startDate: _getStartDateForChart(),
+                                              endDate: _getEndDateForChart(),
+                                            );
+                                    },
+                                    loading: () => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                    error: (error, stack) => Center(
+                                      child: Text('加载失败: $error'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             )
                           ],
@@ -387,10 +662,8 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                     // 添加交易列表
                     AccountTransactionList(
                       account: account,
-                      startDate: DateTime(currentSelectedMonth.year,
-                          currentSelectedMonth.month, 1),
-                      endDate: DateTime(currentSelectedMonth.year,
-                          currentSelectedMonth.month + 1, 0),
+                      startDate: _getStartDateForChart()!,
+                      endDate: _getEndDateForChart()!,
                     ),
                   ],
                 ),
