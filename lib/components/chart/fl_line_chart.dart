@@ -171,9 +171,7 @@ class FlLineChart extends StatelessWidget {
     
     for (int i = 0; i < count; i++) {
       final data = i < chartData.length ? chartData[i] : ChartData(i.toDouble(), 0, '');
-      // Ensure minimum value is slightly above 0 to prevent below-baseline rendering
-      final yValue = data.y <= 0 ? 0.01 : data.y;
-      spots.add(FlSpot(i.toDouble(), yValue));
+      spots.add(FlSpot(i.toDouble(), data.y));
     }
 
     return [
@@ -183,8 +181,12 @@ class FlLineChart extends StatelessWidget {
         barWidth: 2,
         isStrokeCapRound: true,
         isCurved: true,
+        preventCurveOverShooting: true,
         dotData: const FlDotData(show: false),
-        belowBarData: BarAreaData(show: false),
+        belowBarData: BarAreaData(
+          show: true,
+          color: lineColor.withValues(alpha: 0.2),
+        ),
       ),
     ];
   }
