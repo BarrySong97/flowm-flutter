@@ -462,15 +462,15 @@ class _TopAssetsAccountDetailPageState
                                               GoRouter.of(context).pushNamed(
                                                   'topAssetsAccountDetail',
                                                   extra: {
-                                                    'account':
-                                                        selectedAccountToNavigate
+                                                    'accountId':
+                                                        selectedAccountToNavigate.id
                                                   });
                                             } else {
                                               GoRouter.of(context).pushNamed(
                                                   'assetsDetail', // Navigate to accountDetail if no children
                                                   extra: {
-                                                    'account':
-                                                        selectedAccountToNavigate
+                                                    'accountId':
+                                                        selectedAccountToNavigate.id
                                                   });
                                             }
                                           } else {}
