@@ -361,6 +361,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
                                   endDate: _getEndDateForChart(),
                                   timeRangeTitle: title,
                                   isLineChart: _isLineChart,
+                                  chartType: ChartType.income,
                                 ),
                               ),
                             );
@@ -543,6 +544,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
                               endDate: _getEndDateForChart(),
                               timeRangeTitle: title,
                               isLineChart: _isLineChart,
+                              chartType: ChartType.income,
                             ),
                           ),
                         );

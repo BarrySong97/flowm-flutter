@@ -4,6 +4,8 @@ import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
 import 'package:flowm/components/chart/fl_line_chart.dart' as fl_linechart;
 import 'package:flowm/components/chart/barchart.dart' as barchart;
 
+enum ChartType { income, expense }
+
 class FullscreenChartPage extends StatefulWidget {
   final List<barchart.ChartData> chartData;
   final int daysInPeriod;
@@ -11,6 +13,7 @@ class FullscreenChartPage extends StatefulWidget {
   final DateTime? endDate;
   final String timeRangeTitle;
   final bool isLineChart;
+  final ChartType chartType; // 新增：图表类型参数
 
   const FullscreenChartPage({
     super.key,
@@ -20,6 +23,7 @@ class FullscreenChartPage extends StatefulWidget {
     this.startDate,
     this.endDate,
     this.isLineChart = false,
+    this.chartType = ChartType.expense, // 默认为支出（红色）
   });
 
   @override
@@ -29,6 +33,16 @@ class FullscreenChartPage extends StatefulWidget {
 class _FullscreenChartPageState extends State<FullscreenChartPage> {
   bool _isLineChart = false;
   final ScrollController _scrollController = ScrollController();
+
+  // 获取图表颜色
+  Color get chartColor {
+    return widget.chartType == ChartType.income ? Colors.green : Colors.red;
+  }
+
+  // 获取统计类型文本
+  String get statisticTypeText {
+    return widget.chartType == ChartType.income ? '收入' : '支出';
+  }
 
   @override
   void initState() {
@@ -89,7 +103,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(
-          '${widget.timeRangeTitle}支出图表',
+          '${widget.timeRangeTitle}$statisticTypeText图表',
           style: const TextStyle(fontSize: 16),
         ),
         backgroundColor: Colors.white,
@@ -146,7 +160,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                       child: Row(
                         children: [
                           Text(
-                            '${widget.timeRangeTitle}支出统计',
+                            '${widget.timeRangeTitle}$statisticTypeText统计',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -224,7 +238,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                                 widget.daysInPeriod * 12.0, // 每个数据点12像素宽度，更宽一些
                             child: _isLineChart
                                 ? fl_linechart.FlLineChart(
-                                    lineColor: Colors.red,
+                                    lineColor: chartColor,
                                     chartData: widget.chartData
                                         .map((e) => fl_linechart.ChartData(
                                             e.x, e.y, e.day))
@@ -235,7 +249,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                                     isLandscape: true,
                                   )
                                 : fl_barchart.FlBarChart(
-                                    barColor: Colors.red,
+                                    barColor: chartColor,
                                     chartData: widget.chartData
                                         .map((e) => fl_barchart.ChartData(
                                             e.x, e.y, e.day))
@@ -249,7 +263,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                         )
                       : _isLineChart
                           ? fl_linechart.FlLineChart(
-                              lineColor: Colors.red,
+                              lineColor: chartColor,
                               chartData: widget.chartData
                                   .map((e) =>
                                       fl_linechart.ChartData(e.x, e.y, e.day))
@@ -260,7 +274,7 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                               isLandscape: true,
                             )
                           : fl_barchart.FlBarChart(
-                              barColor: Colors.red,
+                              barColor: chartColor,
                               chartData: widget.chartData
                                   .map((e) =>
                                       fl_barchart.ChartData(e.x, e.y, e.day))
