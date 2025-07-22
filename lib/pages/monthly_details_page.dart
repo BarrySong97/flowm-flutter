@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flowm/components/charts/syncfusion_income_expense_chart.dart';
+import 'package:flowm/components/charts/flchart_income_expense_chart.dart';
 import 'package:flowm/components/common/period_range_selector.dart';
 
 class MonthlyDetailsPage extends StatefulWidget {
@@ -114,7 +114,7 @@ class _MonthlyDetailsPageState extends State<MonthlyDetailsPage> {
                         ],
                       ),
                     ),
-                    SyncfusionIncomeExpenseChart(
+                    FlchartIncomeExpenseChart(
                       monthlyData: generateSampleMonthlyData(),
                     ),
                   ],

@@ -80,24 +80,24 @@ class _MonthlyOverviewCardState extends State<MonthlyOverviewCard> {
                       ),
                     ],
                   ),
-                  // if (widget.onTap != null)
-                  // Row(
-                  //   children: [
-                  //     Text(
-                  //       '查看详情',
-                  //       style: const TextStyle(
-                  //         fontSize: 12,
-                  //         color: Colors.white70,
-                  //       ),
-                  //     ),
-                  //     const SizedBox(width: 4),
-                  //     Icon(
-                  //       Icons.chevron_right,
-                  //       color: Colors.white70,
-                  //       size: 16,
-                  //     ),
-                  //   ],
-                  // ),
+                  if (widget.onTap != null)
+                    Row(
+                      children: [
+                        Text(
+                          '查看详情',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
