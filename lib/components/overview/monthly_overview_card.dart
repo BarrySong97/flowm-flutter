@@ -30,9 +30,7 @@ class _MonthlyOverviewCardState extends State<MonthlyOverviewCard> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
+    return Container(
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
@@ -81,22 +79,25 @@ class _MonthlyOverviewCardState extends State<MonthlyOverviewCard> {
                     ],
                   ),
                   if (widget.onTap != null)
-                    Row(
-                      children: [
-                        Text(
-                          '查看详情',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
+                    GestureDetector(
+                      onTap: widget.onTap,
+                      child: Row(
+                        children: [
+                          Text(
+                            '查看详情',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.chevron_right,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -120,8 +121,7 @@ class _MonthlyOverviewCardState extends State<MonthlyOverviewCard> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildMonthlyItem(String label, String amount) {
