@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
+import 'package:flowm/components/chart/fl_line_chart.dart' as fl_linechart;
 import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
@@ -20,6 +21,7 @@ class ExpensesPage extends ConsumerStatefulWidget {
 
 class _ExpensesPageState extends ConsumerState<ExpensesPage>
     with AutomaticKeepAliveClientMixin {
+  bool _isLineChart = false; // false for bar chart, true for line chart
   // 辅助方法格式化数字
   String _formatCurrency(double amount) {
     if (amount.abs() >= 100000) {
@@ -155,15 +157,85 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     );
   }
 
-  Widget _buildBarChart(List<barchart.ChartData> chartData) {
+  Widget _buildChart(List<barchart.ChartData> chartData) {
     final selectedMonth = ref.watch(selectedMonthProvider);
     final daysInMonth =
         DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
-    return fl_barchart.FlBarChart(
-      barColor: Colors.red,
-      chartData:
-          chartData.map((e) => fl_barchart.ChartData(e.x, e.y, e.day)).toList(),
-      daysInMonth: daysInMonth,
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        children: [
+          // Chart title and switch button
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '支出统计图',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isLineChart = !_isLineChart;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isLineChart ? Icons.show_chart : Icons.bar_chart,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isLineChart ? '折线图' : '柱状图',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Chart content
+          _isLineChart
+              ? fl_linechart.FlLineChart(
+                  lineColor: Colors.red,
+                  chartData: chartData
+                      .map((e) => fl_linechart.ChartData(e.x, e.y, e.day))
+                      .toList(),
+                  daysInMonth: daysInMonth,
+                )
+              : fl_barchart.FlBarChart(
+                  barColor: Colors.red,
+                  chartData: chartData
+                      .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
+                      .toList(),
+                  daysInMonth: daysInMonth,
+                ),
+        ],
+      ),
     );
   }
 
@@ -287,7 +359,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     spacing: 12,
                     children: [
                       _buildStatsRow(data),
-                      _buildBarChart(data.chartData),
+                      _buildChart(data.chartData),
                     ],
                   ),
                   loading: () => Column(
