@@ -19,6 +19,7 @@ class LiabilitiesPage extends ConsumerStatefulWidget {
 class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
+  bool _isAscending = true; // State for sort order
 
   @override
   bool get wantKeepAlive => true;
@@ -75,7 +76,56 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                 ),
               ),
             ),
-            _buildAccountList(context, allAccounts),
+            SliverPadding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 0.0),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '负债列表',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    GestureDetector(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 4,
+                        children: [
+                          Icon(
+                            _isAscending
+                                ? Icons.arrow_upward
+                                : Icons.arrow_downward,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          Text(
+                            _isAscending ? '升序' : '降序',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _isAscending = !_isAscending;
+                        });
+                      },
+                    )
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.only(
+                  top: 16, bottom: 16.0, left: 16, right: 16),
+              sliver: _buildAccountList(context, allAccounts),
+            ),
           ],
         );
       },
@@ -298,7 +348,8 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
               return FadeTransition(opacity: animation, child: child);
             },
             child: LiabilityTreemapWidget(
-              key: ValueKey('${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
+              key: ValueKey(
+                  '${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
               title: isDrilledDown ? '负债分布 > $_drilledDownAccountName' : '负债分布',
               dataItems: treeMapData,
               tooltipValueSuffix: ' ¥',
@@ -345,7 +396,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
     final double totalTopLevelAmount =
         allAccounts.fold(0.0, (sum, account) => sum + account.amount.abs());
 
-    final List<Account> accountsWithPercentage = allAccounts.map((account) {
+    List<Account> accountsWithPercentage = allAccounts.map((account) {
       double percentage = totalTopLevelAmount == 0
           ? 0.0
           : (account.amount.abs() / totalTopLevelAmount) * 100;
@@ -361,29 +412,32 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
       );
     }).toList();
 
+    // Sort accounts based on _isAscending state
+    accountsWithPercentage.sort((a, b) {
+      if (_isAscending) {
+        return a.amount.compareTo(b.amount);
+      } else {
+        return b.amount.compareTo(a.amount);
+      }
+    });
+
     return SliverList.builder(
       itemCount: accountsWithPercentage.length,
       itemBuilder: (context, index) {
         final account = accountsWithPercentage[index];
-        return Padding(
-          padding: EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              bottom: index == accountsWithPercentage.length - 1 ? 16 : 0),
-          child: AccountItem(
-            account: account,
-            onTap: (tappedAccount) {
-              bool hasChildren = tappedAccount.children != null &&
-                  tappedAccount.children!.isNotEmpty;
-              if (hasChildren) {
-                GoRouter.of(context).pushNamed('topLiabilitiesAccountDetail',
-                    extra: {'accountId': tappedAccount.id});
-              } else {
-                GoRouter.of(context).pushNamed('liabilitiesDetail',
-                    extra: {'accountId': tappedAccount.id});
-              }
-            },
-          ),
+        return AccountItem(
+          account: account,
+          onTap: (tappedAccount) {
+            bool hasChildren = tappedAccount.children != null &&
+                tappedAccount.children!.isNotEmpty;
+            if (hasChildren) {
+              GoRouter.of(context).pushNamed('topLiabilitiesAccountDetail',
+                  extra: {'accountId': tappedAccount.id});
+            } else {
+              GoRouter.of(context).pushNamed('liabilitiesDetail',
+                  extra: {'accountId': tappedAccount.id});
+            }
+          },
         );
       },
     );
