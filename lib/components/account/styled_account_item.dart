@@ -21,12 +21,12 @@ class StyledAccount {
 
   // Helper to format amount into M/K
   String get formattedAmount {
-    if (rawAmount >= 1000000) {
+    if (rawAmount.abs() >= 1000000) {
+      // 6位数及以上才格式化
       return '${currencySymbol}${(rawAmount / 1000000).toStringAsFixed(2)}M';
-    } else if (rawAmount >= 1000) {
-      return '${currencySymbol}${(rawAmount / 1000).toStringAsFixed(2)}K';
+    } else {
+      return '${currencySymbol}${NumberFormat('#,##0.00', 'zh_CN').format(rawAmount)}';
     }
-    return '${currencySymbol}${rawAmount.toStringAsFixed(2)}';
   }
 }
 

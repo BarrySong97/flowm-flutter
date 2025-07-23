@@ -95,15 +95,22 @@ final expenseAccountTreeDataProvider =
   );
 });
 
-class TopExpensesDetailPage extends ConsumerWidget {
+class TopExpensesDetailPage extends ConsumerStatefulWidget {
   final int accountId; // 接收 accountId 参数
 
   const TopExpensesDetailPage({super.key, required this.accountId}); // 修改构造函数
 
+  @override
+  ConsumerState<TopExpensesDetailPage> createState() => _TopExpensesDetailPageState();
+}
+
+class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
+  bool _isAscending = true; // 默认升序排列
+
   // 辅助方法格式化数字 (Copied from ExpensesPage)
   String _formatCurrency(double amount) {
-    if (amount.abs() >= 100000) {
-      // Use abs() for negative numbers too
+    if (amount.abs() >= 1000000) {
+      // 6位数及以上才格式化
       return '${(amount / 1000).toStringAsFixed(2)}k';
     } else {
       return NumberFormat('#,##0.00', 'zh_CN').format(amount);
@@ -163,12 +170,12 @@ class TopExpensesDetailPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // 动态获取账户信息
-    final accountAsync = ref.watch(accountExpenseNodeProvider(accountId));
+    final accountAsync = ref.watch(accountExpenseNodeProvider(widget.accountId));
     
     return accountAsync.when(
-      data: (account) => _buildDetailPage(context, ref, account),
+      data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('加载中...')),
         body: const Center(child: CircularProgressIndicator()),
@@ -180,7 +187,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailPage(BuildContext context, WidgetRef ref, AccountExpenseNode account) {
+  Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
     // Sample data for the pie chart - 这部分将被动态数据替代
     // final List<Map<String, dynamic>> expenseData = [...];
     // final double totalExpenseAmount = ...;
@@ -495,21 +502,35 @@ class TopExpensesDetailPage extends ConsumerWidget {
                     final double parentAccountBalance = childrenNodes.fold(
                         0.0, (sum, node) => sum + node.balance);
 
-                    // 1. 转换数据给 CustomPieChart
+                    // 先为原始数据分配颜色，保持颜色映射关系
+                    final Map<String, Color> accountColorMap = {};
                     final List<Map<String, dynamic>> pieChartExpenseData = [];
+                    
                     for (int i = 0; i < childrenNodes.length; i++) {
                       final node = childrenNodes[i];
+                      final color = pieColors[i % pieColors.length];
+                      accountColorMap[node.accountData.accountName] = color;
                       pieChartExpenseData.add({
                         'category': node.accountData.accountName,
                         'amount': node.balance,
-                        'color': pieColors[i % pieColors.length],
+                        'color': color,
                       });
                     }
 
+                    // 根据排序状态对childrenNodes进行排序，但保持原有颜色
+                    final sortedNodes = List<AccountExpenseNode>.from(childrenNodes);
+                    sortedNodes.sort((a, b) {
+                      if (_isAscending) {
+                        return a.balance.compareTo(b.balance);
+                      } else {
+                        return b.balance.compareTo(a.balance);
+                      }
+                    });
+
                     // 2. 转换数据给 StyledAccountList
                     final List<StyledAccount> styledAccounts = [];
-                    for (int i = 0; i < childrenNodes.length; i++) {
-                      final node = childrenNodes[i];
+                    for (final node in sortedNodes) {
+                      final color = accountColorMap[node.accountData.accountName]!;
                       final double percentageOfParent = parentAccountBalance > 0
                           ? (node.balance / parentAccountBalance) * 100
                           : 0.0;
@@ -518,7 +539,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
                         rawAmount: node.balance,
                         currencySymbol: '¥',
                         iconData: Icons.label_outline,
-                        leadingColor: pieColors[i % pieColors.length],
+                        leadingColor: color,
                         percentageText:
                             '${percentageOfParent.toStringAsFixed(0)}%',
                       ));
@@ -526,10 +547,50 @@ class TopExpensesDetailPage extends ConsumerWidget {
 
                     return Column(
                       children: [
-                        SizedBox(
-                          height: 260,
-                          child:
-                              CustomPieChart(expenseData: pieChartExpenseData),
+                        Stack(
+                          children: [
+                            SizedBox(
+                              height: 260,
+                              child:
+                                  CustomPieChart(expenseData: pieChartExpenseData),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _isAscending = !_isAscending;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.8),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                        size: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        _isAscending ? '升序' : '降序',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         Container(
                           decoration: BoxDecoration(
@@ -539,7 +600,7 @@ class TopExpensesDetailPage extends ConsumerWidget {
                           child: StyledAccountList(
                             accounts: styledAccounts,
                             onItemTap: (index) {
-                              final selectedNode = childrenNodes[index];
+                              final selectedNode = sortedNodes[index];
                               GoRouter.of(context).pushNamed(
                                 'expensesDetail',
                                 extra: {'accountId': selectedNode.accountData.accountId},

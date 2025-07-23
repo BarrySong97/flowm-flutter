@@ -21,10 +21,11 @@ class IncomePage extends ConsumerStatefulWidget {
 
 class _IncomePageState extends ConsumerState<IncomePage>
     with AutomaticKeepAliveClientMixin {
+  bool _isAscending = true; // 默认升序排列
   // 辅助方法格式化数字
   String _formatCurrency(double amount) {
     if (amount.abs() >= 100000) {
-      // Use abs() for negative numbers too
+      // 6位数及以上才格式化
       return '${(amount / 1000).toStringAsFixed(2)}k';
     } else {
       return NumberFormat('#,##0.00', 'zh_CN').format(amount);
@@ -200,17 +201,34 @@ class _IncomePageState extends ConsumerState<IncomePage>
       Colors.red.shade400
     ];
 
+    // 先为原始数据分配颜色，保持颜色映射关系
+    final Map<String, Color> accountColorMap = {};
     final List<Map<String, dynamic>> pieChartExpenseData = [];
-    final List<StyledAccount> styledAccounts = [];
-
+    
     for (int i = 0; i < accountTreeNodes.length; i++) {
       final node = accountTreeNodes[i];
       final color = pieColors[i % pieColors.length];
+      accountColorMap[node.accountData.accountName] = color;
       pieChartExpenseData.add({
         'category': node.accountData.accountName,
         'amount': node.balance,
         'color': color,
       });
+    }
+
+    // 根据排序状态对accountTreeNodes进行排序，但保持原有颜色
+    final sortedNodes = List<AccountExpenseNode>.from(accountTreeNodes);
+    sortedNodes.sort((a, b) {
+      if (_isAscending) {
+        return a.balance.compareTo(b.balance);
+      } else {
+        return b.balance.compareTo(a.balance);
+      }
+    });
+
+    final List<StyledAccount> styledAccounts = [];
+    for (final node in sortedNodes) {
+      final color = accountColorMap[node.accountData.accountName]!;
       styledAccounts.add(StyledAccount(
         name: node.accountData.accountName,
         rawAmount: node.balance,
@@ -228,9 +246,49 @@ class _IncomePageState extends ConsumerState<IncomePage>
       ),
       child: Column(
         children: [
-          SizedBox(
-            height: 260,
-            child: CustomPieChart(expenseData: pieChartExpenseData),
+          Stack(
+            children: [
+              SizedBox(
+                height: 260,
+                child: CustomPieChart(expenseData: pieChartExpenseData),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isAscending = !_isAscending;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          _isAscending ? '升序' : '降序',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           Container(
             decoration: BoxDecoration(
@@ -240,7 +298,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
             child: StyledAccountList(
               accounts: styledAccounts,
               onItemTap: (index) {
-                final selectedNode = accountTreeNodes[index];
+                final selectedNode = sortedNodes[index];
                 final routeName = selectedNode.children.isNotEmpty
                     ? 'topIncomeDetail'
                     : 'incomeDetail';
