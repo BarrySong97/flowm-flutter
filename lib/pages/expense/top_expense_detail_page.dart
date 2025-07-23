@@ -167,6 +167,7 @@ class TopExpensesDetailPage extends ConsumerStatefulWidget {
 }
 
 class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
+  bool _isAscending = true; // 默认升序排列
   bool _isLineChart = false; // false for bar chart, true for line chart
 
   DateTime? _getStartDateForChart() {
@@ -244,13 +245,6 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
         return DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
     }
   }
-
-  @override
-  ConsumerState<TopExpensesDetailPage> createState() => _TopExpensesDetailPageState();
-}
-
-class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
-  bool _isAscending = true; // 默认升序排列
 
   // 辅助方法格式化数字 (Copied from ExpensesPage)
   String _formatCurrency(double amount) {
@@ -488,15 +482,15 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
 
     return Scaffold(
         appBar: AppBar(
-          backgroundColor: Color(0xFFF5F6FB),
+          backgroundColor: const Color(0xFFF5F6FB),
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios, size: 22, color: Colors.black),
+            icon: const Icon(Icons.arrow_back_ios, size: 22, color: Colors.black),
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(
             account.accountData.accountName,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.black,
               fontSize: 18,
               fontWeight: FontWeight.w500,
@@ -505,7 +499,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
           centerTitle: true,
           actions: [
             IconButton(
-              icon: Icon(Icons.more_vert, color: Colors.black),
+              icon: const Icon(Icons.more_vert, color: Colors.black),
               onPressed: () async {
                 // Convert database Account to UI Account
                 final uiAccount = ui.Account(
@@ -524,7 +518,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
             ),
           ],
         ),
-        backgroundColor: Color(0xFFF5F6FB),
+        backgroundColor: const Color(0xFFF5F6FB),
         body: SafeArea(
             child: SingleChildScrollView(
                 child: Padding(
@@ -566,6 +560,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                                     endDate: _getEndDateForChart(),
                                     timeRangeTitle: title,
                                     isLineChart: _isLineChart,
+                                    chartType: ChartType.expense,
                                   ),
                                 ),
                               );
@@ -712,6 +707,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                                                     endDate: _getEndDateForChart(),
                                                     timeRangeTitle: title,
                                                     isLineChart: _isLineChart,
+                                                    chartType: ChartType.expense,
                                                   ),
                                                 ),
                                               );
@@ -870,7 +866,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Row(
