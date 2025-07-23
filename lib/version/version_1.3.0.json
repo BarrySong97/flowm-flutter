@@ -1,0 +1,104 @@
+{
+  "version": "1.3.0",
+  "date": "2025-07-22",
+  "title": "图表功能全面升级与用户体验优化",
+  "features": [
+    {
+      "type": "新功能",
+      "description": "实现全屏图表模式，支持动态颜色和优化数据显示",
+      "icon": "📊"
+    },
+    {
+      "type": "新功能", 
+      "description": "全应用时间范围选择功能，统一时间筛选体验",
+      "icon": "📅"
+    },
+    {
+      "type": "新功能",
+      "description": "fl_chart图表重构，提供更好的用户交互体验",
+      "icon": "📈"
+    },
+    {
+      "type": "新功能",
+      "description": "所有详情页面新增图表切换功能（柱状图/折线图）",
+      "icon": "🔄"
+    },
+    {
+      "type": "新功能",
+      "description": "数字隐私保护功能，支持敏感信息隐藏",
+      "icon": "🔐"
+    },
+    {
+      "type": "新功能",
+      "description": "账户详情页面编辑功能，支持资产、支出、收入、负债账户编辑",
+      "icon": "✏️"
+    },
+    {
+      "type": "新功能",
+      "description": "开发者信息页面，提供应用相关信息",
+      "icon": "👨‍💻"
+    },
+    {
+      "type": "新功能",
+      "description": "版本信息系统与可折叠展示功能",
+      "icon": "📝"
+    }
+  ],
+  "improvements": [
+    {
+      "type": "修复",
+      "description": "修复TreeMap双击导航参数传递问题",
+      "icon": "🐛"
+    },
+    {
+      "type": "修复",
+      "description": "修复资产概览查看更多导航功能",
+      "icon": "🐛"
+    },
+    {
+      "type": "修复",
+      "description": "修复创建交易后TreeMap不更新的问题",
+      "icon": "🔧"
+    },
+    {
+      "type": "修复",
+      "description": "修复顶级资产账户查询返回父节点问题",
+      "icon": "🔧"
+    },
+    {
+      "type": "优化",
+      "description": "优化图表布局和Y轴标签显示",
+      "icon": "📊"
+    },
+    {
+      "type": "优化",
+      "description": "完善账本选择器操作提示文案",
+      "icon": "🎨"
+    },
+    {
+      "type": "优化",
+      "description": "优化趋势图表零值数据显示和API兼容性",
+      "icon": "⚡"
+    },
+    {
+      "type": "重构",
+      "description": "优化账户创建弹窗tab切换动画，消除抖动问题",
+      "icon": "🎯"
+    },
+    {
+      "type": "重构",
+      "description": "统一界面圆角设计，优化用户体验",
+      "icon": "🎨"
+    },
+    {
+      "type": "重构",
+      "description": "统一文案表述，将"费用"改为"支出"保持一致性",
+      "icon": "📝"
+    },
+    {
+      "type": "重构",
+      "description": "提取添加记录底部弹出框为独立组件",
+      "icon": "🧩"
+    }
+  ]
+}
