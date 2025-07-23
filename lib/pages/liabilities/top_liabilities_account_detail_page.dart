@@ -27,6 +27,7 @@ class _TopAssetsAccountDetailPageState
     extends ConsumerState<TopLiabilitiesAccountDetailPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
+  bool _isAscending = true; // State for sort order
   // dynamic _currentAccount; // _currentAccount is assigned account but account is used directly.
 
   @override
@@ -236,7 +237,7 @@ class _TopAssetsAccountDetailPageState
                     final double totalTopLevelAmount = subAccounts.fold(
                         0.0, (sum, account) => sum + account.amount.abs());
 
-                    final List<Account> accountsWithPercentage =
+                    List<Account> accountsWithPercentage =
                         subAccounts.map((account) {
                       double percentage = totalTopLevelAmount == 0
                           ? 0.0
@@ -253,22 +254,58 @@ class _TopAssetsAccountDetailPageState
                       );
                     }).toList();
 
+                    // Sort accounts based on _isAscending state
+                    accountsWithPercentage.sort((a, b) {
+                      if (_isAscending) {
+                        return a.amount.compareTo(b.amount);
+                      } else {
+                        return b.amount.compareTo(a.amount);
+                      }
+                    });
+
                     return Column(
                       spacing: 12,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 资产分布标题
+                        // 负债分布标题
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               '负债分布',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black54,
                               ),
+                            ),
+                            GestureDetector(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                spacing: 4,
+                                children: [
+                                  Icon(
+                                    _isAscending
+                                        ? Icons.arrow_upward
+                                        : Icons.arrow_downward,
+                                    size: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                  Text(
+                                    _isAscending ? '升序' : '降序',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  _isAscending = !_isAscending;
+                                });
+                              },
                             ),
                           ],
                         ),
