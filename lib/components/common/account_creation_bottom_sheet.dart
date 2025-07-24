@@ -205,7 +205,7 @@ class _AccountCreationBottomSheetState
     final bool isAssetOrLiability =
         currentAccountType == AccountSelectorType.asset ||
             currentAccountType == AccountSelectorType.liability;
-    final double heightRatio = isAssetOrLiability ? 0.55 : 0.45;
+    final double heightRatio = isAssetOrLiability ? 0.61 : 0.48;
 
     return Container(
       height: MediaQuery.of(context).size.height * heightRatio,
