@@ -252,18 +252,31 @@ class _AccountSelectorBottomSheetState
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline,
-                      color: Colors.grey, size: 28),
-                  onPressed: () async {
-                    final currentAccountType =
-                        _accountTypes[_tabController.index];
-                    await AccountCreationBottomSheet.show(
-                      context,
-                      defaultAccountType: currentAccountType,
-                    );
-                  },
-                  tooltip: '创建新账户',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '长按账户编辑，点击加号创建',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline,
+                          color: Colors.grey, size: 28),
+                      onPressed: () async {
+                        final currentAccountType =
+                            _accountTypes[_tabController.index];
+                        await AccountCreationBottomSheet.show(
+                          context,
+                          defaultAccountType: currentAccountType,
+                        );
+                      },
+                      tooltip: '创建新账户',
+                    ),
+                  ],
                 ),
               ],
             ),
