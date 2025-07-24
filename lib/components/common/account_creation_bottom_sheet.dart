@@ -52,7 +52,7 @@ class _AccountCreationBottomSheetState
   final _nameController = TextEditingController();
   final _initialAmountController = TextEditingController();
   Account? _selectedParentAccount;
-  bool _hasInitialAmount = false;
+  bool _hasInitialAmount = true;
 
   @override
   void initState() {
@@ -112,7 +112,7 @@ class _AccountCreationBottomSheetState
   bool _shouldShowInitialAmount() {
     final currentType = _accountTypes[_tabController.index];
     return currentType == AccountSelectorType.asset ||
-           currentType == AccountSelectorType.liability;
+        currentType == AccountSelectorType.liability;
   }
 
   Future<void> _createAccount() async {
@@ -155,7 +155,9 @@ class _AccountCreationBottomSheetState
 
         // 根据是否有初始金额选择创建方法
         if (initialAmount != null && initialAmount > 0) {
-          await ref.read(accountRepositoryProvider).addNewAccountWithInitialAmount(
+          await ref
+              .read(accountRepositoryProvider)
+              .addNewAccountWithInitialAmount(
                 name: _nameController.text.trim(),
                 type: _getAccountTypeFromSelector(
                     _accountTypes[_tabController.index]),
@@ -199,7 +201,7 @@ class _AccountCreationBottomSheetState
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.45,
+      height: MediaQuery.of(context).size.height * 0.55,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
@@ -322,63 +324,47 @@ class _AccountCreationBottomSheetState
                   if (_shouldShowInitialAmount())
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 8,
                       children: [
-                        Row(
+                        const Text('设置初始金额'),
+                        Column(
                           children: [
-                            Checkbox(
-                              value: _hasInitialAmount,
-                              onChanged: (value) {
-                                setState(() {
-                                  _hasInitialAmount = value ?? false;
-                                  if (!_hasInitialAmount) {
-                                    _initialAmountController.clear();
+                            TextFormField(
+                              controller: _initialAmountController,
+                              decoration: const InputDecoration(
+                                labelText: '初始金额',
+                                prefixText: '¥ ',
+                                border: OutlineInputBorder(),
+                                // helperText: '设置此账户的当前余额',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              validator: (value) {
+                                if (_hasInitialAmount &&
+                                    (value == null || value.trim().isEmpty)) {
+                                  return '请输入初始金额';
+                                }
+                                if (_hasInitialAmount && value != null) {
+                                  final amount = double.tryParse(value.trim());
+                                  if (amount == null || amount <= 0) {
+                                    return '初始金额必须为正数';
                                   }
-                                });
+                                  if (amount > 1000000000) {
+                                    return '初始金额不能超过10亿';
+                                  }
+                                }
+                                return null;
                               },
                             ),
-                            const Text('设置初始金额'),
+                            const SizedBox(height: 8),
                           ],
                         ),
-                        if (_hasInitialAmount)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16.0),
-                            child: Column(
-                              children: [
-                                TextFormField(
-                                  controller: _initialAmountController,
-                                  decoration: const InputDecoration(
-                                    labelText: '初始金额',
-                                    prefixText: '¥ ',
-                                    border: OutlineInputBorder(),
-                                    helperText: '设置此账户的当前余额',
-                                  ),
-                                  keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                                  validator: (value) {
-                                    if (_hasInitialAmount && 
-                                        (value == null || value.trim().isEmpty)) {
-                                      return '请输入初始金额';
-                                    }
-                                    if (_hasInitialAmount && value != null) {
-                                      final amount = double.tryParse(value.trim());
-                                      if (amount == null || amount <= 0) {
-                                        return '初始金额必须为正数';
-                                      }
-                                      if (amount > 1000000000) {
-                                        return '初始金额不能超过10亿';
-                                      }
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 8),
-                              ],
-                            ),
-                          ),
                         const SizedBox(height: 16),
                       ],
                     ),
+
                   Row(
                     children: [
                       Expanded(

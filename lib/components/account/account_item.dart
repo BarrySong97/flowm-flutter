@@ -87,10 +87,16 @@ class _AccountItemState extends State<AccountItem> {
       percentage: widget.account.percentage,
       onTap: (account) {
         if (hasChildren) {
+          // 有子账户时处理展开/收起
           if (_controller.isExpanded) {
             _controller.collapse();
           } else {
             _controller.expand();
+          }
+        } else {
+          // 叶子节点时调用外部的onTap回调
+          if (widget.onTap != null) {
+            widget.onTap!(account);
           }
         }
       },

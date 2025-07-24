@@ -53,7 +53,7 @@ class TimeRangeSelector extends StatelessWidget {
         ),
         thumbDecoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(6),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
