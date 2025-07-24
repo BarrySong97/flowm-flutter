@@ -19,6 +19,7 @@ enum DeleteAccountResult {
   success,
   hasChildAccounts,
   hasRelatedTransactions,
+  isSystemAccount,
   error,
 }
 
@@ -811,6 +812,97 @@ class AccountRepository {
     return accountId;
   }
 
+  /// 创建带初始金额的新账户
+  Future<int> addNewAccountWithInitialAmount({
+    required String name,
+    required AccountType type,
+    required int ledgerId,
+    int? parentId,
+    double? initialAmount,
+  }) async {
+    return await _accountDao.db.transaction(() async {
+      // 1. 先创建账户
+      final accountId = await addNewAccount(
+        name: name,
+        type: type,
+        ledgerId: ledgerId,
+        parentId: parentId,
+      );
+
+      // 2. 如果有初始金额且大于0，创建期初余额交易
+      if (initialAmount != null && initialAmount > 0) {
+        // 获取期初余额账户
+        final openingBalanceAccount = await getOpeningBalanceAccount(ledgerId);
+        if (openingBalanceAccount == null) {
+          throw Exception('期初余额账户未找到，无法创建初始金额交易');
+        }
+
+        // 根据账户类型确定借贷方向
+        int fromAccountId;
+        int toAccountId;
+        
+        if (type == AccountType.ASSET) {
+          // 资产账户：借记新账户，贷记期初余额
+          fromAccountId = openingBalanceAccount.accountId;
+          toAccountId = accountId;
+        } else if (type == AccountType.LIABILITY) {
+          // 负债账户：借记期初余额，贷记新账户
+          fromAccountId = openingBalanceAccount.accountId;
+          toAccountId = accountId;
+          // 注意：负债账户的初始金额实际上需要反向处理
+          // 但为了保持API的一致性，我们在这里调整处理逻辑
+        } else {
+          throw Exception('只有资产和负债账户支持设置初始金额');
+        }
+
+        // 创建交易记录
+        final transactionId = await _transactionDao.insertTransaction(
+          TransactionsCompanion.insert(
+            transactionDate: DateTime.now(),
+            description: Value('账户期初余额 - $name'),
+          ),
+        );
+
+        // 创建分录记录
+        if (type == AccountType.ASSET) {
+          // 资产账户：期初余额减少，新账户增加
+          await _accountDao.db.postings.insertOne(
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: openingBalanceAccount.accountId,
+              amount: -initialAmount,
+            ),
+          );
+          await _accountDao.db.postings.insertOne(
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: accountId,
+              amount: initialAmount,
+            ),
+          );
+        } else if (type == AccountType.LIABILITY) {
+          // 负债账户：期初余额增加，新账户减少（负债增加）
+          await _accountDao.db.postings.insertOne(
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: openingBalanceAccount.accountId,
+              amount: initialAmount,
+            ),
+          );
+          await _accountDao.db.postings.insertOne(
+            PostingsCompanion.insert(
+              transactionId: transactionId,
+              accountId: accountId,
+              amount: -initialAmount,
+            ),
+          );
+        }
+      }
+
+      return accountId;
+    });
+  }
+
   /// 更新一个现有账户，并处理路径更新
   Future<void> editAccount({
     required int accountId,
@@ -902,6 +994,15 @@ class AccountRepository {
     try {
       // 获取账户信息用于后续更新 App Group
       final account = await _accountDao.getAccountById(id);
+      if (account == null) {
+        return DeleteAccountResult.error;
+      }
+
+      // 检查是否为系统保护账户（期初余额账户）
+      if (account.accountType == AccountType.EQUITY && 
+          (account.accountName == '期初余额' || account.accountName == 'Opening Balance')) {
+        return DeleteAccountResult.isSystemAccount;
+      }
 
       // 检查是否有子账户
       final children = await _accountDao.getChildAccounts(id);
@@ -924,10 +1025,8 @@ class AccountRepository {
       final result = await _accountDao.deleteAccount(id);
       if (result > 0) {
         // 删除成功后清理相关缓存并更新 App Group 数据
-        if (account != null) {
-          _clearLedgerRelatedCache(account.ledgerId);
-          _updateHomeWidgetAccountData(account.ledgerId);
-        }
+        _clearLedgerRelatedCache(account.ledgerId);
+        _updateHomeWidgetAccountData(account.ledgerId);
         return DeleteAccountResult.success;
       } else {
         return DeleteAccountResult.error;
@@ -1683,6 +1782,22 @@ class AccountRepository {
     _assetAccountsCache.clear();
     _assetCacheTimestamps.clear();
     print('[AccountRepository] 所有缓存已清理');
+  }
+
+  /// 获取期初余额账户
+  Future<Account?> getOpeningBalanceAccount(int ledgerId) async {
+    try {
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      final openingBalanceAccount = allAccounts.firstWhere(
+        (account) => account.accountType == AccountType.EQUITY &&
+            (account.accountName == '期初余额' || account.accountName == 'Opening Balance'),
+        orElse: () => throw Exception('期初余额账户未找到'),
+      );
+      return openingBalanceAccount;
+    } catch (e) {
+      print('[AccountRepository] 获取期初余额账户失败: $e');
+      return null;
+    }
   }
 
   /// 清理指定账本的缓存

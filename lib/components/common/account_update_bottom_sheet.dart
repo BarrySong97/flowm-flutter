@@ -290,6 +290,12 @@ class _AccountUpdateBottomSheetState
             print('删除失败：该账户有相关的交易记录');
             break;
 
+          case DeleteAccountResult.isSystemAccount:
+            message = '无法删除系统账户"期初余额"，该账户用于维护复式记账平衡';
+            backgroundColor = Colors.red;
+            print('删除失败：该账户是系统保护账户');
+            break;
+
           case DeleteAccountResult.error:
           default:
             message = '删除账户失败：未知错误';
@@ -309,6 +315,9 @@ class _AccountUpdateBottomSheetState
             case DeleteAccountResult.hasChildAccounts:
             case DeleteAccountResult.hasRelatedTransactions:
               SnackBarUtils.showOverlayWarning(context, message);
+              break;
+            case DeleteAccountResult.isSystemAccount:
+              SnackBarUtils.showOverlayError(context, message);
               break;
             case DeleteAccountResult.error:
             default:

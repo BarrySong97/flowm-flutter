@@ -50,7 +50,9 @@ class _AccountCreationBottomSheetState
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _initialAmountController = TextEditingController();
   Account? _selectedParentAccount;
+  bool _hasInitialAmount = false;
 
   @override
   void initState() {
@@ -72,7 +74,13 @@ class _AccountCreationBottomSheetState
         length: _accountTypes.length, vsync: this, initialIndex: initialIndex);
     _tabController.addListener(() {
       if (mounted) {
-        setState(() {});
+        setState(() {
+          // 当切换账户类型时，重置初始金额状态
+          if (!_shouldShowInitialAmount()) {
+            _hasInitialAmount = false;
+            _initialAmountController.clear();
+          }
+        });
       }
     });
   }
@@ -81,6 +89,7 @@ class _AccountCreationBottomSheetState
   void dispose() {
     _tabController.dispose();
     _nameController.dispose();
+    _initialAmountController.dispose();
     super.dispose();
   }
 
@@ -97,6 +106,13 @@ class _AccountCreationBottomSheetState
       case AccountSelectorType.equity:
         return AccountType.EQUITY;
     }
+  }
+
+  /// 判断当前账户类型是否应该显示初始金额选项
+  bool _shouldShowInitialAmount() {
+    final currentType = _accountTypes[_tabController.index];
+    return currentType == AccountSelectorType.asset ||
+           currentType == AccountSelectorType.liability;
   }
 
   Future<void> _createAccount() async {
@@ -125,13 +141,37 @@ class _AccountCreationBottomSheetState
       }
 
       try {
-        await ref.read(accountRepositoryProvider).addNewAccount(
-              name: _nameController.text.trim(),
-              type: _getAccountTypeFromSelector(
-                  _accountTypes[_tabController.index]),
-              ledgerId: selectedLedger.ledgerId,
-              parentId: _selectedParentAccount?.id,
-            );
+        // 解析初始金额
+        double? initialAmount;
+        if (_hasInitialAmount && _initialAmountController.text.isNotEmpty) {
+          initialAmount = double.tryParse(_initialAmountController.text.trim());
+          if (initialAmount == null || initialAmount <= 0) {
+            if (mounted) {
+              SnackBarUtils.showOverlayError(context, '初始金额必须为正数');
+            }
+            return;
+          }
+        }
+
+        // 根据是否有初始金额选择创建方法
+        if (initialAmount != null && initialAmount > 0) {
+          await ref.read(accountRepositoryProvider).addNewAccountWithInitialAmount(
+                name: _nameController.text.trim(),
+                type: _getAccountTypeFromSelector(
+                    _accountTypes[_tabController.index]),
+                ledgerId: selectedLedger.ledgerId,
+                parentId: _selectedParentAccount?.id,
+                initialAmount: initialAmount,
+              );
+        } else {
+          await ref.read(accountRepositoryProvider).addNewAccount(
+                name: _nameController.text.trim(),
+                type: _getAccountTypeFromSelector(
+                    _accountTypes[_tabController.index]),
+                ledgerId: selectedLedger.ledgerId,
+                parentId: _selectedParentAccount?.id,
+              );
+        }
 
         invalidateProvidersForTransaction(ref,
             fromAccountType: _getAccountTypeFromSelector(
@@ -278,6 +318,67 @@ class _AccountCreationBottomSheetState
                     },
                   ),
                   const SizedBox(height: 16),
+                  // 初始金额设置（仅对资产和负债账户显示）
+                  if (_shouldShowInitialAmount())
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _hasInitialAmount,
+                              onChanged: (value) {
+                                setState(() {
+                                  _hasInitialAmount = value ?? false;
+                                  if (!_hasInitialAmount) {
+                                    _initialAmountController.clear();
+                                  }
+                                });
+                              },
+                            ),
+                            const Text('设置初始金额'),
+                          ],
+                        ),
+                        if (_hasInitialAmount)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16.0),
+                            child: Column(
+                              children: [
+                                TextFormField(
+                                  controller: _initialAmountController,
+                                  decoration: const InputDecoration(
+                                    labelText: '初始金额',
+                                    prefixText: '¥ ',
+                                    border: OutlineInputBorder(),
+                                    helperText: '设置此账户的当前余额',
+                                  ),
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                                  validator: (value) {
+                                    if (_hasInitialAmount && 
+                                        (value == null || value.trim().isEmpty)) {
+                                      return '请输入初始金额';
+                                    }
+                                    if (_hasInitialAmount && value != null) {
+                                      final amount = double.tryParse(value.trim());
+                                      if (amount == null || amount <= 0) {
+                                        return '初始金额必须为正数';
+                                      }
+                                      if (amount > 1000000000) {
+                                        return '初始金额不能超过10亿';
+                                      }
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   Row(
                     children: [
                       Expanded(
