@@ -1,0 +1,34 @@
+{
+  "version": "1.3.2",
+  "date": "2025-07-24",
+  "title": "账户管理优化与用户体验提升",
+  "features": [
+    {
+      "type": "新功能",
+      "description": "添加账户创建时初始金额功能，支持设置期初余额",
+      "icon": "💰"
+    },
+    {
+      "type": "新功能", 
+      "description": "添加期初余额账户保护机制，防止误操作",
+      "icon": "🛡️"
+    }
+  ],
+  "improvements": [
+    {
+      "type": "修复",
+      "description": "修复叶子节点账户无法点击跳转的问题",
+      "icon": "🐛"
+    },
+    {
+      "type": "优化",
+      "description": "优化账户初始金额设置界面UI体验",
+      "icon": "🎨"
+    },
+    {
+      "type": "修复",
+      "description": "修复代码分析警告，提升代码质量",
+      "icon": "🔧"
+    }
+  ]
+}
