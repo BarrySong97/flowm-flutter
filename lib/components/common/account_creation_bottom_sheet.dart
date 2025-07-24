@@ -200,8 +200,15 @@ class _AccountCreationBottomSheetState
 
   @override
   Widget build(BuildContext context) {
+    // 根据账户类型调整高度：资产和负债类型需要显示初始金额，因此高度更高
+    final currentAccountType = _accountTypes[_tabController.index];
+    final bool isAssetOrLiability =
+        currentAccountType == AccountSelectorType.asset ||
+            currentAccountType == AccountSelectorType.liability;
+    final double heightRatio = isAssetOrLiability ? 0.55 : 0.45;
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.55,
+      height: MediaQuery.of(context).size.height * heightRatio,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
@@ -365,6 +372,18 @@ class _AccountCreationBottomSheetState
                       ],
                     ),
 
+                  // 提示文字
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      '系统最多支持两层账户结构，选择一级账户作为父账户',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+
                   Row(
                     children: [
                       Expanded(
@@ -374,13 +393,13 @@ class _AccountCreationBottomSheetState
                             side: BorderSide(color: Colors.grey.shade300),
                           ),
                           title: Text(
-                              _selectedParentAccount?.name ?? '选择父账户 (可选)'),
+                              _selectedParentAccount?.name ?? '选择一级账户 (可选)'),
                           trailing: const Icon(Icons.keyboard_arrow_right),
                           onTap: () async {
                             final selectedAccount =
                                 await ParentAccountSelectorBottomSheet.show(
                               context,
-                              title: '选择父账户',
+                              title: '选择一级账户',
                               accountType: _accountTypes[_tabController.index],
                               selectedAccount: _selectedParentAccount,
                             );

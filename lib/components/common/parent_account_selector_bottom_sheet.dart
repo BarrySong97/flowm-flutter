@@ -146,6 +146,7 @@ class _ParentAccountSelectorBottomSheetState
         onTap: (selectedAccount) {
           Navigator.of(context).pop(selectedAccount);
         },
+        isRootLevel: true, // 标记为根级别账户
       );
     }).toList();
   }
@@ -155,11 +156,13 @@ class _ParentAccountItem extends StatefulWidget {
   final Account account;
   final Account? selectedAccount;
   final void Function(Account account) onTap;
+  final bool isRootLevel; // 是否为根级别账户
 
   const _ParentAccountItem({
     required this.account,
     this.selectedAccount,
     required this.onTap,
+    this.isRootLevel = false,
   });
 
   @override
@@ -174,12 +177,15 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
     final bool hasChildren =
         widget.account.children != null && widget.account.children!.isNotEmpty;
     final bool isSelected = widget.selectedAccount?.id == widget.account.id;
+    
+    // 判断是否可以选择：只允许选择一级账户（根级别账户）
+    final bool canSelect = widget.isRootLevel;
 
     if (hasChildren) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.white,
+          color: isSelected ? Colors.blue.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(8.0),
           border: isSelected
               ? Border.all(color: Colors.blue, width: 2)
@@ -195,10 +201,11 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
               });
             },
             title: InkWell(
-              onTap: () => widget.onTap(widget.account),
+              onTap: canSelect ? () => widget.onTap(widget.account) : null,
               child: _AccountRow(
                 account: widget.account,
                 isSelected: isSelected,
+                isDisabled: !canSelect,
               ),
             ),
             children: widget.account.children!.map<Widget>((childAccount) {
@@ -209,6 +216,7 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
                   account: childAccount,
                   selectedAccount: widget.selectedAccount,
                   onTap: widget.onTap,
+                  isRootLevel: false, // 子账户不是根级别
                 ),
               );
             }).toList(),
@@ -220,18 +228,19 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.white,
+          color: isSelected ? Colors.blue.withValues(alpha: 0.1) : Colors.white,
           borderRadius: BorderRadius.circular(8.0),
           border: isSelected
               ? Border.all(color: Colors.blue, width: 2)
               : Border.all(color: Colors.grey[200]!, width: 1),
         ),
         child: InkWell(
-          onTap: () => widget.onTap(widget.account),
+          onTap: canSelect ? () => widget.onTap(widget.account) : null,
           borderRadius: BorderRadius.circular(8.0),
           child: _AccountRow(
             account: widget.account,
             isSelected: isSelected,
+            isDisabled: !canSelect,
           ),
         ),
       );
@@ -242,10 +251,12 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
 class _AccountRow extends StatelessWidget {
   final Account account;
   final bool isSelected;
+  final bool isDisabled;
 
   const _AccountRow({
     required this.account,
     this.isSelected = false,
+    this.isDisabled = false,
   });
 
   @override
@@ -253,7 +264,9 @@ class _AccountRow extends StatelessWidget {
     final TextStyle nameStyle = TextStyle(
       fontSize: 15.0,
       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-      color: isSelected ? Colors.blue[700] : Colors.black87,
+      color: isDisabled 
+          ? Colors.grey[400]
+          : (isSelected ? Colors.blue[700] : Colors.black87),
     );
 
     return Padding(
@@ -264,7 +277,9 @@ class _AccountRow extends StatelessWidget {
             Icon(
               account.icon,
               size: 24,
-              color: isSelected ? Colors.blue[700] : Colors.grey[600],
+              color: isDisabled 
+                  ? Colors.grey[300]
+                  : (isSelected ? Colors.blue[700] : Colors.grey[600]),
             ),
             const SizedBox(width: 12),
           ],
@@ -279,7 +294,9 @@ class _AccountRow extends StatelessWidget {
               '${account.currencySymbol}${account.amount.toStringAsFixed(2)}',
               style: TextStyle(
                 fontSize: 14.0,
-                color: isSelected ? Colors.blue[600] : Colors.grey[600],
+                color: isDisabled 
+                    ? Colors.grey[300]
+                    : (isSelected ? Colors.blue[600] : Colors.grey[600]),
               ),
             ),
           ],
