@@ -168,7 +168,7 @@ double getBalanceChange({
       case AccountType.EQUITY:
         return -1; // 权益减少
       case AccountType.INCOME:
-        return 1; // 收入增加
+        return -1; // 收入增加（复式记账：从账户减少）
       case AccountType.EXPENSE:
         return -1; // 费用减少（退款场景）
     }
