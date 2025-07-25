@@ -159,27 +159,33 @@ double getBalanceChange({
 }) {
   if (isFromAccount) {
     if (fromAccountType == null) return 0;
-    // Account is being Credited (source of funds)
+    // Account is being used as source of funds
     switch (fromAccountType) {
       case AccountType.ASSET:
-      case AccountType.EXPENSE:
-        return -1; // Balance decreases
+        return -1; // 资产减少
       case AccountType.LIABILITY:
+        return -1; // 债务增加（负数变得更负，所以是-1）
       case AccountType.EQUITY:
+        return -1; // 权益减少
       case AccountType.INCOME:
-        return 1; // Balance increases
+        return 1; // 收入增加
+      case AccountType.EXPENSE:
+        return -1; // 费用减少（退款场景）
     }
   } else {
     if (toAccountType == null) return 0;
-    // Account is being Debited (destination of funds)
+    // Account is being used as destination of funds
     switch (toAccountType) {
       case AccountType.ASSET:
-      case AccountType.EXPENSE:
-        return 1; // Balance increases
+        return 1; // 资产增加
       case AccountType.LIABILITY:
+        return 1; // 债务减少（负数变得不那么负，所以是+1）
       case AccountType.EQUITY:
+        return 1; // 权益增加
       case AccountType.INCOME:
-        return -1; // Balance decreases
+        return -1; // 收入冲减
+      case AccountType.EXPENSE:
+        return 1; // 费用增加
     }
   }
 }

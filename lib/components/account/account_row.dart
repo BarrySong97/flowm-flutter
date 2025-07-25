@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flowm/components/account/account_item.dart'; // For Account model
+import 'package:flowm/db/tables/account_table.dart' show AccountType;
 
 class AccountRow extends StatelessWidget {
   final Account account;
@@ -27,13 +28,16 @@ class AccountRow extends StatelessWidget {
         fontWeight: FontWeight.normal,
         color: Colors.black87);
 
+    // 获取用户友好的金额显示
+    final userFriendlyAmount = _getUserFriendlyAmount(account.amount, account.type);
+    
     String displayedAmount;
     if (showCurrencySymbolInAmount) {
       displayedAmount =
-          '${account.currencySymbol}${account.amount.toStringAsFixed(2)}';
+          '${account.currencySymbol}${userFriendlyAmount.toStringAsFixed(2)}';
     } else {
       // Typically for parent accounts in a list where children sum up to this amount
-      displayedAmount = account.amount.toStringAsFixed(2);
+      displayedAmount = userFriendlyAmount.toStringAsFixed(2);
     }
 
     return Padding(
@@ -95,5 +99,19 @@ class AccountRow extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 获取用户友好的金额显示
+  /// 只有收入账户显示绝对值，其他账户按原值显示
+  double _getUserFriendlyAmount(double amount, AccountType accountType) {
+    switch (accountType) {
+      case AccountType.INCOME:
+        return amount.abs(); // 显示绝对值
+      case AccountType.ASSET:
+      case AccountType.LIABILITY:
+      case AccountType.EQUITY:
+      case AccountType.EXPENSE:
+        return amount; // 按原值显示
+    }
   }
 }

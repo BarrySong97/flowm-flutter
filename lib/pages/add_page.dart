@@ -598,6 +598,22 @@ class _AddPageState extends ConsumerState<AddPage>
       return;
     }
 
+    // 检查交易是否异常，如果异常则阻止创建
+    final validationResult = AccountTransactionValidator.validateTransaction(
+      fromAccountType: _fromAccount!.type,
+      toAccountType: _toAccount!.type,
+    );
+
+    if (validationResult.level == TransactionValidationLevel.abnormal) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(validationResult.warningMessage ?? '此交易类型不被允许'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     try {
       if (_isEditMode) {
         // 更新逻辑

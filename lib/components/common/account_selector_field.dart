@@ -107,10 +107,13 @@ class AccountSelectorField extends StatelessWidget {
     if (selectedAccount == null) return const SizedBox.shrink();
 
     final originalAmount = selectedAccount!.amount;
+    
+    // 交易表达式中的余额显示：负债账户显示原值
+    final displayAmount = _getTransactionExpressionAmount(originalAmount, selectedAccount!.type);
 
     if (transactionAmount == 0.0) {
       return Text(
-        '${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)}',
+        '${selectedAccount!.currencySymbol}${displayAmount.toStringAsFixed(2)}',
         style: TextStyle(
           fontSize: 14,
           color: Colors.grey[600],
@@ -126,7 +129,7 @@ class AccountSelectorField extends StatelessWidget {
 
     if (balanceChange == 0) {
       return Text(
-        '${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)}',
+        '${selectedAccount!.currencySymbol}${displayAmount.toStringAsFixed(2)}',
         style: TextStyle(
           fontSize: 14,
           color: Colors.grey[600],
@@ -134,18 +137,17 @@ class AccountSelectorField extends StatelessWidget {
       );
     }
 
-    // 使用新的验证工具类获取符号
-    String operator;
-    Color changeColor;
-    
-    operator = AccountTransactionValidator.getAccountSymbol(
+    // 使用统一的符号显示逻辑
+    String operator = AccountTransactionValidator.getAccountSymbol(
       accountType: selectedAccount!.type,
       isFromAccount: isFromAccount,
     );
     
-    changeColor = operator == '+' ? Colors.green : Colors.red;
+    Color changeColor = operator == '+' ? Colors.green : Colors.red;
 
+    // 计算新余额，交易表达式中显示原值
     final newAmount = originalAmount + balanceChange * transactionAmount;
+    final displayNewAmount = _getTransactionExpressionAmount(newAmount, selectedAccount!.type);
 
     return RichText(
       text: TextSpan(
@@ -159,14 +161,28 @@ class AccountSelectorField extends StatelessWidget {
           if (!isEditMode)
             TextSpan(
                 text:
-                    '余额 ${selectedAccount!.currencySymbol}${originalAmount.toStringAsFixed(2)} '),
+                    '余额 ${selectedAccount!.currencySymbol}${displayAmount.toStringAsFixed(2)} '),
           TextSpan(
             text: '$operator ${transactionAmount.abs().toStringAsFixed(2)}',
             style: TextStyle(color: changeColor),
           ),
-          if (!isEditMode) TextSpan(text: ' = ${newAmount.toStringAsFixed(2)}'),
+          if (!isEditMode) TextSpan(text: ' = ${displayNewAmount.toStringAsFixed(2)}'),
         ],
       ),
     );
+  }
+
+  /// 获取交易表达式中的金额显示
+  /// 只有收入账户显示绝对值，其他账户按原值显示
+  double _getTransactionExpressionAmount(double amount, AccountType accountType) {
+    switch (accountType) {
+      case AccountType.INCOME:
+        return amount.abs(); // 显示绝对值
+      case AccountType.ASSET:
+      case AccountType.LIABILITY:
+      case AccountType.EQUITY:
+      case AccountType.EXPENSE:
+        return amount; // 按原值显示
+    }
   }
 }

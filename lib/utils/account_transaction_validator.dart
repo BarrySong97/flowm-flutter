@@ -82,69 +82,38 @@ class AccountTransactionValidator {
     if (isSource) {
       // 作为资金来源（从账户）
       switch (accountType) {
-        case AccountType.ASSET:
-          return const AccountBalanceChange(
-            direction: -1,
-            symbol: '-',
-            description: '资产减少',
-          );
-        case AccountType.LIABILITY:
-          return const AccountBalanceChange(
-            direction: 1,
-            symbol: '+',
-            description: '债务增加',
-          );
-        case AccountType.EQUITY:
-          return const AccountBalanceChange(
-            direction: -1,
-            symbol: '-',
-            description: '权益减少',
-          );
         case AccountType.INCOME:
+          // 收入账户特殊处理：用户理解层面应该显示 '+' 号
           return const AccountBalanceChange(
-            direction: 1,
-            symbol: '+',
-            description: '收入增加',
+            direction: -1, // 复式记账规则：从账户减少
+            symbol: '+',   // 用户理解：获得收入
+            description: '获得收入',
           );
-        case AccountType.EXPENSE:
+        default:
+          // 其他账户：从账户金额减少，显示 '-' 号
           return const AccountBalanceChange(
             direction: -1,
             symbol: '-',
-            description: '费用减少',
+            description: '从账户减少',
           );
       }
     } else {
-      // 作为资金去向（到账户）
+      // 作为资金去向（到账户）- 复式记账规则：到账户金额一定增加  
+      // 显示层面：统一显示 '+' 号（除了收入账户）
       switch (accountType) {
-        case AccountType.ASSET:
-          return const AccountBalanceChange(
-            direction: 1,
-            symbol: '+',
-            description: '资产增加',
-          );
-        case AccountType.LIABILITY:
-          return const AccountBalanceChange(
-            direction: -1,
-            symbol: '-',
-            description: '债务减少',
-          );
-        case AccountType.EQUITY:
-          return const AccountBalanceChange(
-            direction: 1,
-            symbol: '+',
-            description: '权益增加',
-          );
         case AccountType.INCOME:
+          // 收入账户作为到账户：收入冲减，显示 '-' 号
           return const AccountBalanceChange(
-            direction: -1,
-            symbol: '-',
+            direction: 1,  // 复式记账规则：到账户增加
+            symbol: '-',   // 用户理解：收入减少
             description: '收入减少',
           );
-        case AccountType.EXPENSE:
+        default:
+          // 其他账户：到账户增加，显示 '+' 号
           return const AccountBalanceChange(
             direction: 1,
             symbol: '+',
-            description: '费用增加',
+            description: '到账户增加',
           );
       }
     }
