@@ -6,6 +6,8 @@ import 'package:flowm/components/common/account_selector_field.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flowm/utils/account_transaction_validator.dart';
+import 'package:flowm/pages/account_transaction_guide_screen.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
@@ -219,6 +221,123 @@ class _AddPageState extends ConsumerState<AddPage>
       );
     }
     return '';
+  }
+
+  Widget _buildTransactionValidationIndicator() {
+    if (_fromAccount == null || _toAccount == null) {
+      return const SizedBox.shrink();
+    }
+
+    final validationResult = AccountTransactionValidator.validateTransaction(
+      fromAccountType: _fromAccount!.type,
+      toAccountType: _toAccount!.type,
+    );
+
+    IconData icon;
+    Color color;
+    String tooltip;
+
+    switch (validationResult.level) {
+      case TransactionValidationLevel.normal:
+        icon = Icons.check_circle_outline;
+        color = Colors.green;
+        tooltip = '正常交易';
+        break;
+      case TransactionValidationLevel.uncommon:
+        icon = Icons.warning_amber_outlined;
+        color = Colors.orange;
+        tooltip = validationResult.warningMessage ?? '不常见交易';
+        break;
+      case TransactionValidationLevel.abnormal:
+        icon = Icons.error_outline;
+        color = Colors.red;
+        tooltip = validationResult.warningMessage ?? '异常交易';
+        break;
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Icon(
+        icon,
+        color: color,
+        size: 20,
+      ),
+    );
+  }
+
+  Widget _buildTransactionValidationCard() {
+    if (_fromAccount == null || _toAccount == null) {
+      return const SizedBox.shrink();
+    }
+
+    final validationResult = AccountTransactionValidator.validateTransaction(
+      fromAccountType: _fromAccount!.type,
+      toAccountType: _toAccount!.type,
+    );
+
+    // 正常交易不显示提示卡片
+    if (validationResult.level == TransactionValidationLevel.normal) {
+      return const SizedBox(height: 12);
+    }
+
+    IconData icon;
+    Color backgroundColor;
+    Color iconColor;
+    Color textColor;
+
+    switch (validationResult.level) {
+      case TransactionValidationLevel.normal:
+        return const SizedBox(height: 12);
+      case TransactionValidationLevel.uncommon:
+        icon = Icons.warning_amber_outlined;
+        backgroundColor = Colors.orange.shade50;
+        iconColor = Colors.orange.shade600;
+        textColor = Colors.orange.shade700;
+        break;
+      case TransactionValidationLevel.abnormal:
+        icon = Icons.error_outline;
+        backgroundColor = Colors.red.shade50;
+        iconColor = Colors.red.shade600;
+        textColor = Colors.red.shade700;
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: iconColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: iconColor,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              validationResult.warningMessage ?? 
+                (validationResult.level == TransactionValidationLevel.uncommon 
+                  ? '这是一笔不常见的交易类型，请确认账户选择是否正确'
+                  : '这种账户组合可能不合理，请检查账户选择'),
+              style: TextStyle(
+                color: textColor,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleDateTap() {
@@ -457,6 +576,7 @@ class _AddPageState extends ConsumerState<AddPage>
       return;
     }
 
+
     final transactionAmount = double.tryParse(amount);
     if (transactionAmount == null || transactionAmount == 0.0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -568,6 +688,18 @@ class _AddPageState extends ConsumerState<AddPage>
           icon: const Icon(Icons.close, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.black87),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AccountTransactionGuideScreen(),
+                ),
+              );
+            },
+          ),
+        ],
         titleSpacing: 0,
         elevation: 0,
       ),
@@ -665,6 +797,12 @@ class _AddPageState extends ConsumerState<AddPage>
                                 ),
                               ),
                             ],
+                            // 显示交易验证状态
+                            if (_fromAccount != null &&
+                                _toAccount != null) ...[
+                              const SizedBox(width: 8),
+                              _buildTransactionValidationIndicator(),
+                            ],
                           ],
                         ),
                       ),
@@ -693,6 +831,9 @@ class _AddPageState extends ConsumerState<AddPage>
                       toAccountType: _toAccount?.type,
                       isEditMode: _isEditMode,
                     ),
+
+                    // 交易验证提示区域
+                    _buildTransactionValidationCard(),
 
                     const Spacer(),
                   ],

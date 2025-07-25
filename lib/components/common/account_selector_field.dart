@@ -3,6 +3,7 @@ import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/db/tables/account_table.dart' show AccountType;
 import 'package:flowm/utils/transaction_type_map.dart';
+import 'package:flowm/utils/account_transaction_validator.dart';
 
 class AccountSelectorField extends StatelessWidget {
   final String label;
@@ -133,16 +134,16 @@ class AccountSelectorField extends StatelessWidget {
       );
     }
 
+    // 使用新的验证工具类获取符号
     String operator;
     Color changeColor;
-
-    if (balanceChange > 0) {
-      operator = '+';
-      changeColor = Colors.green;
-    } else {
-      operator = '-';
-      changeColor = Colors.red;
-    }
+    
+    operator = AccountTransactionValidator.getAccountSymbol(
+      accountType: selectedAccount!.type,
+      isFromAccount: isFromAccount,
+    );
+    
+    changeColor = operator == '+' ? Colors.green : Colors.red;
 
     final newAmount = originalAmount + balanceChange * transactionAmount;
 
