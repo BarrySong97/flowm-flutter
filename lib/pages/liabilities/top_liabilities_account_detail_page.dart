@@ -246,7 +246,7 @@ class _TopAssetsAccountDetailPageState
                         id: account.id,
                         name: account.name,
                         type: account.type,
-                        amount: account.amount,
+                        amount: account.amount.abs(), // 转换为正数显示
                         icon: account.icon,
                         children: account.children,
                         currencySymbol: account.currencySymbol,

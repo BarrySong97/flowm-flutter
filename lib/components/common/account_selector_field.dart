@@ -137,10 +137,11 @@ class AccountSelectorField extends StatelessWidget {
       );
     }
 
-    // 使用统一的符号显示逻辑
+    // 使用统一的符号显示逻辑，传入对手方账户类型
     String operator = AccountTransactionValidator.getAccountSymbol(
       accountType: selectedAccount!.type,
       isFromAccount: isFromAccount,
+      counterpartAccountType: isFromAccount ? toAccountType : fromAccountType,
     );
     
     Color changeColor = operator == '+' ? Colors.green : Colors.red;
@@ -173,13 +174,13 @@ class AccountSelectorField extends StatelessWidget {
   }
 
   /// 获取交易表达式中的金额显示
-  /// 只有收入账户显示绝对值，其他账户按原值显示
+  /// 收入和负债账户显示绝对值，其他账户按原值显示
   double _getTransactionExpressionAmount(double amount, AccountType accountType) {
     switch (accountType) {
       case AccountType.INCOME:
+      case AccountType.LIABILITY:
         return amount.abs(); // 显示绝对值
       case AccountType.ASSET:
-      case AccountType.LIABILITY:
       case AccountType.EQUITY:
       case AccountType.EXPENSE:
         return amount; // 按原值显示

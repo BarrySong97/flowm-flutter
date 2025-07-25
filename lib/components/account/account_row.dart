@@ -102,13 +102,13 @@ class AccountRow extends StatelessWidget {
   }
 
   /// 获取用户友好的金额显示
-  /// 只有收入账户显示绝对值，其他账户按原值显示
+  /// 收入和负债账户显示绝对值，其他账户按原值显示
   double _getUserFriendlyAmount(double amount, AccountType accountType) {
     switch (accountType) {
       case AccountType.INCOME:
+      case AccountType.LIABILITY:
         return amount.abs(); // 显示绝对值
       case AccountType.ASSET:
-      case AccountType.LIABILITY:
       case AccountType.EQUITY:
       case AccountType.EXPENSE:
         return amount; // 按原值显示

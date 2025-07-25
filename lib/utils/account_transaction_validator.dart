@@ -63,8 +63,16 @@ class AccountTransactionValidator {
     required AccountType fromAccountType,
     required AccountType toAccountType,
   }) {
-    final fromChange = _getAccountBalanceChange(fromAccountType, isSource: true);
-    final toChange = _getAccountBalanceChange(toAccountType, isSource: false);
+    final fromChange = _getAccountBalanceChange(
+      fromAccountType, 
+      isSource: true, 
+      counterpartType: toAccountType,
+    );
+    final toChange = _getAccountBalanceChange(
+      toAccountType, 
+      isSource: false, 
+      counterpartType: fromAccountType,
+    );
     
     final validationInfo = _getTransactionValidationInfo(fromAccountType, toAccountType);
     
@@ -78,7 +86,11 @@ class AccountTransactionValidator {
   }
 
   /// 获取账户余额变化信息
-  static AccountBalanceChange _getAccountBalanceChange(AccountType accountType, {required bool isSource}) {
+  static AccountBalanceChange _getAccountBalanceChange(
+    AccountType accountType, {
+    required bool isSource,
+    AccountType? counterpartType,
+  }) {
     if (isSource) {
       // 作为资金来源（从账户）
       switch (accountType) {
@@ -89,6 +101,23 @@ class AccountTransactionValidator {
             symbol: '+',   // 用户理解：获得收入
             description: '获得收入',
           );
+        case AccountType.LIABILITY:
+          // 负债账户需要根据对手方判断
+          if (counterpartType == AccountType.LIABILITY) {
+            // 负债→负债：债务转移，该债务减少
+            return const AccountBalanceChange(
+              direction: -1, // 复式记账规则：从账户减少
+              symbol: '-',   // 用户理解：该债务减少
+              description: '债务转移',
+            );
+          } else {
+            // 负债→其他：借款使用，债务增加
+            return const AccountBalanceChange(
+              direction: -1, // 复式记账规则：从账户减少
+              symbol: '+',   // 用户理解：债务增加
+              description: '借款使用',
+            );
+          }
         default:
           // 其他账户：从账户金额减少，显示 '-' 号
           return const AccountBalanceChange(
@@ -99,7 +128,6 @@ class AccountTransactionValidator {
       }
     } else {
       // 作为资金去向（到账户）- 复式记账规则：到账户金额一定增加  
-      // 显示层面：统一显示 '+' 号（除了收入账户）
       switch (accountType) {
         case AccountType.INCOME:
           // 收入账户作为到账户：收入冲减，显示 '-' 号
@@ -108,6 +136,23 @@ class AccountTransactionValidator {
             symbol: '-',   // 用户理解：收入减少
             description: '收入减少',
           );
+        case AccountType.LIABILITY:
+          // 负债账户需要根据对手方判断
+          if (counterpartType == AccountType.LIABILITY) {
+            // 负债→负债：债务转移，该债务增加
+            return const AccountBalanceChange(
+              direction: 1,  // 复式记账规则：到账户增加
+              symbol: '+',   // 用户理解：该债务增加
+              description: '承接债务',
+            );
+          } else {
+            // 其他→负债：偿还债务，债务减少
+            return const AccountBalanceChange(
+              direction: 1,  // 复式记账规则：到账户增加
+              symbol: '-',   // 用户理解：债务减少
+              description: '偿还债务',
+            );
+          }
         default:
           // 其他账户：到账户增加，显示 '+' 号
           return const AccountBalanceChange(
@@ -286,8 +331,13 @@ class AccountTransactionValidator {
   static String getAccountSymbol({
     required AccountType accountType,
     required bool isFromAccount,
+    AccountType? counterpartAccountType,
   }) {
-    final change = _getAccountBalanceChange(accountType, isSource: isFromAccount);
+    final change = _getAccountBalanceChange(
+      accountType, 
+      isSource: isFromAccount,
+      counterpartType: counterpartAccountType,
+    );
     return change.symbol;
   }
 
@@ -295,8 +345,13 @@ class AccountTransactionValidator {
   static String getAccountChangeDescription({
     required AccountType accountType,
     required bool isFromAccount,
+    AccountType? counterpartAccountType,
   }) {
-    final change = _getAccountBalanceChange(accountType, isSource: isFromAccount);
+    final change = _getAccountBalanceChange(
+      accountType, 
+      isSource: isFromAccount,
+      counterpartType: counterpartAccountType,
+    );
     return change.description;
   }
 }
