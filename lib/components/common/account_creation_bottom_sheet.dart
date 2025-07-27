@@ -58,6 +58,9 @@ class _AccountCreationBottomSheetState
   void initState() {
     super.initState();
 
+    // 设置初始金额默认值为0
+    _initialAmountController.text = '0';
+
     _accountTypes = [
       AccountSelectorType.asset,
       AccountSelectorType.liability,
@@ -79,6 +82,11 @@ class _AccountCreationBottomSheetState
           if (!_shouldShowInitialAmount()) {
             _hasInitialAmount = false;
             _initialAmountController.clear();
+          } else {
+            // 如果切换到需要显示初始金额的账户类型，恢复默认值0
+            if (_initialAmountController.text.isEmpty) {
+              _initialAmountController.text = '0';
+            }
           }
         });
       }
@@ -145,7 +153,7 @@ class _AccountCreationBottomSheetState
         double? initialAmount;
         if (_hasInitialAmount && _initialAmountController.text.isNotEmpty) {
           initialAmount = double.tryParse(_initialAmountController.text.trim());
-          if (initialAmount == null || initialAmount <= 0) {
+          if (initialAmount == null || initialAmount < 0) {
             if (mounted) {
               SnackBarUtils.showOverlayError(context, '初始金额必须为正数');
             }
@@ -355,7 +363,7 @@ class _AccountCreationBottomSheetState
                                 }
                                 if (_hasInitialAmount && value != null) {
                                   final amount = double.tryParse(value.trim());
-                                  if (amount == null || amount <= 0) {
+                                  if (amount == null || amount < 0) {
                                     return '初始金额必须为正数';
                                   }
                                   if (amount > 1000000000) {

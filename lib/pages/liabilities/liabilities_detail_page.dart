@@ -234,10 +234,15 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                   icon: const Icon(Icons.more_vert,
                       color: Colors.black87, size: 22),
                   onPressed: () async {
-                    await AccountUpdateBottomSheet.show(
+                    final isDeleted = await AccountUpdateBottomSheet.show(
                       context,
                       accountToUpdate: account,
                     );
+                    
+                    // 如果账户被删除，退出详情页面
+                    if (isDeleted == true && mounted) {
+                      Navigator.of(context).pop();
+                    }
                   },
                 ),
               ],

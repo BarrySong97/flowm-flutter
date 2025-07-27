@@ -271,11 +271,7 @@ class _AccountUpdateBottomSheetState
             print('账户删除成功');
 
             // 刷新所有账户相关的provider
-            ref.invalidate(assetsAccountTreeProvider);
-            ref.invalidate(liabilityAccountTreeProvider);
-            ref.invalidate(expenseAccountTreeProvider);
-            ref.invalidate(incomeAccountTreeProvider);
-            ref.invalidate(equityAccountTreeProvider);
+            invalidateProvidersForTransaction(ref, accountType: widget.accountToUpdate.type);
             break;
 
           case DeleteAccountResult.hasChildAccounts:

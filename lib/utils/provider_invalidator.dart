@@ -17,12 +17,17 @@ import 'package:flowm/state/liabilities/liabilities_repository.dart'
 /// 根据交易中涉及的账户类型，有选择地使 providers 失效。
 ///
 /// 这通常在创建、更新或删除交易后调用，以确保UI反映最新状态。
+/// 也可用于账户删除时刷新相关providers。
 void invalidateProvidersForTransaction(
   WidgetRef ref, {
-  required AccountType fromAccountType,
-  required AccountType toAccountType,
+  AccountType? fromAccountType,
+  AccountType? toAccountType,
+  AccountType? accountType, // 用于账户删除等单一账户类型操作
 }) {
-  final types = {fromAccountType, toAccountType};
+  final types = <AccountType>{};
+  if (fromAccountType != null) types.add(fromAccountType);
+  if (toAccountType != null) types.add(toAccountType);
+  if (accountType != null) types.add(accountType);
   
   // 总是刷新通用 providers
   ref.invalidate(monthlyOverviewDataProvider);
@@ -84,3 +89,4 @@ void invalidateProvidersForTransaction(
     ref.invalidate(equityAccountTreeProvider);
   }
 }
+

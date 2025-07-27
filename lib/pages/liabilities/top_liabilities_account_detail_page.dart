@@ -96,10 +96,15 @@ class _TopAssetsAccountDetailPageState
           IconButton(
             icon: const Icon(Icons.more_vert, color: Colors.black),
             onPressed: () async {
-              await AccountUpdateBottomSheet.show(
+              final isDeleted = await AccountUpdateBottomSheet.show(
                 context,
                 accountToUpdate: account,
               );
+              
+              // 如果账户被删除，退出详情页面
+              if (isDeleted == true && mounted) {
+                Navigator.of(context).pop();
+              }
             },
           ),
         ],

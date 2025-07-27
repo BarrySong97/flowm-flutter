@@ -510,10 +510,15 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                   currencySymbol: '¥',
                 );
                 
-                await AccountUpdateBottomSheet.show(
+                final isDeleted = await AccountUpdateBottomSheet.show(
                   context,
                   accountToUpdate: uiAccount,
                 );
+                
+                // 如果账户被删除，退出详情页面
+                if (isDeleted == true && mounted) {
+                  Navigator.of(context).pop();
+                }
               },
             ),
           ],
