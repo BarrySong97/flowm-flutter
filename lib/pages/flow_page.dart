@@ -84,9 +84,10 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
     final formattedAmount = formatter.format(totalAmount.abs());
     
-    // 格式化时间为 HH:mm 格式
+    // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
     final timeFormatter = DateFormat('HH:mm');
     final formattedTime = timeFormatter.format(transaction.transactionDate);
+    final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -98,7 +99,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
         transactionId: transaction.transactionId.toString(),
         title: transaction.description ?? '无描述',
         subtitle:
-            '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName} · $formattedTime',
+            '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}$timeDisplay',
         amount: formattedAmount,
         type: getTransactionFlowType(
             transactionWithAmount.fromAccount?.accountType ?? AccountType.ASSET,

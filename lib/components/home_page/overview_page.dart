@@ -402,16 +402,17 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                             final formattedAmount = formatter
                                 .format(transactionWithAmount.amount.abs());
 
-                            // 格式化时间为 HH:mm 格式
+                            // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
                             final timeFormatter = DateFormat('HH:mm');
                             final formattedTime = timeFormatter.format(transaction.transactionDate);
+                            final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
 
                             return TransactionListItem(
                               title: transaction.description ?? '无描述',
                               transactionId:
                                   transaction.transactionId.toString(),
                               subtitle:
-                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName} · $formattedTime',
+                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}$timeDisplay',
                               amount: formattedAmount,
                               fromAccountType: transactionWithAmount
                                   .fromAccount?.accountType,
