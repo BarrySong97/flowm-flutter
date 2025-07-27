@@ -777,6 +777,29 @@ class SeedData {
     ]);
   }
 
+  /// 生成带随机时间的日期时间
+  DateTime _generateRandomDateTime(Random random, DateTime date, {bool isWorkingHours = false}) {
+    int randomHour, randomMinute;
+    
+    if (isWorkingHours) {
+      // 工作时间段 9:00-18:00
+      randomHour = random.nextInt(10) + 9;
+    } else {
+      // 全天时间段 7:00-23:00
+      randomHour = random.nextInt(17) + 7;
+    }
+    
+    randomMinute = random.nextInt(60);
+    
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      randomHour,
+      randomMinute,
+    );
+  }
+
   /// Generates a large number of transactions for the previous month.
   Future<void> _generateMonthlyTransactions(int ledgerId) async {
     final random = Random();
@@ -922,7 +945,7 @@ class SeedData {
 
         final salaryTransactionId = await db.transactionDao.insertTransaction(
           TransactionsCompanion.insert(
-            transactionDate: currentDate,
+            transactionDate: _generateRandomDateTime(random, currentDate, isWorkingHours: true),
             description: Value(description),
           ),
         );
@@ -948,7 +971,7 @@ class SeedData {
             (random.nextDouble() * 3000 + 4000).roundToDouble(); // 4000-7000
         final transactionId = await db.transactionDao.insertTransaction(
           TransactionsCompanion.insert(
-            transactionDate: currentDate,
+            transactionDate: _generateRandomDateTime(random, currentDate),
             description: Value('${currentDate.month}月房贷还款'),
           ),
         );
@@ -974,7 +997,7 @@ class SeedData {
             (random.nextDouble() * 1000 + 1500).roundToDouble(); // 1500-2500
         final transactionId = await db.transactionDao.insertTransaction(
           TransactionsCompanion.insert(
-            transactionDate: currentDate,
+            transactionDate: _generateRandomDateTime(random, currentDate),
             description: Value('${currentDate.month}月车贷还款'),
           ),
         );
@@ -1003,7 +1026,7 @@ class SeedData {
               (random.nextDouble() * 2000 + 500).roundToDouble(); // 500 - 2500
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value('信用卡还款'),
             ),
           );
@@ -1026,7 +1049,7 @@ class SeedData {
               (random.nextDouble() * 1000 + 200).roundToDouble(); // 200 - 1200
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value('花呗还款'),
             ),
           );
@@ -1049,7 +1072,7 @@ class SeedData {
               (random.nextDouble() * 800 + 100).roundToDouble(); // 100 - 900
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value('白条还款'),
             ),
           );
@@ -1124,7 +1147,7 @@ class SeedData {
 
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value(description),
             ),
           );
@@ -1161,7 +1184,7 @@ class SeedData {
               incomeDescriptions[random.nextInt(incomeDescriptions.length)];
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value(description),
             ),
           );
@@ -1195,7 +1218,7 @@ class SeedData {
 
           final transactionId = await db.transactionDao.insertTransaction(
             TransactionsCompanion.insert(
-              transactionDate: currentDate,
+              transactionDate: _generateRandomDateTime(random, currentDate),
               description: Value(description),
             ),
           );
