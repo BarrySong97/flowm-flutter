@@ -234,6 +234,13 @@ class _FlowPageState extends ConsumerState<FlowPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(flowTransactionsProvider);
 
+    // 当provider被invalidate后，如果数据为空且不在加载中，主动获取数据
+    if (state.transactions.isEmpty && !state.isLoading && state.error == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(flowTransactionsProvider.notifier).fetchTransactions();
+      });
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
       body: Column(

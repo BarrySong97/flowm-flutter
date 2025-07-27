@@ -13,6 +13,7 @@ import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart'
     as liabilities;
+import 'package:flowm/state/transaction/flow_transactions_provider.dart';
 
 /// 根据交易中涉及的账户类型，有选择地使 providers 失效。
 ///
@@ -32,6 +33,7 @@ void invalidateProvidersForTransaction(
   // 总是刷新通用 providers
   ref.invalidate(monthlyOverviewDataProvider);
   ref.invalidate(latestTransactionsProvider);
+  ref.invalidate(flowTransactionsProvider);
   
   // 失效新的动态账户信息 providers - 这些是核心的账户数据提供者
   ref.invalidate(accountInfoProvider);
