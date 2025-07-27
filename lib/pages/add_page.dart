@@ -624,7 +624,14 @@ class _AddPageState extends ConsumerState<AddPage>
               fromAccountId: _fromAccount!.id,
               toAccountId: _toAccount!.id,
               amount: transactionAmount,
-              transactionDate: DateTime.parse(_currentDate),
+              transactionDate: DateTime(
+                DateTime.parse(_currentDate).year,
+                DateTime.parse(_currentDate).month,
+                DateTime.parse(_currentDate).day,
+                DateTime.now().hour,
+                DateTime.now().minute,
+                DateTime.now().second,
+              ),
               description: _noteController.text,
             );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -651,7 +658,14 @@ class _AddPageState extends ConsumerState<AddPage>
               fromAccountId: _fromAccount!.id,
               toAccountId: _toAccount!.id,
               amount: transactionAmount,
-              transactionDate: DateTime.parse(_currentDate),
+              transactionDate: DateTime(
+                DateTime.parse(_currentDate).year,
+                DateTime.parse(_currentDate).month,
+                DateTime.parse(_currentDate).day,
+                DateTime.now().hour,
+                DateTime.now().minute,
+                DateTime.now().second,
+              ),
               description: _noteController.text,
             );
 

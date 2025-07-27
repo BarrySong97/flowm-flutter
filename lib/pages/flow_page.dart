@@ -83,6 +83,10 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     final bool isExpense = totalAmount < 0;
     final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
     final formattedAmount = formatter.format(totalAmount.abs());
+    
+    // 格式化时间为 HH:mm 格式
+    final timeFormatter = DateFormat('HH:mm');
+    final formattedTime = timeFormatter.format(transaction.transactionDate);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -94,7 +98,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
         transactionId: transaction.transactionId.toString(),
         title: transaction.description ?? '无描述',
         subtitle:
-            '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+            '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName} · $formattedTime',
         amount: formattedAmount,
         type: getTransactionFlowType(
             transactionWithAmount.fromAccount?.accountType ?? AccountType.ASSET,
@@ -145,87 +149,121 @@ class _FlowPageState extends ConsumerState<FlowPage> {
       );
     }
 
+    // 按日期分组交易，并对每日内的交易按时间排序
+    final Map<String, List<TransactionWithAmount>> groupedTransactions = {};
+    for (var transaction in state.transactions) {
+      final dateKey = formatDate(transaction.transaction.transactionDate);
+      if (!groupedTransactions.containsKey(dateKey)) {
+        groupedTransactions[dateKey] = [];
+      }
+      groupedTransactions[dateKey]!.add(transaction);
+    }
+
+    // 对每日内的交易按时间降序排序（最新的在前）
+    groupedTransactions.forEach((date, transactions) {
+      transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+    });
+
+    // 获取排序后的日期列表（最新的日期在前）
+    final sortedDates = groupedTransactions.keys.toList();
+    sortedDates.sort((a, b) {
+      // 获取每个日期组中最新的交易时间进行比较
+      final aLatest = groupedTransactions[a]!.first.transaction.transactionDate;
+      final bLatest = groupedTransactions[b]!.first.transaction.transactionDate;
+      return bLatest.compareTo(aLatest);
+    });
+
+    // 计算总的item数量（日期头 + 交易项 + 加载更多indicator）
+    int totalItems = 0;
+    for (String date in sortedDates) {
+      totalItems += 1 + groupedTransactions[date]!.length; // 1个日期头 + N个交易项
+    }
+    if (state.hasMore) totalItems += 1; // 加载更多indicator
+
     return ListView.builder(
       padding: EdgeInsets.zero,
       controller: _scrollController,
-      itemCount: state.transactions.length + (state.hasMore ? 1 : 0),
+      itemCount: totalItems,
       itemBuilder: (context, index) {
-        if (index == state.transactions.length) {
-          return state.hasMore
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : const SizedBox.shrink();
-        }
-
-        final transactionWithAmount = state.transactions[index];
-        final transaction = transactionWithAmount.transaction;
-        final uiDate = formatDate(transaction.transactionDate);
-        final previousUiDate = index > 0
-            ? formatDate(
-                state.transactions[index - 1].transaction.transactionDate)
-            : null;
-
-        if (index == 0 || uiDate != previousUiDate) {
-          final dailyOut = state.transactions
-              .where((twa) =>
-                  formatDate(twa.transaction.transactionDate) == uiDate &&
-                  twa.nature == TransactionNature.OUTFLOW)
-              .fold(0.0, (sum, twa) => sum + twa.amount.abs());
-          final dailyIn = state.transactions
-              .where((twa) =>
-                  formatDate(twa.transaction.transactionDate) == uiDate &&
-                  twa.nature == TransactionNature.INFLOW)
-              .fold(0.0, (sum, twa) => sum + twa.amount.abs());
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  index == 0 ? 0 : 16,
-                  16,
-                  8,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      uiDate,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          '出 ¥${dailyOut.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '入 ¥${dailyIn.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              buildTransactionItem(transactionWithAmount, _deleteTransaction),
-            ],
+        // 处理加载更多indicator
+        if (index == totalItems - 1 && state.hasMore) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
-        return buildTransactionItem(transactionWithAmount, _deleteTransaction);
+
+        // 确定当前item属于哪个日期组和位置
+        int currentIndex = 0;
+        for (int dateIndex = 0; dateIndex < sortedDates.length; dateIndex++) {
+          final date = sortedDates[dateIndex];
+          final dayTransactions = groupedTransactions[date]!;
+
+          // 检查是否是日期头
+          if (currentIndex == index) {
+            // 计算当日收支总额
+            final dailyOut = dayTransactions
+                .where((twa) => twa.nature == TransactionNature.OUTFLOW)
+                .fold(0.0, (sum, twa) => sum + twa.amount.abs());
+            final dailyIn = dayTransactions
+                .where((twa) => twa.nature == TransactionNature.INFLOW)
+                .fold(0.0, (sum, twa) => sum + twa.amount.abs());
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                dateIndex == 0 ? 0 : 16,
+                16,
+                8,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    date,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        '出 ¥${dailyOut.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '入 ¥${dailyIn.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }
+          currentIndex++;
+
+          // 检查是否是当日的交易项
+          for (int transactionIndex = 0; transactionIndex < dayTransactions.length; transactionIndex++) {
+            if (currentIndex == index) {
+              return buildTransactionItem(
+                dayTransactions[transactionIndex], 
+                _deleteTransaction
+              );
+            }
+            currentIndex++;
+          }
+        }
+
+        return const SizedBox.shrink(); // 不应该到达这里
       },
     );
   }
