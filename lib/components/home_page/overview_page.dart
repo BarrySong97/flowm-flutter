@@ -291,9 +291,14 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
               }
             }
 
-            // Sort dates in descending order
+            // Sort dates in descending order and sort transactions within each date
             final sortedDates = groupedTransactions.keys.toList()
               ..sort((a, b) => b.compareTo(a));
+            
+            // Sort transactions within each date by time (newest first)
+            groupedTransactions.forEach((date, transactions) {
+              transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+            });
 
             return Container(
               padding: const EdgeInsets.only(top: 0),
@@ -397,12 +402,16 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                             final formattedAmount = formatter
                                 .format(transactionWithAmount.amount.abs());
 
+                            // 格式化时间为 HH:mm 格式
+                            final timeFormatter = DateFormat('HH:mm');
+                            final formattedTime = timeFormatter.format(transaction.transactionDate);
+
                             return TransactionListItem(
                               title: transaction.description ?? '无描述',
                               transactionId:
                                   transaction.transactionId.toString(),
                               subtitle:
-                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                  '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName} · $formattedTime',
                               amount: formattedAmount,
                               fromAccountType: transactionWithAmount
                                   .fromAccount?.accountType,
