@@ -32,7 +32,7 @@ class _VersionPageState extends State<VersionPage> {
 
   Future<void> _loadVersionHistory() async {
     try {
-      final versions = ['1.3.4']; // 只使用最新版本文件
+      final versions = ['1.3.5', '1.3.4']; // 只使用最新版本文件
       List<Map<String, dynamic>> history = [];
       
       for (String version in versions) {

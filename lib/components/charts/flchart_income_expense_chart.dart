@@ -15,10 +15,12 @@ class FlchartIncomeExpenseChart extends StatefulWidget {
     super.key,
     required this.monthlyData,
     this.periodRange,
+    this.dateRange,
   });
 
   final List<MonthlyComparisonData> monthlyData;
   final String? periodRange; // 用于调整条形图宽度
+  final DateTimeRange? dateRange; // 用于确定正确的时间标签
 
   @override
   State<FlchartIncomeExpenseChart> createState() =>
@@ -37,24 +39,22 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
 
   @override
   Widget build(BuildContext context) {
+    // For empty data, create placeholder data based on the expected period type
+    List<MonthlyComparisonData> displayData = widget.monthlyData;
+    
     if (widget.monthlyData.isEmpty) {
-      return Container(
-        height: 240,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(0),
-        ),
-        child: const Center(child: Text('暂无数据')),
-      );
+      // Try to determine the period type and create appropriate placeholder data
+      displayData = _createPlaceholderData();
     }
 
-    final double expenseMaxY = widget.monthlyData
-        .map((e) => e.expense)
-        .reduce((a, b) => a > b ? a : b);
-    final double incomeMaxY =
-        widget.monthlyData.map((e) => e.income).reduce((a, b) => a > b ? a : b);
+    final double expenseMaxY = displayData.isEmpty 
+        ? 0.0 
+        : displayData.map((e) => e.expense).reduce((a, b) => a > b ? a : b);
+    final double incomeMaxY = displayData.isEmpty 
+        ? 0.0 
+        : displayData.map((e) => e.income).reduce((a, b) => a > b ? a : b);
     final double dataMaxY = expenseMaxY > incomeMaxY ? expenseMaxY : incomeMaxY;
-    final double maxY = dataMaxY * 1.2;
+    final double maxY = dataMaxY == 0 ? 100.0 : dataMaxY * 1.2;
 
     return AspectRatio(
       aspectRatio: 1.6,
@@ -94,7 +94,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      getTitlesWidget: _bottomTitles,
+                      getTitlesWidget: (value, meta) => _bottomTitles(value, meta, displayData),
                       reservedSize: 42,
                     ),
                   ),
@@ -102,16 +102,16 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 50,
-                      interval: maxY / 2,
+                      interval: maxY > 0 ? maxY / 2 : 50.0,
                       getTitlesWidget: _leftTitles,
                     ),
                   ),
                 ),
                 borderData: FlBorderData(show: false),
-                barGroups: _buildVerticalBarGroups(),
+                barGroups: _buildVerticalBarGroups(displayData),
                 gridData: FlGridData(
                   show: true,
-                  horizontalInterval: maxY / 2,
+                  horizontalInterval: maxY > 0 ? maxY / 2 : 50.0,
                   getDrawingHorizontalLine: (value) {
                     if (value == 0) {
                       return FlLine(
@@ -140,7 +140,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
               ),
             ),
             // 右上角信息显示
-            if (touchedGroupIndex >= 0 && touchedGroupIndex < widget.monthlyData.length)
+            if (touchedGroupIndex >= 0 && touchedGroupIndex < displayData.length)
               Positioned(
                 top: 8,
                 right: 8,
@@ -150,7 +150,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
                     color: Colors.black87,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: _buildTouchedInfo(),
+                  child: _buildTouchedInfo(displayData),
                 ),
               ),
           ],
@@ -159,14 +159,14 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
     );
   }
 
-  List<BarChartGroupData> _buildVerticalBarGroups() {
+  List<BarChartGroupData> _buildVerticalBarGroups(List<MonthlyComparisonData> data) {
     final List<BarChartGroupData> groups = [];
 
     // 根据数据量调整条形图宽度
-    double barWidth = _getBarWidth();
+    double barWidth = _getBarWidth(data);
 
-    for (int i = 0; i < widget.monthlyData.length; i++) {
-      final data = widget.monthlyData[i];
+    for (int i = 0; i < data.length; i++) {
+      final monthData = data[i];
       final isTouched = i == touchedGroupIndex;
 
       // 每个月份创建一个组，只有一个 rod，包含收入和支出
@@ -174,8 +174,8 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
         x: i,
         barRods: [
           BarChartRodData(
-            toY: data.income,
-            fromY: -data.expense,
+            toY: monthData.income,
+            fromY: -monthData.expense,
             color: isTouched ? incomeColor.withValues(alpha: 0.8) : incomeColor,
             width: barWidth,
             borderRadius: BorderRadius.circular(2),
@@ -185,13 +185,13 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
             ),
             rodStackItems: [
               BarChartRodStackItem(
-                -data.expense,
+                -monthData.expense,
                 0,
                 isTouched ? expenseColor.withValues(alpha: 0.8) : expenseColor,
               ),
               BarChartRodStackItem(
                 0,
-                data.income,
+                monthData.income,
                 isTouched ? incomeColor.withValues(alpha: 0.8) : incomeColor,
               ),
             ],
@@ -203,8 +203,8 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
     return groups;
   }
 
-  double _getBarWidth() {
-    final dataCount = widget.monthlyData.length;
+  double _getBarWidth(List<MonthlyComparisonData> data) {
+    final dataCount = data.length;
 
     // 根据数据点数量动态调整条形图宽度
     if (dataCount <= 7) {
@@ -251,23 +251,23 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
     );
   }
 
-  Widget _bottomTitles(double value, TitleMeta meta) {
-    if (value.toInt() >= widget.monthlyData.length) {
+  Widget _bottomTitles(double value, TitleMeta meta, List<MonthlyComparisonData> data) {
+    if (value.toInt() >= data.length) {
       return const SizedBox();
     }
 
-    final dataCount = widget.monthlyData.length;
+    final dataCount = data.length;
     final index = value.toInt();
 
     // 根据数据量决定显示标签的间隔
-    int interval = _getLabelInterval();
+    int interval = _getLabelInterval(data);
 
     // 只在指定间隔显示标签
     if (index % interval != 0 && index != dataCount - 1) {
       return const SizedBox();
     }
 
-    final month = widget.monthlyData[index].month;
+    final month = data[index].month;
     return SideTitleWidget(
       meta: meta,
       space: 16,
@@ -281,8 +281,8 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
     );
   }
 
-  int _getLabelInterval() {
-    final dataCount = widget.monthlyData.length;
+  int _getLabelInterval(List<MonthlyComparisonData> data) {
+    final dataCount = data.length;
 
     if (dataCount <= 7) {
       // 周视图：显示所有标签
@@ -299,10 +299,10 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
     }
   }
 
-  Widget _buildTouchedInfo() {
-    final data = widget.monthlyData[touchedGroupIndex];
-    final expense = data.expense;
-    final income = data.income;
+  Widget _buildTouchedInfo(List<MonthlyComparisonData> data) {
+    final monthData = data[touchedGroupIndex];
+    final expense = monthData.expense;
+    final income = monthData.income;
     final balance = income - expense;
     
     return Column(
@@ -310,7 +310,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          data.month,
+          monthData.month,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -348,6 +348,77 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
 
   String _formatTooltipAmount(double amount) {
     return amount.toStringAsFixed(2);
+  }
+
+  List<MonthlyComparisonData> _createPlaceholderData() {
+    // If we have no real data, we need to create placeholder data that matches
+    // the expected format based on the period range and date range context.
+    
+    final now = DateTime.now();
+    
+    // Check periodRange to determine the most appropriate format
+    if (widget.periodRange == 'Y') {
+      // Pure year view - use simple month labels
+      return List.generate(12, (index) {
+        return MonthlyComparisonData('${index + 1}月', 0.0, 0.0);
+      });
+    } else if (widget.periodRange == 'W') {
+      // Week view - use day labels
+      return List.generate(7, (index) {
+        final date = now.subtract(Duration(days: 6 - index));
+        return MonthlyComparisonData('${date.month}/${date.day}', 0.0, 0.0);
+      });
+    } else if (widget.periodRange == 'M') {
+      // Month view - use day-of-month labels
+      final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+      return List.generate(daysInMonth, (index) {
+        return MonthlyComparisonData('${index + 1}日', 0.0, 0.0);
+      });
+    } else {
+      // Range mode - determine format based on the actual date range
+      if (widget.dateRange != null) {
+        final start = widget.dateRange!.start;
+        final end = widget.dateRange!.end;
+        
+        // Check if this looks like a year range (12 months, starts in January)
+        if (start.month == 1 && start.day == 1 && 
+            end.month == 12 && end.day == 31 && 
+            start.year == end.year) {
+          // This is a full year range, use simple month format like "1月", "2月"
+          return List.generate(12, (index) {
+            return MonthlyComparisonData('${index + 1}月', 0.0, 0.0);
+          });
+        }
+        
+        // Check if this looks like a month range
+        if (start.day == 1) {
+          final expectedEnd = DateTime(start.year, start.month + 1, 0);
+          if (end.year == expectedEnd.year && 
+              end.month == expectedEnd.month && 
+              end.day == expectedEnd.day) {
+            // This is a month range, create day labels
+            final daysInMonth = expectedEnd.day;
+            return List.generate(daysInMonth, (index) {
+              return MonthlyComparisonData('${index + 1}日', 0.0, 0.0);
+            });
+          }
+        }
+        
+        // Check if this looks like a week range (7 days)
+        final daysDiff = end.difference(start).inDays + 1;
+        if (daysDiff == 7) {
+          return List.generate(7, (index) {
+            final date = start.add(Duration(days: index));
+            return MonthlyComparisonData('${date.month}/${date.day}', 0.0, 0.0);
+          });
+        }
+      }
+      
+      // Default fallback - likely a navigated year view without specific range info
+      return List.generate(12, (index) {
+        return MonthlyComparisonData('${now.year}/${index + 1}', 0.0, 0.0);
+      });
+    }
   }
 }
 

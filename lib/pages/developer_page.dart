@@ -79,7 +79,7 @@ class DeveloperPage extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // About Us Section
               Container(
                 width: double.infinity,
@@ -135,23 +135,11 @@ class DeveloperPage extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Twitter
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Twitter'),
-                      subtitle: const Text('@4realstudio'),
-                      trailing: const Icon(Icons.copy),
-                      onTap: () => _copyToClipboard(context, '@4realstudio'),
-                    ),
-
-                    const SizedBox(height: 16),
-
                     // 小红书
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('小红书'),
-                      subtitle: const Text('4RE△L Studio'),
+                      subtitle: const Text('4RealStudio'),
                       trailing: const Icon(Icons.copy),
                       onTap: () => _copyToClipboard(context, '4RE△L Studio'),
                     ),

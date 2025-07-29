@@ -190,6 +190,11 @@ final comparisonDataProvider = FutureProvider<ComparisonData>((ref) async {
           final startMonth = DateTime(startDate.year, startDate.month, 1);
           final endMonth = DateTime(endDate.year, endDate.month + 1, 0);
           
+          // 检查是否为完整的年度范围（从1月1日到12月31日）
+          final isFullYearRange = startDate.month == 1 && startDate.day == 1 &&
+                                  endDate.month == 12 && endDate.day == 31 &&
+                                  startDate.year == endDate.year;
+          
           DateTime currentMonth = startMonth;
           while (currentMonth.isBefore(endMonth) || currentMonth.isAtSameMomentAs(endMonth)) {
             final monthStart = DateTime(currentMonth.year, currentMonth.month, 1);
@@ -214,8 +219,13 @@ final comparisonDataProvider = FutureProvider<ComparisonData>((ref) async {
             final monthlyExpense = expenseChartData.fold(0.0, (sum, data) => sum + data.y);
             final monthlyIncome = incomeChartData.fold(0.0, (sum, data) => sum + data.y);
             
+            // 根据是否为完整年度范围选择标签格式
+            final monthLabel = isFullYearRange 
+                ? '${currentMonth.month}月'  // 年度视图格式：1月、2月
+                : '${currentMonth.year}/${currentMonth.month}';  // 自定义范围格式：2023/1、2023/2
+            
             monthlyData.add(MonthlyComparisonData(
-              '${currentMonth.year}/${currentMonth.month}',
+              monthLabel,
               monthlyExpense,
               monthlyIncome,
             ));
