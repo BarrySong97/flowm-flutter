@@ -20,6 +20,51 @@ import 'package:intl/intl.dart'; // For currency formatting
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
 
 
+/// 上期支出数据提供者 (family)
+final previousPeriodExpenseProviderFamily = FutureProvider.autoDispose
+    .family<List<barchart.ChartData>, int?>((ref, accountId) async {
+  final repository = ref.watch(expenseRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
+  final selectedDate = ref.watch(selectedMonthProvider);
+  final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
+
+  if (selectedLedger == null) {
+    return [];
+  }
+
+  DateTime startDate, endDate;
+  
+  switch (timeRangeType) {
+    case '90days':
+      endDate = DateTime.now().subtract(const Duration(days: 90));
+      startDate = endDate.subtract(const Duration(days: 90));
+      break;
+    case '60days':
+      endDate = DateTime.now().subtract(const Duration(days: 60));
+      startDate = endDate.subtract(const Duration(days: 60));
+      break;
+    case 'year':
+      final prevYear = selectedDate.year - 1;
+      startDate = DateTime(prevYear, 1, 1);
+      endDate = DateTime(prevYear, 12, 31);
+      break;
+    case 'all':
+      return []; // No previous period for 'all'
+    case 'month':
+    default:
+      startDate = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+      endDate = DateTime(selectedDate.year, selectedDate.month, 0);
+      break;
+  }
+
+  return repository.getExpenseChartData(
+    startDate: startDate,
+    endDate: endDate,
+    ledgerId: selectedLedger.ledgerId,
+    accountId: accountId,
+  );
+});
+
 /// 支出图表数据提供者
 /// 修改为 .family 以接收 accountId (可以为 null)
 final expenseChartDataProvider = FutureProvider.autoDispose
@@ -222,6 +267,184 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
     }
   }
 
+  // 辅助方法格式化数字
+  String _formatCurrency(double amount) {
+    if (amount.abs() >= 1000000) {
+      // 6位数及以上才格式化
+      return '${(amount / 1000).toStringAsFixed(2)}k';
+    } else {
+      return NumberFormat('#,##0.00', 'zh_CN').format(amount);
+    }
+  }
+
+  // 构建统计项的通用方法
+  Widget _buildStatsItem(
+    String title,
+    String value, {
+    Widget? trailing,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        height: 54,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (trailing != null) trailing,
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(List<barchart.ChartData> currentData, List<barchart.ChartData> previousData) {
+    final selectedMonth = ref.watch(selectedMonthProvider);
+    final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
+
+    // Current period total
+    double currentTotal = currentData.fold(0.0, (sum, item) => sum + item.y);
+
+    // Calculate period info based on time range type
+    String periodTitle;
+    String dailyTitle;
+    String comparisonTitle;
+    String tooltipMessage;
+    double dailyAverage = 0.0;
+
+    switch (timeRangeType) {
+      case '90days':
+        periodTitle = '90天总支出';
+        dailyTitle = '90天日均';
+        comparisonTitle = '较前90天';
+        dailyAverage = currentTotal / 90;
+        break;
+      case '60days':
+        periodTitle = '60天总支出';
+        dailyTitle = '60天日均';
+        comparisonTitle = '较前60天';
+        dailyAverage = currentTotal / 60;
+        break;
+      case 'year':
+        periodTitle = '全年总支出';
+        dailyTitle = '全年日均';
+        comparisonTitle = '较去年同期';
+        final daysInYear = DateTime(selectedMonth.year, 12, 31).difference(DateTime(selectedMonth.year, 1, 1)).inDays + 1;
+        dailyAverage = currentTotal / daysInYear;
+        break;
+      case 'all':
+        periodTitle = '累计总支出';
+        dailyTitle = '全部日均';
+        comparisonTitle = '较前期';
+        final startDate = DateTime(2020, 1, 1);
+        final daysSinceStart = DateTime.now().difference(startDate).inDays;
+        dailyAverage = daysSinceStart > 0 ? currentTotal / daysSinceStart : 0.0;
+        break;
+      case 'month':
+      default:
+        periodTitle = '当月总支出';
+        dailyTitle = '当月日均';
+        comparisonTitle = '较上月支出';
+        final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+        dailyAverage = daysInMonth > 0 ? currentTotal / daysInMonth : 0.0;
+        break;
+    }
+
+    // Change vs previous period
+    double previousTotal = previousData.fold(0.0, (sum, item) => sum + item.y);
+    tooltipMessage = '上期支出: ¥ ${_formatCurrency(previousTotal)}';
+    
+    double changePercent = 0;
+    if (previousTotal.abs() > 0.001) {
+      changePercent = ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
+    } else if (currentTotal.abs() > 0.001) {
+      changePercent = currentTotal > 0 ? 100.0 : -100.0;
+    }
+    final isPositive = changePercent > 0.001;
+    final isNegative = changePercent < -0.001;
+
+    return Row(
+      children: [
+        _buildStatsItem(
+          periodTitle,
+          '¥ ${_formatCurrency(currentTotal)}',
+        ),
+        const SizedBox(width: 10),
+        _buildStatsItem(
+          dailyTitle,
+          '¥ ${_formatCurrency(dailyAverage)}',
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Tooltip(
+            message: tooltipMessage,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    comparisonTitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isPositive)
+                        const Icon(Icons.arrow_upward,
+                            color: Colors.red, size: 16),
+                      if (isNegative)
+                        const Icon(Icons.arrow_downward,
+                            color: Colors.green, size: 16),
+                      if (!isPositive && !isNegative) const SizedBox(width: 16),
+                      Text(
+                        '${changePercent.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isPositive
+                              ? Colors.red
+                              : (isNegative ? Colors.green : Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -286,6 +509,8 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
   Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
     final chartDataAsync = ref
         .watch(expenseChartDataProvider(account.accountData.accountId));
+    final previousPeriodDataAsync = ref
+        .watch(previousPeriodExpenseProviderFamily(account.accountData.accountId));
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
     ref.watch(selectedTimeRangeTypeProvider); // Watch for state changes
     final monthlyExpenseAsync = ref.watch(
@@ -515,6 +740,40 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                                   // Handle error silently
                                 }
                               },
+                            ),
+                            const SizedBox(
+                              height: 12,
+                              child: ColoredBox(color: Colors.transparent),
+                            ),
+                            // New statistics row with comparison data
+                            chartDataAsync.when(
+                              data: (currentData) {
+                                return previousPeriodDataAsync.when(
+                                  data: (previousData) => _buildStatsRow(currentData, previousData),
+                                  loading: () => Container(
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                  error: (error, stack) => const SizedBox.shrink(),
+                                );
+                              },
+                              loading: () => Container(
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              error: (error, stack) => const SizedBox.shrink(),
                             ),
                             const SizedBox(
                               height: 12,
@@ -794,6 +1053,11 @@ class AccountTransactionList extends ConsumerWidget {
                 }
               }
 
+              // 对每日内的交易按时间降序排序（最新的在前）
+              groupedTransactions.forEach((date, transactions) {
+                transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+              });
+
               // 按日期降序排列
               final sortedDates = groupedTransactions.keys.toList()
                 ..sort((a, b) => b.compareTo(a));
@@ -887,6 +1151,11 @@ class AccountTransactionList extends ConsumerWidget {
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 
+                          // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
+                          final timeFormatter = DateFormat('HH:mm');
+                          final formattedTime = timeFormatter.format(transaction.transactionDate);
+                          final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+
                           return Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 0, vertical: 0),
@@ -895,7 +1164,7 @@ class AccountTransactionList extends ConsumerWidget {
                                 transactionId:
                                     transaction.transactionId.toString(),
                                 subtitle:
-                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}$timeDisplay',
                                 amount: formattedAmount,
                                 fromAccountType: transactionWithAmount
                                     .fromAccount?.accountType,

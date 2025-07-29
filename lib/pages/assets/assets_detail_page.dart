@@ -710,6 +710,11 @@ class AccountTransactionList extends ConsumerWidget {
                 }
               }
 
+              // 对每日内的交易按时间降序排序（最新的在前）
+              groupedTransactions.forEach((date, transactions) {
+                transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+              });
+
               // 按日期降序排列
               final sortedDates = groupedTransactions.keys.toList()
                 ..sort((a, b) => b.compareTo(a));
@@ -803,6 +808,11 @@ class AccountTransactionList extends ConsumerWidget {
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 
+                          // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
+                          final timeFormatter = DateFormat('HH:mm');
+                          final formattedTime = timeFormatter.format(transaction.transactionDate);
+                          final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+
                           return Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 0, vertical: 0),
@@ -815,7 +825,7 @@ class AccountTransactionList extends ConsumerWidget {
                                 transactionId:
                                     transaction.transactionId.toString(),
                                 subtitle:
-                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}',
+                                    '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}$timeDisplay',
                                 amount: formattedAmount,
                                 type: getTransactionFlowType(
                                   transactionWithAmount
