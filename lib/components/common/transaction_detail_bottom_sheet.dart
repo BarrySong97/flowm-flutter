@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../db/tables/account_table.dart';
 import '../../state/transaction/transaction_repository.dart';
 import 'package:flowm/utils/snackbar_utils.dart';
-import 'package:flowm/utils/provider_invalidator.dart';
+import '../../utils/transaction_type_map.dart';
+import '../../utils/account_transaction_validator.dart';
 
 class TransactionDetailBottomSheet extends ConsumerWidget {
   final String amount;
@@ -16,6 +18,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
   final AccountType? fromAccountType;
   final AccountType? toAccountType;
   final double? transactionAmount; // 原始交易金额数值
+  final DateTime? transactionDate; // 完整的交易日期时间
   final VoidCallback? onEdit;
   final VoidCallback? onCopy;
   final VoidCallback? onShare;
@@ -32,6 +35,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     this.fromAccountType,
     this.toAccountType,
     this.transactionAmount,
+    this.transactionDate,
     this.onEdit,
     this.onCopy,
     this.onShare,
@@ -49,6 +53,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     AccountType? fromAccountType,
     AccountType? toAccountType,
     double? transactionAmount,
+    DateTime? transactionDate,
     VoidCallback? onEdit,
     VoidCallback? onCopy,
     VoidCallback? onShare,
@@ -68,6 +73,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
         fromAccountType: fromAccountType,
         toAccountType: toAccountType,
         transactionAmount: transactionAmount,
+        transactionDate: transactionDate,
         onEdit: onEdit,
         onCopy: onCopy,
         onShare: onShare,
@@ -80,9 +86,14 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
   Map<String, String> _parseAccountNames() {
     if (subtitle.contains(' -> ')) {
       final parts = subtitle.split(' -> ');
+      // 移除时间部分（如果存在）
+      String toAccount = parts[1].trim();
+      if (toAccount.contains(' · ')) {
+        toAccount = toAccount.split(' · ')[0].trim();
+      }
       return {
         'fromAccount': parts[0].trim(),
-        'toAccount': parts[1].trim(),
+        'toAccount': toAccount,
       };
     }
     return {
@@ -101,11 +112,21 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
       amountValue = double.tryParse(numericAmount) ?? 0.0;
     }
 
+    // 使用与 add_page.dart 相同的逻辑来决定符号
+    if (fromAccountType != null && toAccountType != null) {
+      final symbol = AccountTransactionValidator.getAccountSymbol(
+        accountType: isFromAccount ? fromAccountType! : toAccountType!,
+        isFromAccount: isFromAccount,
+        counterpartAccountType: isFromAccount ? toAccountType : fromAccountType,
+      );
+      
+      return '$symbol¥${amountValue.toStringAsFixed(2)}';
+    }
+
+    // 退回到简单逻辑作为默认值
     if (isFromAccount) {
-      // 转出账户显示负数
       return '-¥${amountValue.toStringAsFixed(2)}';
     } else {
-      // 转入账户显示正数
       return '+¥${amountValue.toStringAsFixed(2)}';
     }
   }
@@ -128,7 +149,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(6),
         ),
         title: const Text('确认删除'),
         content: const Text('您确定要删除这笔交易吗？此操作不可撤销。'),
@@ -175,9 +196,16 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     final accountNames = _parseAccountNames();
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Column(
@@ -185,84 +213,150 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
           children: [
             // 拖拽指示器
             Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 36,
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E5EA),
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFFC7C7CC),
+                borderRadius: BorderRadius.circular(6),
               ),
             ),
 
             // 主要内容
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
               child: Column(
-                spacing: 32,
                 children: [
-                  // 金额显示
-                  Text(
-                    amount,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w600,
-                      color: isExpense
-                          ? const Color(0xFFFF3B30)
-                          : const Color(0xFF34C759),
+                  // 金额显示区域
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 32),
+                    child: Column(
+                      children: [
+                        Text(
+                          amount,
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w700,
+                            color: isExpense
+                                ? const Color(0xFFFF3B30)
+                                : const Color(0xFF34C759),
+                            height: 1.1,
+                          ),
+                        ),
+                        if (description != null && description!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              description!,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF8E8E93),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
 
-                  // 账户详情和记账日期
-                  Column(
-                    spacing: 20,
-                    children: [
-                      _buildAccountDetailItem(
-                        accountName: accountNames['fromAccount']!,
-                        amountChange: _getAccountAmountChange(true),
-                        isFromAccount: true,
+                  // 交易类型显示
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _getTransactionTypeColor().withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getTransactionTypeIcon(),
+                          color: _getTransactionTypeColor(),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _getTransactionTypeText(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _getTransactionTypeColor(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 交易详情卡片
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 32),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFFE5E5EA),
+                        width: 0.5,
                       ),
-                      _buildAccountDetailItem(
-                        accountName: accountNames['toAccount']!,
-                        amountChange: _getAccountAmountChange(false),
-                        isFromAccount: false,
-                      ),
-                      _buildDetailItem(
-                        label: '记账日期',
-                        value: date,
-                      ),
-                    ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildAccountDetailItem(
+                          accountName: accountNames['fromAccount']!,
+                          amountChange: _getAccountAmountChange(true),
+                          isFromAccount: true,
+                        ),
+                        const Divider(
+                          height: 24,
+                          color: Color(0xFFF0F0F0),
+                          thickness: 1,
+                        ),
+                        _buildAccountDetailItem(
+                          accountName: accountNames['toAccount']!,
+                          amountChange: _getAccountAmountChange(false),
+                          isFromAccount: false,
+                        ),
+                        const Divider(
+                          height: 24,
+                          color: Color(0xFFF0F0F0),
+                          thickness: 1,
+                        ),
+                        _buildDetailItem(
+                          label: '记账时间',
+                          value: _getFormattedDateTime(),
+                        ),
+                      ],
+                    ),
                   ),
 
                   // 操作按钮
-                  Column(
-                    spacing: 20,
+                  Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildActionButton(
-                            icon: Icons.edit_outlined,
-                            label: '编辑',
-                            color: const Color(0xFF007AFF),
-                            onTap: () {
-                              Navigator.pop(context);
-                              if (transactionId != null) {
-                                final id = int.tryParse(transactionId!);
-                                if (id != null) {
-                                  context.push('/add', extra: id);
-                                }
+                      Expanded(
+                        child: _buildActionButton(
+                          icon: Icons.edit_rounded,
+                          label: '编辑',
+                          color: const Color(0xFF007AFF),
+                          onTap: () {
+                            Navigator.pop(context);
+                            if (transactionId != null) {
+                              final id = int.tryParse(transactionId!);
+                              if (id != null) {
+                                context.push('/add', extra: id);
                               }
-                            },
-                          ),
-                          _buildActionButton(
-                            icon: Icons.delete_outline,
-                            label: '删除',
-                            color: const Color(0xFFFF3B30),
-                            onTap: () => _handleDelete(context, ref),
-                          ),
-                        ],
+                            }
+                          },
+                        ),
                       ),
-                      const SizedBox(height: 0), // 占位符，保持最后的间距
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildActionButton(
+                          icon: Icons.delete_rounded,
+                          label: '删除',
+                          color: const Color(0xFFFF3B30),
+                          onTap: () => _handleDelete(context, ref),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -279,50 +373,65 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     required String amountChange,
     required bool isFromAccount,
   }) {
-    final isPositive = amountChange.startsWith('+');
-    final isNegative = amountChange.startsWith('-');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              spacing: 4,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isFromAccount ? '转出账户' : '转入账户',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF999999),
-                  ),
-                ),
-                Text(
-                  accountName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-              ],
-            ),
+    return Row(
+      children: [
+        // 账户图标
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: isFromAccount 
+                ? const Color(0xFFFF3B30).withValues(alpha: 0.1)
+                : const Color(0xFF34C759).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
           ),
-          Text(
-            amountChange,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isPositive
-                  ? const Color(0xFF34C759)
-                  : isNegative
-                      ? const Color(0xFFFF3B30)
-                      : const Color(0xFF333333),
-            ),
+          child: Icon(
+            isFromAccount ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+            color: isFromAccount 
+                ? const Color(0xFFFF3B30)
+                : const Color(0xFF34C759),
+            size: 18,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        
+        // 账户信息
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isFromAccount ? '转出账户' : '转入账户',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8E8E93),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                accountName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF1C1C1E),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // 金额变化
+        Text(
+          amountChange,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _getAmountChangeColor(amountChange),
+          ),
+        ),
+      ],
     );
   }
 
@@ -331,28 +440,121 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     required String value,
     Color? valueColor,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF333333),
-            ),
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFF007AFF).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              color: valueColor ?? const Color(0xFF333333),
-            ),
+          child: const Icon(
+            Icons.calendar_today_rounded,
+            color: Color(0xFF007AFF),
+            size: 18,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8E8E93),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: valueColor ?? const Color(0xFF1C1C1E),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
+  }
+
+  // 获取交易类型文本
+  String _getTransactionTypeText() {
+    if (fromAccountType != null && toAccountType != null) {
+      return getTransactionFlowType(fromAccountType!, toAccountType!);
+    }
+    return '未知类型';
+  }
+
+  // 获取交易类型颜色
+  Color _getTransactionTypeColor() {
+    if (fromAccountType != null && toAccountType != null) {
+      final nature = getTransactionNature(fromAccountType, toAccountType);
+      switch (nature) {
+        case TransactionNature.INFLOW:
+          return const Color(0xFF34C759);
+        case TransactionNature.OUTFLOW:
+          return const Color(0xFFFF3B30);
+        case TransactionNature.TRANSFER:
+          return const Color(0xFF007AFF);
+        default:
+          return const Color(0xFF8E8E93);
+      }
+    }
+    return const Color(0xFF8E8E93);
+  }
+
+  // 获取交易类型图标
+  IconData _getTransactionTypeIcon() {
+    if (fromAccountType != null && toAccountType != null) {
+      final nature = getTransactionNature(fromAccountType, toAccountType);
+      switch (nature) {
+        case TransactionNature.INFLOW:
+          return Icons.arrow_downward_rounded;
+        case TransactionNature.OUTFLOW:
+          return Icons.arrow_upward_rounded;
+        case TransactionNature.TRANSFER:
+          return Icons.swap_horiz_rounded;
+        default:
+          return Icons.help_outline_rounded;
+      }
+    }
+    return Icons.help_outline_rounded;
+  }
+
+  // 获取金额变化的颜色
+  Color _getAmountChangeColor(String amountChange) {
+    if (amountChange.startsWith('+')) {
+      return const Color(0xFF34C759);
+    } else if (amountChange.startsWith('-')) {
+      return const Color(0xFFFF3B30);
+    } else {
+      return const Color(0xFF1C1C1E);
+    }
+  }
+
+  // 获取格式化的日期时间
+  String _getFormattedDateTime() {
+    if (transactionDate != null) {
+      final dateFormatter = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN');
+      final timeFormatter = DateFormat('HH:mm');
+      final formattedDate = dateFormatter.format(transactionDate!);
+      final formattedTime = timeFormatter.format(transactionDate!);
+      
+      if (formattedTime == '00:00') {
+        return formattedDate;
+      } else {
+        return '$formattedDate · $formattedTime';
+      }
+    }
+    return date;
   }
 
   Widget _buildActionButton({
@@ -361,33 +563,41 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        spacing: 8,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: const Color(0xFFE0E0E0),
+              width: 1,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
