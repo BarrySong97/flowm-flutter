@@ -5,7 +5,6 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flowm/components/calendar/calendar_day.dart';
 import '../../db/dao/transaction_dao.dart';
-import '../../state/transaction/transaction_repository.dart';
 import '../../state/transaction/calendar_provider.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import '../../utils/transaction_type_map.dart';
@@ -22,6 +21,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   String customFormatted1 = DateFormat('yyyy年MM月').format(DateTime.now());
+  bool _isTransactionSortAscending = false; // 默认降序（最新在前）
 
   @override
   void initState() {
@@ -45,7 +45,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       case TransactionNature.TRANSFER:
         return '转账';
       case TransactionNature.OTHER:
-      default:
         return '其他';
     }
   }
@@ -91,7 +90,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       case TransactionNature.TRANSFER:
         return Colors.blue;
       case TransactionNature.OTHER:
-      default:
         return Colors.grey;
     }
   }
@@ -113,6 +111,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     return item.nature == TransactionNature.OUTFLOW;
   }
 
+
   @override
   Widget build(BuildContext context) {
     final newFormattedHeader = DateFormat('yyyy年MM月').format(_focusedDay);
@@ -124,6 +123,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       backgroundColor: const Color(0xFFF5F6FB),
       appBar: AppBar(
         title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               customFormatted1,
@@ -159,7 +159,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               ),
             )
           ],
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -306,27 +305,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '交易记录',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ),
-          // 当天收支汇总
+          // 时间日期标题和收支数据
           Consumer(
             builder: (context, ref, child) {
-              final monthKey =
-                  DateTime(_selectedDay.year, _selectedDay.month, 1);
-              final monthlySummaryAsyncValue =
-                  ref.watch(monthlyCalendarSummaryProvider(monthKey));
+              final monthKey = DateTime(_selectedDay.year, _selectedDay.month, 1);
+              final monthlySummaryAsyncValue = ref.watch(monthlyCalendarSummaryProvider(monthKey));
 
               return monthlySummaryAsyncValue.when(
                 data: (summaryMap) {
@@ -335,105 +318,92 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   final expenses = daySummary?.expenses ?? 0.0;
                   final net = income - expenses;
 
-                  return Container(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 0.0),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                    child: Column(
                       children: [
-                        // 收入
-                        Column(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '收入',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                              DateFormat('yyyy年MM月dd日').format(_selectedDay),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              NumberFormat.currency(
-                                      symbol: '¥', decimalDigits: 2)
-                                  .format(income),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
+                            // 排序按钮
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isTransactionSortAscending = !_isTransactionSortAscending;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _isTransactionSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                      size: 16,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _isTransactionSortAscending ? '时间升序' : '时间降序',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        // 分隔线
-                        Container(
-                          height: 40,
-                          width: 1,
-                          color: Colors.grey[300],
-                        ),
-                        // 支出
-                        Column(
+                        const SizedBox(height: 12),
+                        // 收支和结余数据
+                        Row(
                           children: [
-                            Text(
-                              '支出',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                            Expanded(
+                              child: Text(
+                                '收入: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(income)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.normal,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              NumberFormat.currency(
-                                      symbol: '¥', decimalDigits: 2)
-                                  .format(expenses),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                '支出: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(expenses)}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.normal,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                        // 分隔线
-                        Container(
-                          height: 40,
-                          width: 1,
-                          color: Colors.grey[300],
-                        ),
-                        // 净额
-                        Column(
-                          children: [
-                            Text(
-                              '净额',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              NumberFormat.currency(
-                                      symbol: '¥', decimalDigits: 2)
-                                  .format(net),
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: net >= 0 ? Colors.green : Colors.red,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                '结余: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(net)}',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.normal,
+                                ),
                               ),
                             ),
                           ],
@@ -442,35 +412,150 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     ),
                   );
                 },
-                loading: () => Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 8.0),
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                loading: () => Padding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                  child: Column(
                     children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('yyyy年MM月dd日').format(_selectedDay),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: const Text(
+                              '加载中...',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 8),
-                      Text('加载中...', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '收入: ¥0.00',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '支出: ¥0.00',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '结余: ¥0.00',
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                error: (error, stackTrace) => const SizedBox.shrink(),
+                error: (error, stackTrace) => Padding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('yyyy年MM月dd日').format(_selectedDay),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: const Text(
+                              '加载失败',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '收入: --',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '支出: --',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '结余: --',
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -483,29 +568,74 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 return selectedDayTransactionsAsync.when(
                   data: (transactionsWithAmount) {
                     if (transactionsWithAmount.isEmpty) {
-                      return const Center(child: Text('该日期无交易记录'));
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long_outlined,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                '该日期无交易记录',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
                     }
+
+                    // 对交易进行排序
+                    final sortedTransactions = List<TransactionWithAmount>.from(transactionsWithAmount);
+                    sortedTransactions.sort((a, b) {
+                      if (_isTransactionSortAscending) {
+                        return a.transaction.transactionDate.compareTo(b.transaction.transactionDate);
+                      } else {
+                        return b.transaction.transactionDate.compareTo(a.transaction.transactionDate);
+                      }
+                    });
+
                     return SuperListView.builder(
-                      itemCount: transactionsWithAmount.length,
+                      itemCount: sortedTransactions.length,
                       itemBuilder: (context, index) {
-                        final item = transactionsWithAmount[index];
+                        final item = sortedTransactions[index];
                         final transaction = item.transaction;
                         final amountString =
                             NumberFormat.currency(symbol: '¥', decimalDigits: 2)
                                 .format(item.amount.abs());
 
-                        String subtitle = DateFormat('HH:mm')
-                            .format(transaction.transactionDate);
-                        if (item.fromAccount != null &&
-                            item.toAccount != null) {
-                          subtitle =
-                              '${item.fromAccount!.accountName} -> ${item.toAccount!.accountName}';
-                        } else if (item.nature == TransactionNature.OUTFLOW &&
-                            item.toAccount != null) {
+                        // 改进时间显示逻辑 - 参考top_expense_detail_page的实现
+                        String subtitle = '';
+                        final timeStr = DateFormat('HH:mm').format(transaction.transactionDate);
+                        
+                        // 优先显示账户信息，时间作为补充
+                        if (item.fromAccount != null && item.toAccount != null) {
+                          subtitle = '${item.fromAccount!.accountName} → ${item.toAccount!.accountName}';
+                          // 如果不是00:00，添加时间显示
+                          if (timeStr != '00:00') {
+                            subtitle += ' • $timeStr';
+                          }
+                        } else if (item.nature == TransactionNature.OUTFLOW && item.toAccount != null) {
                           subtitle = item.toAccount!.accountName;
-                        } else if (item.nature == TransactionNature.INFLOW &&
-                            item.fromAccount != null) {
+                          if (timeStr != '00:00') {
+                            subtitle += ' • $timeStr';
+                          }
+                        } else if (item.nature == TransactionNature.INFLOW && item.fromAccount != null) {
                           subtitle = item.fromAccount!.accountName;
+                          if (timeStr != '00:00') {
+                            subtitle += ' • $timeStr';
+                          }
+                        } else {
+                          // 如果没有账户信息，只显示时间（除非是00:00）
+                          subtitle = timeStr != '00:00' ? timeStr : '';
                         }
 
                         return TransactionListItem(
