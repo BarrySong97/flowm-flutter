@@ -677,14 +677,14 @@ class _AddPageState extends ConsumerState<AddPage>
             backgroundColor: Colors.green,
           ),
         );
-        _clearForm();
         if (mounted) {
-          // revalidate providers
+          // revalidate providers (在清空表单前调用)
           invalidateProvidersForTransaction(
             ref,
             fromAccountType: _fromAccount!.type,
             toAccountType: _toAccount!.type,
           );
+          _clearForm();
           Navigator.of(context).pop();
         }
       } else {
