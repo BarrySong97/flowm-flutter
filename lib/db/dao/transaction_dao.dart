@@ -779,8 +779,8 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       variables: [
         Variable.withInt(accountId),
         Variable.withInt(accountId),
-        Variable.withDateTime(startDate),
-        Variable.withDateTime(endDate),
+        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).watch().map((rows) {
@@ -915,8 +915,8 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       variables: [
         Variable.withInt(accountId),
         Variable.withInt(accountId),
-        Variable.withDateTime(startDate),
-        Variable.withDateTime(endDate),
+        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).get();
@@ -1194,8 +1194,8 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       ''',
       variables: [
         Variable.withInt(ledgerId),
-        Variable.withDateTime(startDate),
-        Variable.withDateTime(endDate),
+        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).get();
