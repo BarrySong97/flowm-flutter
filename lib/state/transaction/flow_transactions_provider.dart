@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../db/dao/transaction_dao.dart';
 import 'transaction_repository.dart';
 import '../ledger/ledger_repository.dart';
+import '../home_page/overview_page_providers.dart';
 
 /// Flow页面交易状态类
 class FlowTransactionsState {
@@ -117,6 +118,7 @@ class FlowTransactionsNotifier extends StateNotifier<FlowTransactionsState> {
   /// 删除指定的交易
   Future<void> deleteTransaction(int transactionId) async {
     try {
+      
       // 调用repository删除交易
       await _transactionRepository.deleteTransactionWithPostings(transactionId);
 
@@ -128,6 +130,10 @@ class FlowTransactionsNotifier extends StateNotifier<FlowTransactionsState> {
       state = state.copyWith(
         transactions: updatedTransactions,
       );
+
+      // 刷新其他相关的providers
+      _ref.invalidate(monthlyOverviewDataProvider);
+      _ref.invalidate(latestTransactionsProvider);
     } catch (e) {
       state = state.copyWith(
         error: e.toString(),

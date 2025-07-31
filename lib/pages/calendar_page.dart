@@ -8,6 +8,7 @@ import '../../db/dao/transaction_dao.dart';
 import '../../state/transaction/calendar_provider.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import '../../utils/transaction_type_map.dart';
+import '../../utils/provider_invalidator.dart';
 
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key});
@@ -662,6 +663,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             // 刷新当天交易列表
                             ref.invalidate(
                                 selectedDayTransactionsProvider(_selectedDay));
+
+                            // 刷新其他相关的providers
+                            if (item.fromAccount?.accountType != null &&
+                                item.toAccount?.accountType != null) {
+                              invalidateProvidersForTransaction(
+                                ref,
+                                fromAccountType: item.fromAccount?.accountType,
+                                toAccountType: item.toAccount?.accountType,
+                              );
+                            }
                           },
                         );
                       },
