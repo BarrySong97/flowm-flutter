@@ -36,7 +36,7 @@ class _AddPageState extends ConsumerState<AddPage>
   late TabController _tabController;
   final List<String> _tabs = TransactionType.getAllDisplayNames();
   final TextEditingController _noteController = TextEditingController();
-  String _currentDate = DateTime.now().toString().split(' ')[0];
+  DateTime _currentDateTime = DateTime.now();
 
   bool _isEditMode = false;
 
@@ -85,8 +85,7 @@ class _AddPageState extends ConsumerState<AddPage>
       setState(() {
         amount = transaction.amount.toStringAsFixed(2);
         _noteController.text = transaction.transaction.description ?? '';
-        _currentDate =
-            transaction.transaction.transactionDate.toString().split(' ')[0];
+        _currentDateTime = transaction.transaction.transactionDate;
         if (dbFromAccount != null) {
           _fromAccount = Account(
             id: dbFromAccount.accountId,
@@ -135,7 +134,7 @@ class _AddPageState extends ConsumerState<AddPage>
         try {
           final dateTime = DateTime.parse(params.date!);
           setState(() {
-            _currentDate = dateTime.toString().split(' ')[0];
+            _currentDateTime = dateTime;
           });
         } catch (e) {
           debugPrint('[AddPage] 日期解析失败: ${params.date}, 错误: $e');
@@ -221,6 +220,12 @@ class _AddPageState extends ConsumerState<AddPage>
       );
     }
     return '';
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final date = dateTime.toString().split(' ')[0];
+    final time = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '$date $time';
   }
 
   Widget _buildTransactionValidationIndicator() {
@@ -340,10 +345,22 @@ class _AddPageState extends ConsumerState<AddPage>
     );
   }
 
-  void _handleDateTap() {
-    showDatePicker(
+  Future<TimeOfDay?> _showTimeInputDialog() async {
+    return await showDialog<TimeOfDay>(
       context: context,
-      initialDate: DateTime.now(),
+      builder: (BuildContext context) {
+        return _TimeInputDialog(
+          initialHour: _currentDateTime.hour,
+          initialMinute: _currentDateTime.minute,
+        );
+      },
+    );
+  }
+
+  void _handleDateTap() async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: _currentDateTime,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       builder: (BuildContext context, Widget? child) {
@@ -395,13 +412,40 @@ class _AddPageState extends ConsumerState<AddPage>
           child: child!,
         );
       },
-    ).then((selectedDate) {
-      if (selectedDate != null) {
+    );
+
+    if (selectedDate != null) {
+      // 直接使用键盘输入时间
+      TimeOfDay? selectedTime;
+      if (mounted) {
+        selectedTime = await _showTimeInputDialog();
+      }
+
+      if (selectedTime != null) {
+        final time = selectedTime;
         setState(() {
-          _currentDate = selectedDate.toString().split(' ')[0];
+          _currentDateTime = DateTime(
+            selectedDate.year,
+            selectedDate.month,
+            selectedDate.day,
+            time.hour,
+            time.minute,
+          );
+        });
+      } else {
+        // 如果用户取消了时间选择，只更新日期部分，保持原有时间
+        setState(() {
+          _currentDateTime = DateTime(
+            selectedDate.year,
+            selectedDate.month,
+            selectedDate.day,
+            _currentDateTime.hour,
+            _currentDateTime.minute,
+            _currentDateTime.second,
+          );
         });
       }
-    });
+    }
   }
 
   void onKeypadPressed(String value) {
@@ -551,7 +595,7 @@ class _AddPageState extends ConsumerState<AddPage>
       _fromAccount = null;
       _toAccount = null;
       _transactionFlowType = '';
-      _currentDate = DateTime.now().toString().split(' ')[0];
+      _currentDateTime = DateTime.now();
     });
   }
 
@@ -624,14 +668,7 @@ class _AddPageState extends ConsumerState<AddPage>
               fromAccountId: _fromAccount!.id,
               toAccountId: _toAccount!.id,
               amount: transactionAmount,
-              transactionDate: DateTime(
-                DateTime.parse(_currentDate).year,
-                DateTime.parse(_currentDate).month,
-                DateTime.parse(_currentDate).day,
-                DateTime.now().hour,
-                DateTime.now().minute,
-                DateTime.now().second,
-              ),
+              transactionDate: _currentDateTime,
               description: _noteController.text,
             );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -658,14 +695,7 @@ class _AddPageState extends ConsumerState<AddPage>
               fromAccountId: _fromAccount!.id,
               toAccountId: _toAccount!.id,
               amount: transactionAmount,
-              transactionDate: DateTime(
-                DateTime.parse(_currentDate).year,
-                DateTime.parse(_currentDate).month,
-                DateTime.parse(_currentDate).day,
-                DateTime.now().hour,
-                DateTime.now().minute,
-                DateTime.now().second,
-              ),
+              transactionDate: _currentDateTime,
               description: _noteController.text,
             );
 
@@ -873,7 +903,7 @@ class _AddPageState extends ConsumerState<AddPage>
 
             // 底部输入工具栏
             BottomInputToolbar(
-              date: _currentDate,
+              date: _formatDateTime(_currentDateTime),
               noteController: _noteController,
               onDateTap: _handleDateTap,
             ),
@@ -885,6 +915,107 @@ class _AddPageState extends ConsumerState<AddPage>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TimeInputDialog extends StatefulWidget {
+  final int initialHour;
+  final int initialMinute;
+
+  const _TimeInputDialog({
+    required this.initialHour,
+    required this.initialMinute,
+  });
+
+  @override
+  State<_TimeInputDialog> createState() => _TimeInputDialogState();
+}
+
+class _TimeInputDialogState extends State<_TimeInputDialog> {
+  late TextEditingController hourController;
+  late TextEditingController minuteController;
+
+  @override
+  void initState() {
+    super.initState();
+    hourController = TextEditingController();
+    minuteController = TextEditingController();
+    
+    // 设置初始值
+    hourController.text = widget.initialHour.toString().padLeft(2, '0');
+    minuteController.text = widget.initialMinute.toString().padLeft(2, '0');
+  }
+
+  @override
+  void dispose() {
+    hourController.dispose();
+    minuteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('输入时间'),
+      content: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 60,
+            child: TextField(
+              controller: hourController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 2,
+              decoration: const InputDecoration(
+                counterText: '',
+                labelText: '时',
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Text(':', style: TextStyle(fontSize: 24)),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 60,
+            child: TextField(
+              controller: minuteController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              maxLength: 2,
+              decoration: const InputDecoration(
+                counterText: '',
+                labelText: '分',
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () {
+            final hour = int.tryParse(hourController.text) ?? 0;
+            final minute = int.tryParse(minuteController.text) ?? 0;
+            
+            if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+              Navigator.of(context).pop(TimeOfDay(hour: hour, minute: minute));
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('请输入有效时间（小时：0-23，分钟：0-59）'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          child: const Text('确定'),
+        ),
+      ],
     );
   }
 }
