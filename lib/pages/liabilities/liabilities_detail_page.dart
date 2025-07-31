@@ -900,6 +900,10 @@ class AccountTransactionList extends ConsumerWidget {
                                 subtitle:
                                     '${transactionWithAmount.fromAccount?.accountName} -> ${transactionWithAmount.toAccount?.accountName}$timeDisplay',
                                 amount: formattedAmount,
+                                transactionDate: transaction.transactionDate,
+                                transactionAmount: transactionWithAmount.amount,
+                                createDate: transaction.createdAt,
+                                fullDescription: transaction.description,
                                 type: getTransactionFlowType(
                                   transactionWithAmount
                                           .fromAccount?.accountType ??

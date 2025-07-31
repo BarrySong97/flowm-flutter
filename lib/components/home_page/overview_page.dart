@@ -418,6 +418,10 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                   .fromAccount?.accountType,
                               toAccountType:
                                   transactionWithAmount.toAccount?.accountType,
+                              transactionDate: transaction.transactionDate,
+                              createDate: transaction.createdAt,
+                              transactionAmount: transactionWithAmount.amount,
+                              fullDescription: transaction.description,
                               type: getTransactionFlowType(
                                   transactionWithAmount
                                           .fromAccount?.accountType ??

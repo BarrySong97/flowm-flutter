@@ -12,6 +12,7 @@ class TransactionListItem extends StatelessWidget {
   final String? transactionId;
   final String? fullDescription;
   final DateTime? transactionDate;
+  final DateTime? createDate;
   final AccountType? fromAccountType;
   final AccountType? toAccountType;
   final double? transactionAmount;
@@ -31,6 +32,7 @@ class TransactionListItem extends StatelessWidget {
     this.transactionId,
     this.fullDescription,
     this.transactionDate,
+    this.createDate,
     this.fromAccountType,
     this.toAccountType,
     this.transactionAmount,
@@ -56,6 +58,8 @@ class TransactionListItem extends StatelessWidget {
       fromAccountType: fromAccountType,
       toAccountType: toAccountType,
       transactionAmount: transactionAmount,
+      transactionDate: transactionDate,
+      createDate: createDate,
       onEdit: onEdit,
       onCopy: onCopy,
       onShare: onShare,

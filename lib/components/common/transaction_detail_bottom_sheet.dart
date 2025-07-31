@@ -19,6 +19,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
   final AccountType? toAccountType;
   final double? transactionAmount; // 原始交易金额数值
   final DateTime? transactionDate; // 完整的交易日期时间
+  final DateTime? createDate; // 记录创建时间
   final VoidCallback? onEdit;
   final VoidCallback? onCopy;
   final VoidCallback? onShare;
@@ -36,6 +37,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     this.toAccountType,
     this.transactionAmount,
     this.transactionDate,
+    this.createDate,
     this.onEdit,
     this.onCopy,
     this.onShare,
@@ -54,6 +56,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     AccountType? toAccountType,
     double? transactionAmount,
     DateTime? transactionDate,
+    DateTime? createDate,
     VoidCallback? onEdit,
     VoidCallback? onCopy,
     VoidCallback? onShare,
@@ -74,6 +77,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
         toAccountType: toAccountType,
         transactionAmount: transactionAmount,
         transactionDate: transactionDate,
+        createDate: createDate,
         onEdit: onEdit,
         onCopy: onCopy,
         onShare: onShare,
@@ -322,8 +326,19 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
                           thickness: 1,
                         ),
                         _buildDetailItem(
-                          label: '记账时间',
-                          value: _getFormattedDateTime(),
+                          label: '交易时间',
+                          value: _getFormattedTransactionDateTime(),
+                          icon: Icons.schedule_rounded,
+                        ),
+                        const Divider(
+                          height: 24,
+                          color: Color(0xFFF0F0F0),
+                          thickness: 1,
+                        ),
+                        _buildDetailItem(
+                          label: '记录时间',
+                          value: _getFormattedCreateDateTime(),
+                          icon: Icons.history_rounded,
                         ),
                       ],
                     ),
@@ -439,6 +454,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     required String label,
     required String value,
     Color? valueColor,
+    IconData? icon,
   }) {
     return Row(
       children: [
@@ -449,8 +465,8 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
             color: const Color(0xFF007AFF).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: const Icon(
-            Icons.calendar_today_rounded,
+          child: Icon(
+            icon ?? Icons.calendar_today_rounded,
             color: Color(0xFF007AFF),
             size: 18,
           ),
@@ -540,8 +556,8 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
     }
   }
 
-  // 获取格式化的日期时间
-  String _getFormattedDateTime() {
+  // 获取格式化的交易日期时间
+  String _getFormattedTransactionDateTime() {
     if (transactionDate != null) {
       final dateFormatter = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN');
       final timeFormatter = DateFormat('HH:mm');
@@ -555,6 +571,27 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
       }
     }
     return date;
+  }
+
+  // 获取格式化的记录创建时间
+  String _getFormattedCreateDateTime() {
+    if (createDate != null) {
+      final dateFormatter = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN');
+      final timeFormatter = DateFormat('HH:mm');
+      final formattedDate = dateFormatter.format(createDate!);
+      final formattedTime = timeFormatter.format(createDate!);
+      
+      if (formattedTime == '00:00') {
+        return formattedDate;
+      } else {
+        return '$formattedDate · $formattedTime';
+      }
+    }
+    // 如果没有创建时间，显示当前时间作为后备
+    final now = DateTime.now();
+    final dateFormatter = DateFormat('yyyy年MM月dd日 EEEE', 'zh_CN');
+    final timeFormatter = DateFormat('HH:mm');
+    return '${dateFormatter.format(now)} · ${timeFormatter.format(now)}';
   }
 
   Widget _buildActionButton({

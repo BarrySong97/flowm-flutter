@@ -647,6 +647,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           statusColor: _getTransactionColor(item),
                           isExpense: _isExpenseTransaction(item),
                           transactionDate: transaction.transactionDate,
+                          createDate: transaction.createdAt,
                           transactionAmount: item.amount,
                           fullDescription: transaction.description,
                           fromAccountType: item.fromAccount?.accountType,

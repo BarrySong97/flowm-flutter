@@ -109,6 +109,8 @@ class _FlowPageState extends ConsumerState<FlowPage> {
             : const Color(0xFF34C759), // Green for income
         isExpense: isExpense,
         transactionDate: transaction.transactionDate,
+        createDate: transaction.createdAt,
+        fullDescription: transaction.description,
         fromAccountType: transactionWithAmount.fromAccount?.accountType,
         toAccountType: transactionWithAmount.toAccount?.accountType,
         transactionAmount: totalAmount.abs(),
