@@ -11,9 +11,10 @@ import 'package:flowm/pages/account_transaction_guide_screen.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
-import 'package:flowm/db/tables/account_table.dart';
+import 'package:flowm/db/tables/account_table.dart' show AccountType;
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/state/icome/income_providers.dart';
@@ -23,7 +24,8 @@ import 'package:flowm/utils/provider_invalidator.dart';
 
 class AddPage extends ConsumerStatefulWidget {
   final int? transactionId;
-  const AddPage({super.key, this.transactionId});
+  final String? transactionType;
+  const AddPage({super.key, this.transactionId, this.transactionType});
 
   @override
   ConsumerState<AddPage> createState() => _AddPageState();
@@ -62,6 +64,7 @@ class _AddPageState extends ConsumerState<AddPage>
       // 如果不是编辑模式，检查是否有深度链接参数
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadDeepLinkParams();
+        _handleTransactionType();
       });
     }
   }
@@ -104,6 +107,84 @@ class _AddPageState extends ConsumerState<AddPage>
         }
         _transactionFlowType = _calculateTransactionFlowType();
       });
+    }
+  }
+
+  /// 处理交易类型参数
+  Future<void> _handleTransactionType() async {
+    if (widget.transactionType == null) return;
+
+    try {
+      final accounts = await ref.read(accountRepositoryProvider).getAllAccounts();
+      final selectedLedger = await ref.read(selectedLedgerProvider.future);
+      
+      if (selectedLedger == null) return;
+      
+      if (widget.transactionType == 'expense') {
+        // 支出：默认选择默认资产账户作为从账户，支出分类账户作为到账户
+        final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
+        final expenseAccounts = accounts.where((a) => a.accountType == AccountType.EXPENSE).toList();
+        
+        if (defaultAssetAccount != null && expenseAccounts.isNotEmpty) {
+          final fromAccountBalance = await ref
+              .read(accountRepositoryProvider)
+              .getAccountBalance(defaultAssetAccount.accountId);
+          final toAccountBalance = await ref
+              .read(accountRepositoryProvider)
+              .getAccountBalance(expenseAccounts.first.accountId);
+              
+          if (mounted) {
+            setState(() {
+            _fromAccount = Account(
+              id: defaultAssetAccount.accountId,
+              name: defaultAssetAccount.accountName,
+              amount: fromAccountBalance,
+              type: defaultAssetAccount.accountType,
+            );
+            _toAccount = Account(
+              id: expenseAccounts.first.accountId,
+              name: expenseAccounts.first.accountName,
+              amount: toAccountBalance,
+              type: expenseAccounts.first.accountType,
+            );
+            _transactionFlowType = _calculateTransactionFlowType();
+            });
+          }
+        }
+      } else if (widget.transactionType == 'income') {
+        // 收入：默认选择收入分类账户作为从账户，默认资产账户作为到账户
+        final incomeAccounts = accounts.where((a) => a.accountType == AccountType.INCOME).toList();
+        final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
+        
+        if (incomeAccounts.isNotEmpty && defaultAssetAccount != null) {
+          final fromAccountBalance = await ref
+              .read(accountRepositoryProvider)
+              .getAccountBalance(incomeAccounts.first.accountId);
+          final toAccountBalance = await ref
+              .read(accountRepositoryProvider)
+              .getAccountBalance(defaultAssetAccount.accountId);
+              
+          if (mounted) {
+            setState(() {
+              _fromAccount = Account(
+                id: incomeAccounts.first.accountId,
+                name: incomeAccounts.first.accountName,
+                amount: fromAccountBalance,
+                type: incomeAccounts.first.accountType,
+              );
+              _toAccount = Account(
+                id: defaultAssetAccount.accountId,
+                name: defaultAssetAccount.accountName,
+                amount: toAccountBalance,
+                type: defaultAssetAccount.accountType,
+              );
+              _transactionFlowType = _calculateTransactionFlowType();
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[AddPage] 处理交易类型参数失败: $e');
     }
   }
 

@@ -1,5 +1,3 @@
-import 'package:flowm/components/home_page/expenses_page.dart';
-import 'package:flowm/components/home_page/income_page.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
@@ -53,6 +51,7 @@ class _AccountUpdateBottomSheetState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   Account? _selectedParentAccount;
+  bool _isDefaultAssetAccount = false;
 
   @override
   void initState() {
@@ -83,40 +82,49 @@ class _AccountUpdateBottomSheetState
       }
     });
 
-    // 异步获取当前账户的父账户信息
-    _initializeParentAccount();
+    // 异步获取当前账户的完整信息（包括父账户和默认状态）
+    _initializeAccountData();
   }
 
-  /// 初始化父账户信息
-  Future<void> _initializeParentAccount() async {
+  /// 初始化账户数据（包括父账户和默认状态）
+  Future<void> _initializeAccountData() async {
     try {
       // 从数据库获取当前账户的完整信息
       final accountRepository = ref.read(accountRepositoryProvider);
       final dbAccount =
           await accountRepository.getAccountById(widget.accountToUpdate.id);
 
-      if (dbAccount != null && dbAccount.parentAccountId != null) {
-        // 如果有父账户，获取父账户信息
-        final parentAccount =
-            await accountRepository.getAccountById(dbAccount.parentAccountId!);
+      if (dbAccount != null && mounted) {
+        setState(() {
+          // 设置默认资产账户状态
+          _isDefaultAssetAccount = dbAccount.defaultUseAssets ?? false;
+        });
 
-        if (parentAccount != null && mounted) {
-          // 将数据库的Account转换为UI的Account
-          setState(() {
-            _selectedParentAccount = Account(
-              id: parentAccount.accountId,
-              name: parentAccount.accountName,
-              amount: 0.0, // 父账户选择不需要金额信息
-              type: parentAccount.accountType,
-              currencySymbol: '¥',
-            );
-          });
-          print('已设置父账户: ${_selectedParentAccount?.name}');
+        if (dbAccount.parentAccountId != null) {
+          // 如果有父账户，获取父账户信息
+          final parentAccount =
+              await accountRepository.getAccountById(dbAccount.parentAccountId!);
+
+          if (parentAccount != null && mounted) {
+            // 将数据库的Account转换为UI的Account
+            setState(() {
+              _selectedParentAccount = Account(
+                id: parentAccount.accountId,
+                name: parentAccount.accountName,
+                amount: 0.0, // 父账户选择不需要金额信息
+                type: parentAccount.accountType,
+                currencySymbol: '¥',
+              );
+            });
+            print('已设置父账户: ${_selectedParentAccount?.name}');
+          }
         }
+        
+        print('已设置默认资产账户状态: $_isDefaultAssetAccount');
       }
     } catch (e) {
-      print('获取父账户信息失败: $e');
-      // 如果获取失败，继续使用默认值 null
+      print('获取账户信息失败: $e');
+      // 如果获取失败，继续使用默认值
     }
   }
 
@@ -193,6 +201,7 @@ class _AccountUpdateBottomSheetState
                   _accountTypes[_tabController.index]),
               ledgerId: selectedLedger.ledgerId,
               parentId: _selectedParentAccount?.id,
+              isDefaultAsset: _isDefaultAssetAccount,
             );
 
         print('账户更新成功');
@@ -437,6 +446,27 @@ class _AccountUpdateBottomSheetState
                     },
                   ),
                   const SizedBox(height: 16),
+                  
+                  // 设为默认资产账户选项（仅资产账户显示）
+                  if (_accountTypes[_tabController.index] == AccountSelectorType.asset)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CheckboxListTile(
+                          title: const Text('设为默认资产账户'),
+                          subtitle: const Text('设置此账户为添加交易时的默认资产账户'),
+                          value: _isDefaultAssetAccount,
+                          onChanged: (value) {
+                            setState(() {
+                              _isDefaultAssetAccount = value ?? false;
+                            });
+                          },
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                    
                   Row(
                     children: [
                       Expanded(

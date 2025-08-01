@@ -757,6 +757,7 @@ class AccountRepository {
     required int ledgerId,
     int? parentId,
     bool isActive = true,
+    bool isDefaultAsset = false,
   }) async {
     final accountId = await _accountDao.insertAccount(AccountsCompanion.insert(
       accountName: name,
@@ -766,6 +767,7 @@ class AccountRepository {
       parentAccountId:
           parentId == null ? const Value.absent() : Value(parentId),
       isActive: Value(isActive),
+      defaultUseAssets: Value(isDefaultAsset),
     ));
 
     // 创建账户后清理相关缓存，确保数据一致性
@@ -782,6 +784,7 @@ class AccountRepository {
     required AccountType type,
     required int ledgerId,
     int? parentId,
+    bool isDefaultAsset = false,
   }) async {
     String fullPath;
     String parentPath = '';
@@ -806,7 +809,13 @@ class AccountRepository {
       type: type,
       ledgerId: ledgerId,
       parentId: parentId,
+      isDefaultAsset: false, // 先创建为非默认状态
     );
+
+    // 如果需要设置为默认资产账户，则调用专门的方法
+    if (isDefaultAsset && type == AccountType.ASSET) {
+      await setDefaultAssetAccount(accountId, ledgerId);
+    }
 
     // createAccount 已经会更新 Home Widget，这里不需要重复调用
     return accountId;
@@ -819,6 +828,7 @@ class AccountRepository {
     required int ledgerId,
     int? parentId,
     double? initialAmount,
+    bool isDefaultAsset = false,
   }) async {
     return await _accountDao.db.transaction(() async {
       // 1. 先创建账户
@@ -827,6 +837,7 @@ class AccountRepository {
         type: type,
         ledgerId: ledgerId,
         parentId: parentId,
+        isDefaultAsset: isDefaultAsset,
       );
 
       // 2. 如果有初始金额且大于0，创建期初余额交易
@@ -910,6 +921,7 @@ class AccountRepository {
     required AccountType type,
     required int ledgerId,
     int? parentId,
+    bool? isDefaultAsset,
   }) async {
     String newFullPath;
     String parentPath = '';
@@ -931,6 +943,11 @@ class AccountRepository {
       ledgerId: Value(ledgerId),
       parentAccountId: Value(parentId),
     ));
+
+    // 如果需要设置为默认资产账户
+    if (isDefaultAsset == true && type == AccountType.ASSET) {
+      await setDefaultAssetAccount(accountId, ledgerId);
+    }
 
     // After updating, we might need to update the full path of all children
     final children = await _accountDao.getChildAccounts(accountId);
@@ -968,7 +985,11 @@ class AccountRepository {
     String? name,
     AccountType? type,
     bool? isActive,
+    bool? isDefaultAsset,
   }) async {
+    final account = await _accountDao.getAccountById(id);
+    if (account == null) return false;
+
     final result = await _accountDao.updateAccount(AccountsCompanion(
       accountId: Value(id),
       accountName: name != null ? Value(name) : const Value.absent(),
@@ -976,14 +997,16 @@ class AccountRepository {
       isActive: isActive != null ? Value(isActive) : const Value.absent(),
     ));
 
+    // 如果需要设置为默认资产账户
+    if (result && isDefaultAsset == true && account.accountType == AccountType.ASSET) {
+      await setDefaultAssetAccount(id, account.ledgerId);
+    }
+
     // 获取账户的 ledgerId 以更新 App Group 数据
     if (result) {
-      final account = await _accountDao.getAccountById(id);
-      if (account != null) {
-        // 更新账户后清理相关缓存，确保数据一致性
-        _clearLedgerRelatedCache(account.ledgerId);
-        _updateHomeWidgetAccountData(account.ledgerId);
-      }
+      // 更新账户后清理相关缓存，确保数据一致性
+      _clearLedgerRelatedCache(account.ledgerId);
+      _updateHomeWidgetAccountData(account.ledgerId);
     }
 
     return result;
@@ -1343,6 +1366,7 @@ class AccountRepository {
           a.full_path,
           a.account_type,
           a.is_active,
+          a.default_use_assets,
           a.created_at,
           COALESCE(SUM(p.amount), 0) as balance
         FROM accounts a
@@ -1356,7 +1380,7 @@ class AccountRepository {
             AND child.ledger_id = a.ledger_id
           )
         GROUP BY a.account_id, a.ledger_id, a.parent_account_id, a.account_name, 
-                 a.full_path, a.account_type, a.is_active, a.created_at
+                 a.full_path, a.account_type, a.is_active, a.default_use_assets, a.created_at
         ORDER BY balance DESC
         ${limit != null ? 'LIMIT ?' : ''}
         ''',
@@ -1387,6 +1411,7 @@ class AccountRepository {
             orElse: () => AccountType.ASSET,
           ),
           isActive: row.read<bool>('is_active'),
+          defaultUseAssets: row.readNullable<bool>('default_use_assets'),
           createdAt: row.read<DateTime>('created_at'),
         );
 
@@ -1797,6 +1822,139 @@ class AccountRepository {
     } catch (e) {
       print('[AccountRepository] 获取期初余额账户失败: $e');
       return null;
+    }
+  }
+
+  /// 获取最近使用的资产账户
+  Future<Account?> getLastUsedAssetAccount(int ledgerId) async {
+    try {
+      // 获取最近的一笔交易中使用的资产账户
+      final result = await _accountDao.customSelect(
+        '''
+        SELECT DISTINCT a.account_id, a.ledger_id, a.parent_account_id, 
+               a.account_name, a.full_path, a.account_type, a.is_active, 
+               a.default_use_assets, a.created_at, t.transaction_date
+        FROM accounts a
+        JOIN postings p ON a.account_id = p.account_id
+        JOIN transactions t ON p.transaction_id = t.transaction_id
+        WHERE a.ledger_id = ? 
+          AND a.account_type = ? 
+          AND a.is_active = 1
+        ORDER BY t.transaction_date DESC, t.created_at DESC
+        LIMIT 1
+        ''',
+        variables: [
+          Variable.withInt(ledgerId),
+          Variable.withString(AccountType.ASSET.name),
+        ],
+      ).getSingleOrNull();
+
+      if (result != null) {
+        return Account(
+          accountId: result.read<int>('account_id'),
+          ledgerId: result.read<int>('ledger_id'),
+          parentAccountId: result.readNullable<int>('parent_account_id'),
+          accountName: result.read<String>('account_name'),
+          fullPath: result.read<String>('full_path'),
+          accountType: AccountType.values.firstWhere(
+            (type) => type.name == result.read<String>('account_type'),
+            orElse: () => AccountType.ASSET,
+          ),
+          isActive: result.read<bool>('is_active'),
+          defaultUseAssets: result.readNullable<bool>('default_use_assets'),
+          createdAt: result.read<DateTime>('created_at'),
+        );
+      }
+      
+      return null;
+    } catch (e) {
+      print('[AccountRepository] 获取最近使用的资产账户失败: $e');
+      return null;
+    }
+  }
+
+  /// 获取默认资产账户
+  Future<Account?> getDefaultAssetAccount(int ledgerId) async {
+    try {
+      final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
+      
+      // 1. 首先尝试找到设置为默认的资产账户
+      final defaultAssetAccount = allAccounts.where((account) => 
+        account.accountType == AccountType.ASSET && 
+        account.isActive &&
+        (account.defaultUseAssets ?? false)
+      ).firstOrNull;
+      
+      if (defaultAssetAccount != null) {
+        print('[AccountRepository] 使用设置的默认资产账户: ${defaultAssetAccount.accountName}');
+        return defaultAssetAccount;
+      }
+      
+      // 2. 如果没有设置默认账户，尝试获取最近使用的资产账户
+      final lastUsedAssetAccount = await getLastUsedAssetAccount(ledgerId);
+      if (lastUsedAssetAccount != null) {
+        print('[AccountRepository] 使用最近使用的资产账户: ${lastUsedAssetAccount.accountName}');
+        return lastUsedAssetAccount;
+      }
+      
+      // 3. 如果没有历史记录，返回第一个活跃的叶子资产账户（优先选择没有子账户的账户）
+      final activeAssetAccounts = allAccounts.where((account) => 
+        account.accountType == AccountType.ASSET && 
+        account.isActive
+      ).toList();
+      
+      // 找出所有叶子账户（没有子账户的账户）
+      final leafAssetAccounts = activeAssetAccounts.where((account) {
+        // 检查是否有其他账户以此账户为父账户
+        final hasChildren = allAccounts.any((child) => child.parentAccountId == account.accountId);
+        return !hasChildren;
+      }).toList();
+      
+      // 优先选择叶子账户
+      final firstAssetAccount = leafAssetAccounts.isNotEmpty 
+        ? leafAssetAccounts.first 
+        : activeAssetAccounts.firstOrNull;
+      
+      if (firstAssetAccount != null) {
+        final accountType = leafAssetAccounts.contains(firstAssetAccount) ? '叶子资产账户' : '资产账户';
+        print('[AccountRepository] 使用第一个活跃的$accountType: ${firstAssetAccount.accountName}');
+      }
+      
+      return firstAssetAccount;
+    } catch (e) {
+      print('[AccountRepository] 获取默认资产账户失败: $e');
+      return null;
+    }
+  }
+
+  /// 设置默认资产账户（确保只有一个默认账户）
+  Future<void> setDefaultAssetAccount(int accountId, int ledgerId) async {
+    try {
+      await _accountDao.db.transaction(() async {
+        // 首先将该账本下所有资产账户的defaultUseAssets设置为false
+        await _accountDao.customUpdate(
+          'UPDATE accounts SET default_use_assets = 0 WHERE ledger_id = ? AND account_type = ?',
+          variables: [
+            Variable.withInt(ledgerId),
+            Variable.withString(AccountType.ASSET.name),
+          ],
+        );
+        
+        // 然后将指定账户的defaultUseAssets设置为true
+        await _accountDao.customUpdate(
+          'UPDATE accounts SET default_use_assets = 1 WHERE account_id = ?',
+          variables: [
+            Variable.withInt(accountId),
+          ],
+        );
+      });
+      
+      // 清理相关缓存
+      _clearLedgerRelatedCache(ledgerId);
+      _updateHomeWidgetAccountData(ledgerId);
+    } catch (e) {
+      print('[AccountRepository] 设置默认资产账户失败: $e');
+      rethrow;
     }
   }
 

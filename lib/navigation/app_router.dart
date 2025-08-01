@@ -154,10 +154,22 @@ class AppRouter {
         path: '/add',
         name: 'add',
         pageBuilder: (context, state) {
-          final transactionId = state.extra as int?;
-          return SwipeablePage(
-            builder: (context) => AddPage(transactionId: transactionId),
-          );
+          if (state.extra is Map<String, dynamic>) {
+            final extra = state.extra as Map<String, dynamic>;
+            final transactionId = extra['transactionId'] as int?;
+            final type = extra['type'] as String?;
+            return SwipeablePage(
+              builder: (context) => AddPage(
+                transactionId: transactionId,
+                transactionType: type,
+              ),
+            );
+          } else {
+            final transactionId = state.extra as int?;
+            return SwipeablePage(
+              builder: (context) => AddPage(transactionId: transactionId),
+            );
+          }
         },
       ),
       GoRoute(

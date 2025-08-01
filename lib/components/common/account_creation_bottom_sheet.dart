@@ -53,6 +53,7 @@ class _AccountCreationBottomSheetState
   final _initialAmountController = TextEditingController();
   Account? _selectedParentAccount;
   bool _hasInitialAmount = true;
+  bool _isDefaultAssetAccount = false;
 
   @override
   void initState() {
@@ -172,6 +173,7 @@ class _AccountCreationBottomSheetState
                 ledgerId: selectedLedger.ledgerId,
                 parentId: _selectedParentAccount?.id,
                 initialAmount: initialAmount,
+                isDefaultAsset: _isDefaultAssetAccount,
               );
         } else {
           await ref.read(accountRepositoryProvider).addNewAccount(
@@ -180,6 +182,7 @@ class _AccountCreationBottomSheetState
                     _accountTypes[_tabController.index]),
                 ledgerId: selectedLedger.ledgerId,
                 parentId: _selectedParentAccount?.id,
+                isDefaultAsset: _isDefaultAssetAccount,
               );
         }
 
@@ -341,7 +344,6 @@ class _AccountCreationBottomSheetState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       spacing: 8,
                       children: [
-                        const Text('设置初始金额'),
                         Column(
                           children: [
                             TextFormField(
@@ -376,21 +378,30 @@ class _AccountCreationBottomSheetState
                             const SizedBox(height: 8),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                      ],
+                    ),
+
+                  // 设为默认资产账户选项（仅资产账户显示）
+                  if (_accountTypes[_tabController.index] ==
+                      AccountSelectorType.asset)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CheckboxListTile(
+                          title: const Text('设为默认资产账户'),
+                          subtitle: const Text('设置此账户为添加交易时的默认资产账户'),
+                          value: _isDefaultAssetAccount,
+                          onChanged: (value) {
+                            setState(() {
+                              _isDefaultAssetAccount = value ?? false;
+                            });
+                          },
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ],
                     ),
 
                   // 提示文字
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(
-                      '系统最多支持两层账户结构，选择一级账户作为父账户',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
 
                   Row(
                     children: [
@@ -433,7 +444,17 @@ class _AccountCreationBottomSheetState
                         ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      '系统最多支持两层账户结构，选择一级账户作为父账户',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _createAccount,
                     style: ElevatedButton.styleFrom(

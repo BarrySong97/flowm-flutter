@@ -10,6 +10,7 @@ class Accounts extends Table {
   TextColumn get fullPath => text()();
   TextColumn get accountType => textEnum<AccountType>()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  BoolColumn get defaultUseAssets => boolean().nullable().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 

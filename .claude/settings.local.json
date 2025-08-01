@@ -5,7 +5,13 @@
       "Bash(mv:*)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git tag:*)",
+      "Bash(grep:*)",
+      "Bash(git checkout:*)",
+      "Bash(flutter pub run build_runner build:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(flutter run:*)"
     ],
     "deny": []
   }

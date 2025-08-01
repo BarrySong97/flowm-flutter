@@ -39,6 +39,24 @@ class AddBottomSheet extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildActionButton(
+                      icon: Icons.trending_down,
+                      label: '添加支出',
+                      color: Colors.red[600]!,
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/add', extra: {'type': 'expense'});
+                      },
+                    ),
+                    _buildActionButton(
+                      icon: Icons.trending_up,
+                      label: '添加收入',
+                      color: Colors.blue[600]!,
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/add', extra: {'type': 'income'});
+                      },
+                    ),
+                    _buildActionButton(
                       icon: Icons.receipt_long,
                       label: '添加流水',
                       color: Colors.grey[600]!,

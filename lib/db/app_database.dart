@@ -48,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -111,6 +111,10 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (Migrator m, int from, int to) async {
           // Handle future migrations
           if (from == 1 && to == 2) {
+            // 添加 default_use_assets 列到 accounts 表
+            await customStatement(
+                'ALTER TABLE accounts ADD COLUMN default_use_assets INTEGER DEFAULT 0');
+            
             // 添加索引的迁移逻辑
             await customStatement(
                 'CREATE INDEX IF NOT EXISTS idx_postings_account_id ON postings(account_id)');

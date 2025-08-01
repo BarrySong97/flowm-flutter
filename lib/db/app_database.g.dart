@@ -413,6 +413,16 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_active" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _defaultUseAssetsMeta =
+      const VerificationMeta('defaultUseAssets');
+  @override
+  late final GeneratedColumn<bool> defaultUseAssets = GeneratedColumn<bool>(
+      'default_use_assets', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("default_use_assets" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -430,6 +440,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         fullPath,
         accountType,
         isActive,
+        defaultUseAssets,
         createdAt
       ];
   @override
@@ -476,6 +487,12 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
       context.handle(_isActiveMeta,
           isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
     }
+    if (data.containsKey('default_use_assets')) {
+      context.handle(
+          _defaultUseAssetsMeta,
+          defaultUseAssets.isAcceptableOrUnknown(
+              data['default_use_assets']!, _defaultUseAssetsMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -504,6 +521,8 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
           .read(DriftSqlType.string, data['${effectivePrefix}account_type'])!),
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
+      defaultUseAssets: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}default_use_assets']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -526,6 +545,7 @@ class Account extends DataClass implements Insertable<Account> {
   final String fullPath;
   final AccountType accountType;
   final bool isActive;
+  final bool? defaultUseAssets;
   final DateTime createdAt;
   const Account(
       {required this.accountId,
@@ -535,6 +555,7 @@ class Account extends DataClass implements Insertable<Account> {
       required this.fullPath,
       required this.accountType,
       required this.isActive,
+      this.defaultUseAssets,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -551,6 +572,9 @@ class Account extends DataClass implements Insertable<Account> {
           $AccountsTable.$converteraccountType.toSql(accountType));
     }
     map['is_active'] = Variable<bool>(isActive);
+    if (!nullToAbsent || defaultUseAssets != null) {
+      map['default_use_assets'] = Variable<bool>(defaultUseAssets);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -566,6 +590,9 @@ class Account extends DataClass implements Insertable<Account> {
       fullPath: Value(fullPath),
       accountType: Value(accountType),
       isActive: Value(isActive),
+      defaultUseAssets: defaultUseAssets == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultUseAssets),
       createdAt: Value(createdAt),
     );
   }
@@ -582,6 +609,7 @@ class Account extends DataClass implements Insertable<Account> {
       accountType: $AccountsTable.$converteraccountType
           .fromJson(serializer.fromJson<String>(json['accountType'])),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      defaultUseAssets: serializer.fromJson<bool?>(json['defaultUseAssets']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -597,6 +625,7 @@ class Account extends DataClass implements Insertable<Account> {
       'accountType': serializer.toJson<String>(
           $AccountsTable.$converteraccountType.toJson(accountType)),
       'isActive': serializer.toJson<bool>(isActive),
+      'defaultUseAssets': serializer.toJson<bool?>(defaultUseAssets),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -609,6 +638,7 @@ class Account extends DataClass implements Insertable<Account> {
           String? fullPath,
           AccountType? accountType,
           bool? isActive,
+          Value<bool?> defaultUseAssets = const Value.absent(),
           DateTime? createdAt}) =>
       Account(
         accountId: accountId ?? this.accountId,
@@ -620,6 +650,9 @@ class Account extends DataClass implements Insertable<Account> {
         fullPath: fullPath ?? this.fullPath,
         accountType: accountType ?? this.accountType,
         isActive: isActive ?? this.isActive,
+        defaultUseAssets: defaultUseAssets.present
+            ? defaultUseAssets.value
+            : this.defaultUseAssets,
         createdAt: createdAt ?? this.createdAt,
       );
   Account copyWithCompanion(AccountsCompanion data) {
@@ -635,6 +668,9 @@ class Account extends DataClass implements Insertable<Account> {
       accountType:
           data.accountType.present ? data.accountType.value : this.accountType,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      defaultUseAssets: data.defaultUseAssets.present
+          ? data.defaultUseAssets.value
+          : this.defaultUseAssets,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -649,14 +685,23 @@ class Account extends DataClass implements Insertable<Account> {
           ..write('fullPath: $fullPath, ')
           ..write('accountType: $accountType, ')
           ..write('isActive: $isActive, ')
+          ..write('defaultUseAssets: $defaultUseAssets, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(accountId, ledgerId, parentAccountId,
-      accountName, fullPath, accountType, isActive, createdAt);
+  int get hashCode => Object.hash(
+      accountId,
+      ledgerId,
+      parentAccountId,
+      accountName,
+      fullPath,
+      accountType,
+      isActive,
+      defaultUseAssets,
+      createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -668,6 +713,7 @@ class Account extends DataClass implements Insertable<Account> {
           other.fullPath == this.fullPath &&
           other.accountType == this.accountType &&
           other.isActive == this.isActive &&
+          other.defaultUseAssets == this.defaultUseAssets &&
           other.createdAt == this.createdAt);
 }
 
@@ -679,6 +725,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<String> fullPath;
   final Value<AccountType> accountType;
   final Value<bool> isActive;
+  final Value<bool?> defaultUseAssets;
   final Value<DateTime> createdAt;
   const AccountsCompanion({
     this.accountId = const Value.absent(),
@@ -688,6 +735,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.fullPath = const Value.absent(),
     this.accountType = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.defaultUseAssets = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   AccountsCompanion.insert({
@@ -698,6 +746,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     required String fullPath,
     required AccountType accountType,
     this.isActive = const Value.absent(),
+    this.defaultUseAssets = const Value.absent(),
     this.createdAt = const Value.absent(),
   })  : ledgerId = Value(ledgerId),
         accountName = Value(accountName),
@@ -711,6 +760,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Expression<String>? fullPath,
     Expression<String>? accountType,
     Expression<bool>? isActive,
+    Expression<bool>? defaultUseAssets,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -721,6 +771,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       if (fullPath != null) 'full_path': fullPath,
       if (accountType != null) 'account_type': accountType,
       if (isActive != null) 'is_active': isActive,
+      if (defaultUseAssets != null) 'default_use_assets': defaultUseAssets,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -733,6 +784,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       Value<String>? fullPath,
       Value<AccountType>? accountType,
       Value<bool>? isActive,
+      Value<bool?>? defaultUseAssets,
       Value<DateTime>? createdAt}) {
     return AccountsCompanion(
       accountId: accountId ?? this.accountId,
@@ -742,6 +794,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       fullPath: fullPath ?? this.fullPath,
       accountType: accountType ?? this.accountType,
       isActive: isActive ?? this.isActive,
+      defaultUseAssets: defaultUseAssets ?? this.defaultUseAssets,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -771,6 +824,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (defaultUseAssets.present) {
+      map['default_use_assets'] = Variable<bool>(defaultUseAssets.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -787,6 +843,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
           ..write('fullPath: $fullPath, ')
           ..write('accountType: $accountType, ')
           ..write('isActive: $isActive, ')
+          ..write('defaultUseAssets: $defaultUseAssets, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -2554,6 +2611,7 @@ typedef $$AccountsTableCreateCompanionBuilder = AccountsCompanion Function({
   required String fullPath,
   required AccountType accountType,
   Value<bool> isActive,
+  Value<bool?> defaultUseAssets,
   Value<DateTime> createdAt,
 });
 typedef $$AccountsTableUpdateCompanionBuilder = AccountsCompanion Function({
@@ -2564,6 +2622,7 @@ typedef $$AccountsTableUpdateCompanionBuilder = AccountsCompanion Function({
   Value<String> fullPath,
   Value<AccountType> accountType,
   Value<bool> isActive,
+  Value<bool?> defaultUseAssets,
   Value<DateTime> createdAt,
 });
 
@@ -2659,6 +2718,10 @@ class $$AccountsTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get defaultUseAssets => $composableBuilder(
+      column: $table.defaultUseAssets,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2770,6 +2833,10 @@ class $$AccountsTableOrderingComposer
   ColumnOrderings<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get defaultUseAssets => $composableBuilder(
+      column: $table.defaultUseAssets,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -2838,6 +2905,9 @@ class $$AccountsTableAnnotationComposer
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<bool> get defaultUseAssets => $composableBuilder(
+      column: $table.defaultUseAssets, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2959,6 +3029,7 @@ class $$AccountsTableTableManager extends RootTableManager<
             Value<String> fullPath = const Value.absent(),
             Value<AccountType> accountType = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
+            Value<bool?> defaultUseAssets = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               AccountsCompanion(
@@ -2969,6 +3040,7 @@ class $$AccountsTableTableManager extends RootTableManager<
             fullPath: fullPath,
             accountType: accountType,
             isActive: isActive,
+            defaultUseAssets: defaultUseAssets,
             createdAt: createdAt,
           ),
           createCompanionCallback: ({
@@ -2979,6 +3051,7 @@ class $$AccountsTableTableManager extends RootTableManager<
             required String fullPath,
             required AccountType accountType,
             Value<bool> isActive = const Value.absent(),
+            Value<bool?> defaultUseAssets = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               AccountsCompanion.insert(
@@ -2989,6 +3062,7 @@ class $$AccountsTableTableManager extends RootTableManager<
             fullPath: fullPath,
             accountType: accountType,
             isActive: isActive,
+            defaultUseAssets: defaultUseAssets,
             createdAt: createdAt,
           ),
           withReferenceMapper: (p0) => p0
