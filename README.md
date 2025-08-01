@@ -20,3 +20,5 @@ samples, guidance on mobile development, and a full API reference.
 flutter pub run build_runner build --delete-conflicting-outputs
 flutter build ios --release
 ios-deploy --bundle build/ios/iphoneos/Runner.app
+
+flutter build ios --release --flavor dev
