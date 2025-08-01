@@ -63,8 +63,14 @@ class _AddPageState extends ConsumerState<AddPage>
     } else {
       // 如果不是编辑模式，检查是否有深度链接参数
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _loadDeepLinkParams();
-        _handleTransactionType();
+        final params = ref.read(addPageParamsProvider);
+        if (params != null && !params.isEmpty) {
+          // 有URL参数，只加载深度链接参数，不执行默认账户初始化
+          _loadDeepLinkParams();
+        } else {
+          // 没有URL参数，执行默认账户初始化
+          _handleTransactionType();
+        }
       });
     }
   }
@@ -115,23 +121,18 @@ class _AddPageState extends ConsumerState<AddPage>
     if (widget.transactionType == null) return;
 
     try {
-      final accounts = await ref.read(accountRepositoryProvider).getAllAccounts();
       final selectedLedger = await ref.read(selectedLedgerProvider.future);
       
       if (selectedLedger == null) return;
       
       if (widget.transactionType == 'expense') {
-        // 支出：默认选择默认资产账户作为从账户，支出分类账户作为到账户
+        // 支出：只填充默认资产账户作为从账户，让用户自己选择支出分类账户
         final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
-        final expenseAccounts = accounts.where((a) => a.accountType == AccountType.EXPENSE).toList();
         
-        if (defaultAssetAccount != null && expenseAccounts.isNotEmpty) {
+        if (defaultAssetAccount != null) {
           final fromAccountBalance = await ref
               .read(accountRepositoryProvider)
               .getAccountBalance(defaultAssetAccount.accountId);
-          final toAccountBalance = await ref
-              .read(accountRepositoryProvider)
-              .getAccountBalance(expenseAccounts.first.accountId);
               
           if (mounted) {
             setState(() {
@@ -141,37 +142,21 @@ class _AddPageState extends ConsumerState<AddPage>
               amount: fromAccountBalance,
               type: defaultAssetAccount.accountType,
             );
-            _toAccount = Account(
-              id: expenseAccounts.first.accountId,
-              name: expenseAccounts.first.accountName,
-              amount: toAccountBalance,
-              type: expenseAccounts.first.accountType,
-            );
             _transactionFlowType = _calculateTransactionFlowType();
             });
           }
         }
       } else if (widget.transactionType == 'income') {
-        // 收入：默认选择收入分类账户作为从账户，默认资产账户作为到账户
-        final incomeAccounts = accounts.where((a) => a.accountType == AccountType.INCOME).toList();
+        // 收入：只填充默认资产账户作为到账户，让用户自己选择收入分类账户
         final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
         
-        if (incomeAccounts.isNotEmpty && defaultAssetAccount != null) {
-          final fromAccountBalance = await ref
-              .read(accountRepositoryProvider)
-              .getAccountBalance(incomeAccounts.first.accountId);
+        if (defaultAssetAccount != null) {
           final toAccountBalance = await ref
               .read(accountRepositoryProvider)
               .getAccountBalance(defaultAssetAccount.accountId);
               
           if (mounted) {
             setState(() {
-              _fromAccount = Account(
-                id: incomeAccounts.first.accountId,
-                name: incomeAccounts.first.accountName,
-                amount: fromAccountBalance,
-                type: incomeAccounts.first.accountType,
-              );
               _toAccount = Account(
                 id: defaultAssetAccount.accountId,
                 name: defaultAssetAccount.accountName,
