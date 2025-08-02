@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/database_sync_service.dart';
 import '../services/webdav_config.dart';
 import '../utils/global_refresh_service.dart';
+import '../components/sync_status_widget.dart';
+import '../utils/file_time_utils.dart';
 
 enum ConflictAction {
   cancel,
@@ -27,6 +29,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   bool _isSyncing = false;
   String _syncStatus = '';
   DateTime? _lastSyncTime;
+  
+  // 新增：状态信息
+  SyncStatusInfo _statusInfo = const SyncStatusInfo();
+  bool _isLoadingStatus = false;
 
   @override
   void initState() {
@@ -77,6 +83,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             backgroundColor: Colors.green,
           ),
         );
+        
+        // 配置保存后立即更新同步状态
+        _loadSyncStatus();
       }
     } catch (e) {
       if (mounted) {
@@ -138,25 +147,91 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   }
 
   Future<void> _loadSyncStatus() async {
+    setState(() {
+      _isLoadingStatus = true;
+    });
+
     try {
       final config = await WebDAVConfig.load();
       if (!config.isValid) {
+        setState(() {
+          _statusInfo = const SyncStatusInfo(
+            statusMessage: '请先配置WebDAV服务器',
+          );
+          _isLoadingStatus = false;
+        });
         return;
       }
 
       final webdavClient = config.createClient();
       final syncService = DatabaseSyncService(webdavClient: webdavClient);
-      final syncStatus = await syncService.getSyncStatus();
+      
+      // 获取本地数据库文件时间和大小
+      final databasePath = await syncService.getDatabaseFilePath();
+      final localTime = await FileTimeUtils.getLocalDatabaseTime(databasePath);
+      int? localSize;
+      if (localTime != null) {
+        final dbFile = await syncService.getDatabaseFile();
+        final stat = await dbFile.stat();
+        localSize = stat.size;
+      }
+
+      // 获取服务器文件信息
+      DateTime? remoteTime;
+      int? remoteSize;
+      try {
+        final remoteFileInfo = await webdavClient.getFileInfo(syncService.remoteDatabasePath);
+        if (remoteFileInfo != null) {
+          remoteTime = remoteFileInfo.lastModified;
+          remoteSize = remoteFileInfo.size;
+        }
+      } catch (e) {
+        print('[WebdavConfig] 获取服务器文件信息失败: $e');
+      }
+
+      // 获取上次同步时间
       final lastSyncTime = await syncService.getLastSyncTime();
 
       setState(() {
+        _statusInfo = SyncStatusInfo(
+          localFileTime: localTime,
+          remoteFileTime: remoteTime,
+          lastSyncTime: lastSyncTime,
+          localFileSize: localSize,
+          remoteFileSize: remoteSize,
+          statusMessage: _getSyncStatusMessage(localTime, remoteTime),
+        );
         _lastSyncTime = lastSyncTime;
-        _syncStatus = syncStatus.message;
+        _isLoadingStatus = false;
       });
     } catch (e) {
       setState(() {
-        _syncStatus = '获取同步状态失败: $e';
+        _statusInfo = SyncStatusInfo(
+          statusMessage: '获取同步状态失败: $e',
+        );
+        _isLoadingStatus = false;
       });
+    }
+  }
+
+  String _getSyncStatusMessage(DateTime? localTime, DateTime? remoteTime) {
+    if (localTime == null && remoteTime == null) {
+      return '未找到数据库文件';
+    }
+    if (localTime == null) {
+      return '服务器有新数据，建议下载';
+    }
+    if (remoteTime == null) {
+      return '本地有数据，建议上传到服务器';
+    }
+
+    final comparison = FileTimeUtils.compareTime(localTime, remoteTime);
+    if (comparison > 0) {
+      return '本地数据较新，建议上传';
+    } else if (comparison < 0) {
+      return '服务器数据较新，建议下载';
+    } else {
+      return '数据已同步';
     }
   }
 
@@ -692,6 +767,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // 新的同步状态显示组件
+                SyncStatusWidget(
+                  statusInfo: _statusInfo.copyWith(isLoading: _isLoadingStatus),
+                ),
+                const SizedBox(height: 16),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -699,53 +779,13 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '数据同步',
+                          '同步操作',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 16),
-                        if (_lastSyncTime != null)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.info_outline,
-                                    color: Colors.blue.shade600, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '最后同步时间: ${_formatDateTime(_lastSyncTime!)}',
-                                        style: TextStyle(
-                                          color: Colors.blue.shade700,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      if (_syncStatus.isNotEmpty)
-                                        Text(
-                                          _syncStatus,
-                                          style: TextStyle(
-                                            color: Colors.blue.shade600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (_lastSyncTime != null) const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(

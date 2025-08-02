@@ -20,6 +20,9 @@ class DatabaseSyncService {
     return 'flowm-app/$_databaseFileName';
   }
 
+  // 公共方法：获取远程数据库路径
+  String get remoteDatabasePath => _remoteDatabasePath;
+
   // 获取数据库文件路径
   Future<String> getDatabaseFilePath() async {
     final dbFolder = await getApplicationDocumentsDirectory();

@@ -13,7 +13,10 @@
       "mcp__ide__getDiagnostics",
       "Bash(flutter run:*)",
       "Bash(flutter pub:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(find:*)",
+      "Bash(flutter clean)",
+      "Bash(flutter analyze lib/services/auto_sync_service.dart)"
     ],
     "deny": []
   }

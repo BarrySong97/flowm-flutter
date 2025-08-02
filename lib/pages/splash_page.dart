@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../state/database/database_provider.dart';
 import '../utils/web_message_sender.dart';
+import '../services/auto_sync_service.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -27,6 +28,11 @@ class _SplashPageState extends ConsumerState<SplashPage>
   String _displayText = '数据初始化中...';
   String _subtitleText = '正在准备您的财务数据';
   bool _hasNavigated = false;
+  
+  // 新增：同步相关状态
+  bool _isSyncing = false;
+  String _syncProgress = '';
+  bool _hasSyncError = false;
 
   @override
   void initState() {
@@ -116,7 +122,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
     _titleController.forward();
   }
 
-  void _handleDatabaseInitialization(bool isInitialized) {
+  void _handleDatabaseInitialization(bool isInitialized) async {
     if (isInitialized && !_isInitialized && !_hasNavigated) {
       setState(() {
         _isInitialized = true;
@@ -124,18 +130,189 @@ class _SplashPageState extends ConsumerState<SplashPage>
         _subtitleText = '智能财务管理';
       });
 
-      // 数据已初始化，等待一段时间后跳转
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted && !_hasNavigated) {
-          _hasNavigated = true;
-          if (kIsWeb) {
-            // 在Web环境下发送消息
-            sendWebMessage('app_ready', '*');
+      // 数据库初始化完成后，检查是否需要同步
+      await _checkStartupSync();
+
+      // 等待一段时间后跳转（如果没有同步操作）
+      if (!_isSyncing && !_hasNavigated) {
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          _navigateToMain();
+        });
+      }
+    }
+  }
+
+  /// 检查启动时同步
+  Future<void> _checkStartupSync() async {
+    try {
+      setState(() {
+        _isSyncing = true;
+        _syncProgress = '检查同步状态...';
+        _subtitleText = _syncProgress;
+      });
+
+      final checkResult = await AutoSyncService.checkStartupSync();
+      
+      if (!checkResult.shouldSync) {
+        // 不需要同步
+        print('[SplashPage] 不需要同步: ${checkResult.message}');
+        setState(() {
+          _isSyncing = false;
+          _subtitleText = '智能财务管理';
+        });
+        return;
+      }
+
+      if (checkResult.direction == SyncDirection.conflict) {
+        // 有冲突，需要用户选择
+        setState(() {
+          _isSyncing = false;
+          _subtitleText = '检测到数据冲突';
+        });
+        await _showConflictDialog(checkResult);
+        return;
+      }
+
+      // 执行同步
+      final success = await AutoSyncService.executeStartupSync(
+        checkResult,
+        ref,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _syncProgress = progress;
+              _subtitleText = progress;
+            });
           }
-          context.go('/');
+        },
+      );
+
+      setState(() {
+        _isSyncing = false;
+        if (success) {
+          _subtitleText = '同步完成';
+        } else {
+          _subtitleText = '同步失败，使用本地数据';
+          _hasSyncError = true;
         }
       });
+
+      // 同步完成后跳转
+      if (mounted && !_hasNavigated) {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          _navigateToMain();
+        });
+      }
+
+    } catch (e) {
+      print('[SplashPage] 同步检查失败: $e');
+      setState(() {
+        _isSyncing = false;
+        _subtitleText = '同步检查失败，使用本地数据';
+        _hasSyncError = true;
+      });
+      
+      // 错误情况下也要跳转
+      if (mounted && !_hasNavigated) {
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          _navigateToMain();
+        });
+      }
     }
+  }
+
+  /// 显示冲突对话框
+  Future<void> _showConflictDialog(SyncCheckResult checkResult) async {
+    if (!mounted) return;
+
+    final action = await showDialog<SyncDirection>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('数据同步冲突'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('本地和服务器的数据都有更新，请选择如何处理：'),
+            const SizedBox(height: 16),
+            if (checkResult.conflict != null) ...[
+              Text('本地文件: ${_formatDateTime(checkResult.conflict!.localModified)}'),
+              Text('文件大小: ${_formatFileSize(checkResult.conflict!.localSize)}'),
+              const SizedBox(height: 8),
+              Text('服务器文件: ${_formatDateTime(checkResult.conflict!.remoteModified)}'),
+              Text('文件大小: ${_formatFileSize(checkResult.conflict!.remoteSize)}'),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.none),
+            child: const Text('跳过同步'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.download),
+            child: const Text('使用服务器数据'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.upload),
+            child: const Text('使用本地数据'),
+          ),
+        ],
+      ),
+    );
+
+    if (action != null && action != SyncDirection.none) {
+      // 执行用户选择的同步操作
+      setState(() {
+        _isSyncing = true;
+        _syncProgress = action == SyncDirection.download ? '正在下载服务器数据...' : '正在上传本地数据...';
+        _subtitleText = _syncProgress;
+      });
+
+      final success = await AutoSyncService.forcSync(ref, action);
+      
+      setState(() {
+        _isSyncing = false;
+        _subtitleText = success ? '同步完成' : '同步失败';
+        _hasSyncError = !success;
+      });
+    } else {
+      setState(() {
+        _subtitleText = '跳过同步，使用本地数据';
+      });
+    }
+
+    // 冲突处理完成后跳转
+    if (mounted && !_hasNavigated) {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        _navigateToMain();
+      });
+    }
+  }
+
+  /// 导航到主页面
+  void _navigateToMain() {
+    if (_hasNavigated) return;
+    
+    _hasNavigated = true;
+    if (kIsWeb) {
+      sendWebMessage('app_ready', '*');
+    }
+    context.go('/');
+  }
+
+  /// 格式化日期时间
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 格式化文件大小
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   void _handleDatabaseError() {
@@ -259,26 +436,4 @@ class _SplashPageState extends ConsumerState<SplashPage>
     );
   }
 
-  Widget _buildDot(int index) {
-    return AnimatedBuilder(
-      animation: _fadeController,
-      builder: (context, child) {
-        // 创建一个延迟的动画效果
-        final delay = index * 0.2;
-        final progress = (_fadeController.value - delay).clamp(0.0, 1.0);
-
-        return Transform.scale(
-          scale: progress,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
