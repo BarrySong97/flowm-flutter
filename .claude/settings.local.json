@@ -16,7 +16,8 @@
       "Bash(rm:*)",
       "Bash(find:*)",
       "Bash(flutter clean)",
-      "Bash(flutter analyze lib/services/auto_sync_service.dart)"
+      "Bash(flutter analyze lib/services/auto_sync_service.dart)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../state/database/database_provider.dart';
 import '../utils/web_message_sender.dart';
 import '../services/auto_sync_service.dart';
+import '../services/webdav_config.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -142,6 +143,22 @@ class _SplashPageState extends ConsumerState<SplashPage>
     }
   }
 
+  /// 检查是否曾经同步过
+  Future<bool> _checkIfEverSynced() async {
+    try {
+      final lastSyncTime = await WebDAVConfig.getLastSyncTime();
+      final lastLocalHash = await WebDAVConfig.getLastLocalHash();
+      final lastRemoteHash = await WebDAVConfig.getLastRemoteHash();
+      
+      return lastSyncTime != null || 
+             lastLocalHash != null || 
+             lastRemoteHash != null;
+    } catch (e) {
+      print('[SplashPage] 检查同步历史失败: $e');
+      return false;
+    }
+  }
+
   /// 检查启动时同步
   Future<void> _checkStartupSync() async {
     try {
@@ -167,9 +184,18 @@ class _SplashPageState extends ConsumerState<SplashPage>
         // 有冲突，需要用户选择
         setState(() {
           _isSyncing = false;
-          _subtitleText = '检测到数据冲突';
+          _subtitleText = '检测到数据差异';
         });
-        await _showConflictDialog(checkResult);
+        
+        // 检查是否为首次配置情况  
+        final hasEverSynced = await _checkIfEverSynced();
+        if (!hasEverSynced) {
+          // 首次配置发现云端数据
+          await _showFirstTimeDataDialog(checkResult);
+        } else {
+          // 普通冲突情况
+          await _showConflictDialog(checkResult);
+        }
         return;
       }
 
@@ -221,6 +247,102 @@ class _SplashPageState extends ConsumerState<SplashPage>
     }
   }
 
+  /// 显示首次配置数据发现对话框
+  Future<void> _showFirstTimeDataDialog(SyncCheckResult checkResult) async {
+    if (!mounted) return;
+
+    final action = await showDialog<SyncDirection>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.cloud_download, color: Colors.blue, size: 24),
+            SizedBox(width: 8),
+            Text('发现云端数据'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '云端已有数据文件，这可能是：',
+              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+            ),
+            SizedBox(height: 12),
+            _buildOptionRow(Icons.phone_android, '您在其他设备上的数据'),
+            _buildOptionRow(Icons.backup, '之前的备份数据'),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '推荐选择"下载云端数据"以避免数据丢失',
+                      style: TextStyle(
+                        color: Colors.blue.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (checkResult.conflict != null) ...[
+              SizedBox(height: 16),
+              Text(
+                '文件信息：',
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '云端文件: ${_formatDateTime(checkResult.conflict!.remoteModified)}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+              Text(
+                '文件大小: ${_formatFileSize(checkResult.conflict!.remoteSize)}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.none),
+            child: Text(
+              '暂不同步',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.upload),
+            child: Text('使用本地数据\n(覆盖云端)'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(SyncDirection.download),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('下载云端数据\n(推荐)'),
+          ),
+        ],
+      ),
+    );
+
+    await _handleSyncAction(action);
+  }
+
   /// 显示冲突对话框
   Future<void> _showConflictDialog(SyncCheckResult checkResult) async {
     if (!mounted) return;
@@ -262,6 +384,28 @@ class _SplashPageState extends ConsumerState<SplashPage>
       ),
     );
 
+    await _handleSyncAction(action);
+  }
+
+  /// 构建选项行
+  Widget _buildOptionRow(IconData icon, String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade600),
+          SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 处理同步动作
+  Future<void> _handleSyncAction(SyncDirection? action) async {
     if (action != null && action != SyncDirection.none) {
       // 执行用户选择的同步操作
       setState(() {
@@ -424,6 +568,45 @@ class _SplashPageState extends ConsumerState<SplashPage>
                   ),
                 ),
               ),
+              
+              // 同步状态指示器
+              if (_isSyncing)
+                Container(
+                  margin: const EdgeInsets.only(top: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color.fromRGBO(12, 12, 48, 0.6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _syncProgress,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color.fromRGBO(12, 12, 48, 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              // 同步错误提示
+              if (_hasSyncError && !_isSyncing)
+                Container(
+                  margin: const EdgeInsets.only(top: 20),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
+                ),
               // 主要Logo区域
 
               // 底部空间

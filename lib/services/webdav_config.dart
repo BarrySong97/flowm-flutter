@@ -8,6 +8,7 @@ class WebDAVConfig {
   static const String _lastSyncTimeKey = 'last_sync_time';
   static const String _lastLocalHashKey = 'last_local_hash';
   static const String _lastRemoteHashKey = 'last_remote_hash';
+  static const String _firstConfigTimeKey = 'first_config_time';
 
   final String url;
   final String username;
@@ -37,6 +38,14 @@ class WebDAVConfig {
   // 保存配置到 SharedPreferences
   Future<void> save() async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // 检查是否为首次配置
+    final firstConfigTime = prefs.getInt(_firstConfigTimeKey);
+    if (firstConfigTime == null) {
+      // 记录首次配置时间
+      await prefs.setInt(_firstConfigTimeKey, DateTime.now().millisecondsSinceEpoch);
+    }
+    
     await prefs.setString(_urlKey, url);
     await prefs.setString(_usernameKey, username);
     await prefs.setString(_passwordKey, password);
@@ -58,6 +67,7 @@ class WebDAVConfig {
     await prefs.remove(_urlKey);
     await prefs.remove(_usernameKey);
     await prefs.remove(_passwordKey);
+    await prefs.remove(_firstConfigTimeKey);
     await clearSyncStatus();
   }
 
@@ -91,6 +101,25 @@ class WebDAVConfig {
   static Future<String?> getLastRemoteHash() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_lastRemoteHashKey);
+  }
+
+  // 获取首次配置时间
+  static Future<DateTime?> getFirstConfigTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final timestamp = prefs.getInt(_firstConfigTimeKey);
+    return timestamp != null ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null;
+  }
+
+  // 设置首次配置时间（用于测试或特殊场景）
+  static Future<void> setFirstConfigTime(DateTime time) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_firstConfigTimeKey, time.millisecondsSinceEpoch);
+  }
+
+  // 检查是否为首次配置
+  static Future<bool> isFirstTimeConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_firstConfigTimeKey) == null;
   }
 
   // 清除同步状态

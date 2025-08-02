@@ -242,8 +242,10 @@ class WebDAVClient {
         final lastModifiedStr = lastModifiedMatch.group(1)!;
         final contentLength = int.parse(contentLengthMatch.group(1)!);
 
-        // 解析RFC2822格式的日期
-        final lastModified = HttpDate.parse(lastModifiedStr);
+        // 解析RFC2822格式的日期（服务器通常返回UTC时间）
+        final lastModifiedUtc = HttpDate.parse(lastModifiedStr);
+        // 转换为本地时间用于比较
+        final lastModified = lastModifiedUtc.toLocal();
 
         return WebDAVFileInfo(
           path: remotePath,

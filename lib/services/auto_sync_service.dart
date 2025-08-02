@@ -120,7 +120,20 @@ class AutoSyncService {
         remoteTime = remoteFileInfo?.lastModified;
       } catch (e) {
         print('[AutoSyncService] 获取服务器文件信息失败: $e');
-        // 服务器无文件或网络错误，如果本地有文件可以考虑上传
+        remoteTime = null; // 确保remoteTime为null表示服务器无数据或连接失败
+      }
+
+      // 检查是否曾经同步过
+      final hasEverSynced = await _hasEverSynced();
+      
+      // 如果从未同步过，进入首次配置处理流程
+      if (!hasEverSynced) {
+        print('[AutoSyncService] 检测到从未同步过，进入首次配置处理');
+        return await _handleFirstTimeSync(localTime, remoteTime, syncService);
+      }
+
+      // 已同步过的设备，检查网络连接失败的情况
+      if (remoteTime == null) {
         if (localTime != null) {
           return SyncCheckResult.upload('服务器无数据，建议上传本地数据');
         }
@@ -383,6 +396,103 @@ class AutoSyncService {
     
     // 停止网络状态监控
     NetworkService.dispose();
+  }
+
+  /// 检查是否曾经同步过
+  static Future<bool> _hasEverSynced() async {
+    try {
+      // 检查本地是否有同步历史记录
+      final lastSyncTime = await WebDAVConfig.getLastSyncTime();
+      final lastLocalHash = await WebDAVConfig.getLastLocalHash();
+      final lastRemoteHash = await WebDAVConfig.getLastRemoteHash();
+      
+      // 如果有任何同步记录，说明曾经同步过
+      return lastSyncTime != null || 
+             lastLocalHash != null || 
+             lastRemoteHash != null;
+    } catch (e) {
+      print('[AutoSyncService] 检查同步历史失败: $e');
+      // 如果检查失败，保守地认为从未同步过
+      return false;
+    }
+  }
+
+  /// 处理首次同步的情况
+  static Future<SyncCheckResult> _handleFirstTimeSync(
+    DateTime? localTime,
+    DateTime? remoteTime,
+    DatabaseSyncService syncService,
+  ) async {
+    // 情况1: 无本地无远程 - 全新安装
+    if (localTime == null && remoteTime == null) {
+      return SyncCheckResult.noSync('全新安装，无需同步');
+    }
+    
+    // 情况2: 无本地有远程 - 跨设备安装
+    if (localTime == null && remoteTime != null) {
+      return SyncCheckResult.download('检测到云端数据，建议下载');
+    }
+    
+    // 情况3: 有本地无远程 - 首次使用或网络问题
+    if (localTime != null && remoteTime == null) {
+      // 检查是否为默认数据库（通过文件创建时间判断）
+      final isRecentlyCreated = await _isRecentlyCreated(syncService);
+      if (isRecentlyCreated) {
+        return SyncCheckResult.noSync('首次安装，无需同步');
+      } else {
+        return SyncCheckResult.upload('检测到本地数据，建议上传');
+      }
+    }
+    
+    // 情况4: 有本地有远程 - 需要用户选择或智能判断
+    if (localTime != null && remoteTime != null) {
+      // 检查是否为最近创建的默认数据库
+      final isRecentlyCreated = await _isRecentlyCreated(syncService);
+      if (isRecentlyCreated) {
+        // 本地是默认数据，云端有数据，很可能是跨设备安装
+        return SyncCheckResult.download('检测到云端数据，建议下载');
+      } else {
+        // 本地有用户数据，云端也有数据，需要用户选择
+        // 构建冲突信息让用户决定
+        final dbFile = await syncService.getDatabaseFile();
+        final localStat = await dbFile.stat();
+        
+        return SyncCheckResult.conflict(SyncConflict(
+          localModified: localTime,
+          remoteModified: remoteTime,
+          localSize: localStat.size,
+          remoteSize: 0, // 暂时设为0，实际使用时会获取真实大小
+          localHash: 'unknown',
+          remoteHash: 'unknown',
+        ));
+      }
+    }
+    
+    // 默认情况，不应该到达这里
+    return SyncCheckResult.noSync('无法确定同步需求');
+  }
+  
+  /// 检查数据库文件是否为最近创建的默认文件
+  static Future<bool> _isRecentlyCreated(DatabaseSyncService syncService) async {
+    try {
+      final dbFile = await syncService.getDatabaseFile();
+      if (!await dbFile.exists()) return true;
+      
+      final stat = await dbFile.stat();
+      final fileAge = DateTime.now().difference(stat.changed);
+      
+      // 如果文件创建时间在10分钟内，认为是最近创建的默认文件
+      return fileAge.inMinutes < 10;
+    } catch (e) {
+      print('[AutoSyncService] 检查文件创建时间失败: $e');
+      // 检查失败时保守地认为不是最近创建的
+      return false;
+    }
+  }
+
+  /// 检查是否从未同步过（保留兼容性）
+  static Future<bool> _hasNeverSynced(DatabaseSyncService syncService) async {
+    return !(await _hasEverSynced());
   }
 
   /// 强制同步（用户手动触发）
