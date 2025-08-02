@@ -16,6 +16,7 @@ import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/version_page.dart';
 import 'package:flowm/pages/developer_page.dart';
 import 'package:flowm/pages/monthly_details_page.dart';
+import 'package:flowm/pages/webdav_config_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -199,6 +200,15 @@ class AppRouter {
           final month = extra?['month'] as String? ?? '未知月份';
           return SwipeablePage(
             builder: (context) => MonthlyDetailsPage(month: month),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/webdav-config',
+        name: 'webdav-config',
+        pageBuilder: (context, state) {
+          return SwipeablePage(
+            builder: (context) => const WebdavConfigPage(),
           );
         },
       ),

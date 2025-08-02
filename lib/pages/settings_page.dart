@@ -37,6 +37,20 @@ class _SettingsPageState extends State<SettingsPage> {
             spacing: 12,
             children: [
               SettingsDataSection(
+                title: '数据同步',
+                items: [
+                  SettingsDataItem(
+                    icon: Icons.cloud_sync,
+                    title: 'WebDAV配置',
+                    subtitle: '配置WebDAV服务器同步数据',
+                    showArrow: true,
+                    onTap: () {
+                      context.pushNamed('webdav-config');
+                    },
+                  ),
+                ],
+              ),
+              SettingsDataSection(
                 title: '关于',
                 items: [
                   SettingsDataItem(

@@ -69,6 +69,7 @@ dependencies:
   network_info_plus: ^5.0.0
   swipeable_page_route: ^0.4.2
   el_tooltip: ^2.0.0
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
