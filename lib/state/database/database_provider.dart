@@ -7,16 +7,29 @@ import '../../db/dao/tag_dao.dart';
 import '../../db/dao/transaction_tag_dao.dart';
 import '../../db/dao/ledger_dao.dart';
 
+/// 数据库刷新触发器
+///
+/// 用于触发数据库连接的重新建立，当该provider被invalidate时，
+/// 所有依赖它的provider都会重新创建
+final databaseRefreshTriggerProvider = StateProvider<int>((ref) => 0);
+
 /// 全局数据库实例提供者
 ///
 /// 通过Riverpod管理AppDatabase的单例实例，确保整个应用程序
 /// 只有一个数据库连接实例被创建和使用。
+/// 当databaseRefreshTriggerProvider发生变化时，会重新创建数据库连接。
 final databaseProvider = Provider<AppDatabase>((ref) {
+  // 监听刷新触发器，确保在触发器变化时重新创建数据库
+  ref.watch(databaseRefreshTriggerProvider);
+
+  print('[DatabaseProvider] 创建新的数据库连接实例');
+
   // 创建数据库实例
   final database = AppDatabase();
 
   // 确保当Provider被销毁时关闭数据库连接
   ref.onDispose(() {
+    print('[DatabaseProvider] 关闭数据库连接');
     database.close();
   });
 

@@ -11,7 +11,9 @@
       "Bash(git checkout:*)",
       "Bash(flutter pub run build_runner build:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(flutter pub:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
