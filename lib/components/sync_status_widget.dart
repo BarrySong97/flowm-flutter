@@ -10,6 +10,7 @@ class SyncStatusInfo {
   final int? remoteFileSize;
   final String statusMessage;
   final bool isLoading;
+  final String statusTitle; // 新增：状态标题，由外部提供
 
   const SyncStatusInfo({
     this.localFileTime,
@@ -18,6 +19,7 @@ class SyncStatusInfo {
     this.localFileSize,
     this.remoteFileSize,
     this.statusMessage = '未知状态',
+    this.statusTitle = '检查中...', // 默认状态标题
     this.isLoading = false,
   });
 
@@ -29,6 +31,7 @@ class SyncStatusInfo {
     int? localFileSize,
     int? remoteFileSize,
     String? statusMessage,
+    String? statusTitle,
     bool? isLoading,
   }) {
     return SyncStatusInfo(
@@ -38,41 +41,10 @@ class SyncStatusInfo {
       localFileSize: localFileSize ?? this.localFileSize,
       remoteFileSize: remoteFileSize ?? this.remoteFileSize,
       statusMessage: statusMessage ?? this.statusMessage,
+      statusTitle: statusTitle ?? this.statusTitle,
       isLoading: isLoading ?? this.isLoading,
     );
   }
-
-  /// 判断哪个文件更新
-  SyncFileStatus get fileStatus {
-    if (localFileTime == null && remoteFileTime == null) {
-      return SyncFileStatus.noFiles;
-    }
-    if (localFileTime == null) {
-      return SyncFileStatus.remoteOnly;
-    }
-    if (remoteFileTime == null) {
-      return SyncFileStatus.localOnly;
-    }
-
-    final comparison = FileTimeUtils.compareTime(localFileTime, remoteFileTime);
-    if (comparison > 0) {
-      return SyncFileStatus.localNewer;
-    } else if (comparison < 0) {
-      return SyncFileStatus.remoteNewer;
-    } else {
-      return SyncFileStatus.synchronized;
-    }
-  }
-}
-
-/// 文件同步状态枚举
-enum SyncFileStatus {
-  noFiles,      // 无文件
-  localOnly,    // 仅本地有文件
-  remoteOnly,   // 仅服务器有文件
-  localNewer,   // 本地更新
-  remoteNewer,  // 服务器更新
-  synchronized, // 已同步
 }
 
 /// 同步状态显示组件
@@ -130,7 +102,6 @@ class SyncStatusWidget extends StatelessWidget {
           label: '本地文件',
           time: statusInfo.localFileTime,
           size: statusInfo.localFileSize,
-          isNewer: statusInfo.fileStatus == SyncFileStatus.localNewer,
         ),
         const SizedBox(height: 8),
         _buildTimeRow(
@@ -138,7 +109,6 @@ class SyncStatusWidget extends StatelessWidget {
           label: '服务器文件',
           time: statusInfo.remoteFileTime,
           size: statusInfo.remoteFileSize,
-          isNewer: statusInfo.fileStatus == SyncFileStatus.remoteNewer,
         ),
         const SizedBox(height: 8),
         _buildTimeRow(
@@ -156,21 +126,12 @@ class SyncStatusWidget extends StatelessWidget {
     required String label,
     DateTime? time,
     int? size,
-    bool isNewer = false,
     bool isSync = false,
   }) {
     Color getStatusColor() {
       if (isSync) return Colors.blue.shade600;
       if (time == null) return Colors.grey.shade600;
-      if (isNewer) return Colors.green.shade600;
-      return Colors.orange.shade600;
-    }
-
-    String getStatusIcon() {
-      if (isSync) return '⏰';
-      if (time == null) return '❌';
-      if (isNewer) return '🟢';
-      return '🟡';
+      return Colors.grey.shade700;
     }
 
     return Row(
@@ -188,11 +149,6 @@ class SyncStatusWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          getStatusIcon(),
-          style: const TextStyle(fontSize: 12),
-        ),
-        const SizedBox(width: 4),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +159,6 @@ class SyncStatusWidget extends StatelessWidget {
                     : '无文件',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: isNewer ? FontWeight.w600 : FontWeight.normal,
                   color: getStatusColor(),
                 ),
               ),
@@ -223,18 +178,48 @@ class SyncStatusWidget extends StatelessWidget {
   }
 
   Widget _buildStatusSection() {
+    // 根据状态消息确定显示样式
+    Color statusColor = Colors.blue.shade700;
+    Color backgroundColor = Colors.blue.shade50;
+    Color borderColor = Colors.blue.shade200;
+    IconData statusIcon = Icons.info_outline;
+    
+    // 根据关键词判断状态类型
+    final message = statusInfo.statusMessage.toLowerCase();
+    if (message.contains('错误') || message.contains('失败')) {
+      statusColor = Colors.red.shade700;
+      backgroundColor = Colors.red.shade50;
+      borderColor = Colors.red.shade200;
+      statusIcon = Icons.error_outline;
+    } else if (message.contains('上传') || message.contains('本地')) {
+      statusColor = Colors.green.shade700;
+      backgroundColor = Colors.green.shade50;
+      borderColor = Colors.green.shade200;
+      statusIcon = Icons.cloud_upload_outlined;
+    } else if (message.contains('下载') || message.contains('服务器')) {
+      statusColor = Colors.orange.shade700;
+      backgroundColor = Colors.orange.shade50;
+      borderColor = Colors.orange.shade200;
+      statusIcon = Icons.cloud_download_outlined;
+    } else if (message.contains('已同步') || message.contains('无需')) {
+      statusColor = Colors.green.shade700;
+      backgroundColor = Colors.green.shade50;
+      borderColor = Colors.green.shade200;
+      statusIcon = Icons.check_circle_outline;
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _getStatusBackgroundColor(),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _getStatusBorderColor()),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           Icon(
-            _getStatusIcon(),
-            color: _getStatusColor(),
+            statusIcon,
+            color: statusColor,
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -243,9 +228,9 @@ class SyncStatusWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _getStatusTitle(),
+                  statusInfo.statusTitle,
                   style: TextStyle(
-                    color: _getStatusColor(),
+                    color: statusColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -254,7 +239,7 @@ class SyncStatusWidget extends StatelessWidget {
                   Text(
                     statusInfo.statusMessage,
                     style: TextStyle(
-                      color: _getStatusColor().withValues(alpha: 0.8),
+                      color: statusColor.withValues(alpha: 0.8),
                       fontSize: 12,
                     ),
                   ),
@@ -264,82 +249,5 @@ class SyncStatusWidget extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _getStatusTitle() {
-    switch (statusInfo.fileStatus) {
-      case SyncFileStatus.noFiles:
-        return '未找到数据文件';
-      case SyncFileStatus.localOnly:
-        return '本地有未同步更改';
-      case SyncFileStatus.remoteOnly:
-        return '服务器有新数据';
-      case SyncFileStatus.localNewer:
-        return '本地有未同步更改';
-      case SyncFileStatus.remoteNewer:
-        return '服务器有新数据';
-      case SyncFileStatus.synchronized:
-        return '数据已同步';
-    }
-  }
-
-  IconData _getStatusIcon() {
-    switch (statusInfo.fileStatus) {
-      case SyncFileStatus.noFiles:
-        return Icons.warning_outlined;
-      case SyncFileStatus.localOnly:
-      case SyncFileStatus.localNewer:
-        return Icons.cloud_upload_outlined;
-      case SyncFileStatus.remoteOnly:
-      case SyncFileStatus.remoteNewer:
-        return Icons.cloud_download_outlined;
-      case SyncFileStatus.synchronized:
-        return Icons.check_circle_outline;
-    }
-  }
-
-  Color _getStatusColor() {
-    switch (statusInfo.fileStatus) {
-      case SyncFileStatus.noFiles:
-        return Colors.orange.shade700;
-      case SyncFileStatus.localOnly:
-      case SyncFileStatus.localNewer:
-        return Colors.blue.shade700;
-      case SyncFileStatus.remoteOnly:
-      case SyncFileStatus.remoteNewer:
-        return Colors.green.shade700;
-      case SyncFileStatus.synchronized:
-        return Colors.green.shade700;
-    }
-  }
-
-  Color _getStatusBackgroundColor() {
-    switch (statusInfo.fileStatus) {
-      case SyncFileStatus.noFiles:
-        return Colors.orange.shade50;
-      case SyncFileStatus.localOnly:
-      case SyncFileStatus.localNewer:
-        return Colors.blue.shade50;
-      case SyncFileStatus.remoteOnly:
-      case SyncFileStatus.remoteNewer:
-        return Colors.green.shade50;
-      case SyncFileStatus.synchronized:
-        return Colors.green.shade50;
-    }
-  }
-
-  Color _getStatusBorderColor() {
-    switch (statusInfo.fileStatus) {
-      case SyncFileStatus.noFiles:
-        return Colors.orange.shade200;
-      case SyncFileStatus.localOnly:
-      case SyncFileStatus.localNewer:
-        return Colors.blue.shade200;
-      case SyncFileStatus.remoteOnly:
-      case SyncFileStatus.remoteNewer:
-        return Colors.green.shade200;
-      case SyncFileStatus.synchronized:
-        return Colors.green.shade200;
-    }
   }
 }

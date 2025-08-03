@@ -123,6 +123,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     });
 
     try {
+      // 检查是否为首次配置（测试前先获取当前配置）
+      final previousConfig = await WebDAVConfig.load();
+      final isFirstTimeConfig = !previousConfig.isValid;
+
       final config = WebDAVConfig(
         url: _urlController.text.trim(),
         username: _usernameController.text.trim(),
@@ -133,12 +137,34 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       final success = await webdavClient.testConnection();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? '连接测试成功' : '连接测试失败'),
-            backgroundColor: success ? Colors.green : Colors.red,
-          ),
-        );
+        if (success) {
+          // 测试成功后自动保存配置
+          await config.save();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('连接测试成功，配置已保存'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+          
+          // 保存成功后立即更新同步状态
+          await _loadSyncStatus();
+          
+          // 如果是首次配置，弹出初始同步选择对话框
+          if (isFirstTimeConfig) {
+            _showInitialSyncDialog();
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('连接测试失败'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -167,6 +193,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         setState(() {
           _statusInfo = const SyncStatusInfo(
             statusMessage: '请先配置WebDAV服务器',
+            statusTitle: '未配置',
           );
           _isLoadingStatus = false;
         });
@@ -206,6 +233,23 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       // 获取上次同步时间
       final lastSyncTime = await syncService.getLastSyncTime();
 
+      // 根据 AutoSyncService 的分析结果确定状态标题
+      String statusTitle = '同步状态';
+      switch (syncCheckResult.direction) {
+        case SyncDirection.download:
+          statusTitle = '服务器有新数据';
+          break;
+        case SyncDirection.upload:
+          statusTitle = '本地有未同步更改';
+          break;
+        case SyncDirection.conflict:
+          statusTitle = '检测到同步冲突';
+          break;
+        case SyncDirection.none:
+          statusTitle = '数据已同步';
+          break;
+      }
+
       setState(() {
         _statusInfo = SyncStatusInfo(
           localFileTime: localTime,
@@ -216,6 +260,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           statusMessage: syncCheckResult.hasError 
               ? syncCheckResult.errorMessage ?? '检查失败'
               : syncCheckResult.message,
+          statusTitle: statusTitle,
         );
         _lastSyncTime = lastSyncTime;
         _isLoadingStatus = false;
@@ -224,6 +269,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       setState(() {
         _statusInfo = SyncStatusInfo(
           statusMessage: '获取同步状态失败: $e',
+          statusTitle: '检查失败',
         );
         _isLoadingStatus = false;
       });
