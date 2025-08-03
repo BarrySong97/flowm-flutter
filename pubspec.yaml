@@ -72,6 +72,7 @@ dependencies:
   shared_preferences: ^2.3.2
   http: ^1.1.0
   crypto: ^3.0.3
+  watcher: ^1.1.0
 
 dev_dependencies:
   flutter_test:

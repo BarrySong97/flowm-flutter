@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:watcher/watcher.dart';
 import '../services/database_sync_service.dart';
 import '../services/webdav_config.dart';
 import '../services/network_service.dart';
@@ -84,8 +86,12 @@ class AutoSyncService {
   // 同步状态管理
   static bool _isSyncing = false;
   static Timer? _uploadTimer;
-  static Timer? _dbWatcher;
+  static Timer? _dbWatcher; // 保留作为回退机制
   static DateTime? _lastSyncCheck;
+
+  // 文件系统监听器
+  static DirectoryWatcher? _fileWatcher;
+  static StreamSubscription? _watcherSubscription;
 
   // 防抖延迟时间（秒）
   static const int _debounceDelaySeconds = 3;
@@ -331,7 +337,7 @@ class AutoSyncService {
 
   /// 场景B：开始监听数据库变化（运行时自动上传）
   static void startDatabaseWatcher(WidgetRef ref) {
-    if (_dbWatcher != null) {
+    if (_fileWatcher != null || _dbWatcher != null) {
       return; // 已经在监听
     }
 
@@ -340,10 +346,62 @@ class AutoSyncService {
     // 开始网络状态监控
     NetworkService.initialize();
 
-    // 这里先用定时检查的方式，后续可以改为文件系统监听
-    _dbWatcher = Timer.periodic(const Duration(seconds: 30), (timer) {
-      _checkDatabaseChanges(ref);
-    });
+    // 尝试启动文件系统监听，失败则回退到定时检查
+    _startFileSystemWatcher(ref);
+  }
+
+  /// 启动文件系统监听器
+  static Future<void> _startFileSystemWatcher(WidgetRef ref) async {
+    try {
+      // 获取WebDAV配置来创建同步服务
+      final config = await WebDAVConfig.load();
+      if (!config.isValid) {
+        print('[AutoSyncService] WebDAV未配置，跳过文件监听');
+        return;
+      }
+      
+      final webdavClient = config.createClient();
+      final syncService = DatabaseSyncService(webdavClient: webdavClient);
+      final databasePath = await syncService.getDatabaseFilePath();
+      final dbFile = File(databasePath);
+      final dbDirectory = dbFile.parent;
+      
+      print('[AutoSyncService] 启动文件系统监听: ${dbDirectory.path}');
+      
+      _fileWatcher = DirectoryWatcher(dbDirectory.path);
+      _watcherSubscription = _fileWatcher!.events
+          .where((event) => 
+              event.path.endsWith('.sqlite') && 
+              event.type == ChangeType.MODIFY)
+          .listen((event) {
+            print('[AutoSyncService] 检测到数据库文件变化: ${event.path}');
+            scheduleUpload(ref);
+          }, onError: (error) {
+            print('[AutoSyncService] 文件监听器错误: $error，切换到定时检查');
+            _fallbackToPeriodicCheck(ref);
+          });
+          
+      print('[AutoSyncService] 文件系统监听已启动');
+    } catch (e) {
+      print('[AutoSyncService] 文件系统监听启动失败: $e，使用定时检查作为回退');
+      _fallbackToPeriodicCheck(ref);
+    }
+  }
+
+  /// 回退到定时检查机制
+  static void _fallbackToPeriodicCheck(WidgetRef ref) {
+    // 清理文件监听器
+    _watcherSubscription?.cancel();
+    _watcherSubscription = null;
+    _fileWatcher = null;
+    
+    // 启动定时检查作为回退机制
+    if (_dbWatcher == null) {
+      print('[AutoSyncService] 启动定时检查回退机制（30秒轮询）');
+      _dbWatcher = Timer.periodic(const Duration(seconds: 30), (timer) {
+        _checkDatabaseChanges(ref);
+      });
+    }
   }
 
   /// 检查数据库变化
@@ -434,10 +492,17 @@ class AutoSyncService {
   /// 停止监听
   static void stopWatcher() {
     print('[AutoSyncService] 停止数据库文件监听');
+    
+    // 停止文件系统监听
+    _watcherSubscription?.cancel();
+    _watcherSubscription = null;
+    _fileWatcher = null;
 
+    // 停止定时检查
     _dbWatcher?.cancel();
     _dbWatcher = null;
 
+    // 停止上传定时器
     _uploadTimer?.cancel();
     _uploadTimer = null;
 

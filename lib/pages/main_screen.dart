@@ -12,6 +12,7 @@ import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/common/add_bottom_sheet.dart';
 import 'package:flowm/state/home/page_controller_provider.dart';
+import 'package:flowm/services/auto_sync_service.dart';
 
 // Provider for MainScreen's selected tab index
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
@@ -65,12 +66,19 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     // 初始化app_links深度链接监听
     _initAppLinks();
+    
+    // 启动数据库文件监听（自动同步功能）
+    AutoSyncService.startDatabaseWatcher(ref);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _linkSubscription?.cancel();
+    
+    // 停止数据库文件监听
+    AutoSyncService.stopWatcher();
+    
     super.dispose();
   }
 
