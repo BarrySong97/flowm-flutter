@@ -29,7 +29,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
   String _displayText = '数据初始化中...';
   String _subtitleText = '正在准备您的财务数据';
   bool _hasNavigated = false;
-  
+
   // 新增：同步相关状态
   bool _isSyncing = false;
   String _syncProgress = '';
@@ -149,10 +149,10 @@ class _SplashPageState extends ConsumerState<SplashPage>
       final lastSyncTime = await WebDAVConfig.getLastSyncTime();
       final lastLocalHash = await WebDAVConfig.getLastLocalHash();
       final lastRemoteHash = await WebDAVConfig.getLastRemoteHash();
-      
-      return lastSyncTime != null || 
-             lastLocalHash != null || 
-             lastRemoteHash != null;
+
+      return lastSyncTime != null ||
+          lastLocalHash != null ||
+          lastRemoteHash != null;
     } catch (e) {
       print('[SplashPage] 检查同步历史失败: $e');
       return false;
@@ -169,7 +169,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
       });
 
       final checkResult = await AutoSyncService.checkStartupSync();
-      
+
       if (!checkResult.shouldSync) {
         // 不需要同步
         print('[SplashPage] 不需要同步: ${checkResult.message}');
@@ -186,8 +186,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
           _isSyncing = false;
           _subtitleText = '检测到数据差异';
         });
-        
-        // 检查是否为首次配置情况  
+
+        // 检查是否为首次配置情况
         final hasEverSynced = await _checkIfEverSynced();
         if (!hasEverSynced) {
           // 首次配置发现云端数据
@@ -229,7 +229,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
           _navigateToMain();
         });
       }
-
     } catch (e) {
       print('[SplashPage] 同步检查失败: $e');
       setState(() {
@@ -237,7 +236,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
         _subtitleText = '同步检查失败，使用本地数据';
         _hasSyncError = true;
       });
-      
+
       // 错误情况下也要跳转
       if (mounted && !_hasNavigated) {
         Future.delayed(const Duration(milliseconds: 1000), () {
@@ -283,7 +282,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade700, size: 20),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -359,11 +359,14 @@ class _SplashPageState extends ConsumerState<SplashPage>
             const Text('本地和服务器的数据都有更新，请选择如何处理：'),
             const SizedBox(height: 16),
             if (checkResult.conflict != null) ...[
-              Text('本地文件: ${_formatDateTime(checkResult.conflict!.localModified)}'),
+              Text(
+                  '本地文件: ${_formatDateTime(checkResult.conflict!.localModified)}'),
               Text('文件大小: ${_formatFileSize(checkResult.conflict!.localSize)}'),
               const SizedBox(height: 8),
-              Text('服务器文件: ${_formatDateTime(checkResult.conflict!.remoteModified)}'),
-              Text('文件大小: ${_formatFileSize(checkResult.conflict!.remoteSize)}'),
+              Text(
+                  '服务器文件: ${_formatDateTime(checkResult.conflict!.remoteModified)}'),
+              Text(
+                  '文件大小: ${_formatFileSize(checkResult.conflict!.remoteSize)}'),
             ],
           ],
         ),
@@ -410,12 +413,13 @@ class _SplashPageState extends ConsumerState<SplashPage>
       // 执行用户选择的同步操作
       setState(() {
         _isSyncing = true;
-        _syncProgress = action == SyncDirection.download ? '正在下载服务器数据...' : '正在上传本地数据...';
+        _syncProgress =
+            action == SyncDirection.download ? '正在下载服务器数据...' : '正在上传本地数据...';
         _subtitleText = _syncProgress;
       });
 
       final success = await AutoSyncService.forcSync(ref, action);
-      
+
       setState(() {
         _isSyncing = false;
         _subtitleText = success ? '同步完成' : '同步失败';
@@ -438,7 +442,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
   /// 导航到主页面
   void _navigateToMain() {
     if (_hasNavigated) return;
-    
+
     _hasNavigated = true;
     if (kIsWeb) {
       sendWebMessage('app_ready', '*');
@@ -568,7 +572,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                   ),
                 ),
               ),
-              
+
               // 同步状态指示器
               if (_isSyncing)
                 Container(
@@ -596,7 +600,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                     ],
                   ),
                 ),
-              
+
               // 同步错误提示
               if (_hasSyncError && !_isSyncing)
                 Container(
@@ -618,5 +622,4 @@ class _SplashPageState extends ConsumerState<SplashPage>
       ),
     );
   }
-
 }

@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'webdav_client.dart';
+import '../utils/etag_utils.dart';
+import '../models/sync_record.dart';
 
 class WebDAVConfig {
   static const String _urlKey = 'webdav_url';
@@ -8,6 +10,7 @@ class WebDAVConfig {
   static const String _lastSyncTimeKey = 'last_sync_time';
   static const String _lastLocalHashKey = 'last_local_hash';
   static const String _lastRemoteHashKey = 'last_remote_hash';
+  static const String _lastRemoteEtagKey = 'last_remote_etag';
   static const String _firstConfigTimeKey = 'first_config_time';
 
   final String url;
@@ -71,17 +74,26 @@ class WebDAVConfig {
     await clearSyncStatus();
   }
 
-  // 保存同步状态
+  // 保存同步状态（支持 ETag 优先）
   static Future<void> saveSyncStatus({
     required String localHash,
-    required String remoteHash,
+    String? remoteEtag,
+    String? remoteHash,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
     
     await prefs.setInt(_lastSyncTimeKey, now);
     await prefs.setString(_lastLocalHashKey, localHash);
-    await prefs.setString(_lastRemoteHashKey, remoteHash);
+    
+    // 优先保存 ETag，如果有效的话
+    if (remoteEtag != null && ETagUtils.isValidEtag(remoteEtag)) {
+      await prefs.setString(_lastRemoteEtagKey, ETagUtils.normalizeEtag(remoteEtag));
+      await prefs.remove(_lastRemoteHashKey); // 清除备用 Hash
+    } else if (remoteHash != null) {
+      await prefs.setString(_lastRemoteHashKey, remoteHash);
+      await prefs.remove(_lastRemoteEtagKey); // 清除 ETag
+    }
   }
 
   // 获取最后同步时间
@@ -101,6 +113,26 @@ class WebDAVConfig {
   static Future<String?> getLastRemoteHash() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_lastRemoteHashKey);
+  }
+
+  // 获取最后远程文件 ETag
+  static Future<String?> getLastRemoteEtag() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_lastRemoteEtagKey);
+  }
+
+  // 获取完整的同步记录
+  static Future<SyncRecord> getSyncRecord() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final syncTime = prefs.getInt(_lastSyncTimeKey);
+    
+    return SyncRecord(
+      lastLocalHash: prefs.getString(_lastLocalHashKey),
+      lastRemoteEtag: prefs.getString(_lastRemoteEtagKey),
+      lastRemoteHash: prefs.getString(_lastRemoteHashKey),
+      lastSyncTime: syncTime != null ? DateTime.fromMillisecondsSinceEpoch(syncTime) : null,
+    );
   }
 
   // 获取首次配置时间
@@ -128,6 +160,7 @@ class WebDAVConfig {
     await prefs.remove(_lastSyncTimeKey);
     await prefs.remove(_lastLocalHashKey);
     await prefs.remove(_lastRemoteHashKey);
+    await prefs.remove(_lastRemoteEtagKey);
   }
 
   // 复制并修改配置

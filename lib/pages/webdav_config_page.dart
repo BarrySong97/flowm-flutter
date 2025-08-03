@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/database_sync_service.dart';
 import '../services/webdav_config.dart';
+import '../services/auto_sync_service.dart';
 import '../utils/global_refresh_service.dart';
 import '../components/sync_status_widget.dart';
 import '../utils/file_time_utils.dart';
@@ -68,6 +69,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     });
 
     try {
+      // 检查是否为首次配置（保存前先获取当前配置）
+      final previousConfig = await WebDAVConfig.load();
+      final isFirstTimeConfig = !previousConfig.isValid;
+
       final config = WebDAVConfig(
         url: _urlController.text.trim(),
         username: _usernameController.text.trim(),
@@ -85,7 +90,12 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         );
         
         // 配置保存后立即更新同步状态
-        _loadSyncStatus();
+        await _loadSyncStatus();
+        
+        // 如果是首次配置，弹出初始同步选择对话框
+        if (isFirstTimeConfig) {
+          _showInitialSyncDialog();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -163,6 +173,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         return;
       }
 
+      // 使用 AutoSyncService 的分析逻辑
+      final syncCheckResult = await AutoSyncService.checkStartupSync();
+      
+      // 获取文件时间和大小信息用于显示
       final webdavClient = config.createClient();
       final syncService = DatabaseSyncService(webdavClient: webdavClient);
       
@@ -199,7 +213,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           lastSyncTime: lastSyncTime,
           localFileSize: localSize,
           remoteFileSize: remoteSize,
-          statusMessage: _getSyncStatusMessage(localTime, remoteTime),
+          statusMessage: syncCheckResult.hasError 
+              ? syncCheckResult.errorMessage ?? '检查失败'
+              : syncCheckResult.message,
         );
         _lastSyncTime = lastSyncTime;
         _isLoadingStatus = false;
@@ -211,27 +227,6 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         );
         _isLoadingStatus = false;
       });
-    }
-  }
-
-  String _getSyncStatusMessage(DateTime? localTime, DateTime? remoteTime) {
-    if (localTime == null && remoteTime == null) {
-      return '未找到数据库文件';
-    }
-    if (localTime == null) {
-      return '服务器有新数据，建议下载';
-    }
-    if (remoteTime == null) {
-      return '本地有数据，建议上传到服务器';
-    }
-
-    final comparison = FileTimeUtils.compareTime(localTime, remoteTime);
-    if (comparison > 0) {
-      return '本地数据较新，建议上传';
-    } else if (comparison < 0) {
-      return '服务器数据较新，建议下载';
-    } else {
-      return '数据已同步';
     }
   }
 
@@ -576,6 +571,152 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       ),
     );
     return result ?? false;
+  }
+
+  Future<void> _showInitialSyncDialog() async {
+    // 首先进行同步检查以获取智能建议
+    final syncCheckResult = await AutoSyncService.checkStartupSync();
+    
+    if (!mounted) return; // 检查组件是否仍然挂载
+    
+    String recommendation = '';
+    Color recommendationColor = Colors.blue;
+    IconData recommendationIcon = Icons.info_outline;
+    
+    // 根据检查结果给出智能建议
+    switch (syncCheckResult.direction) {
+      case SyncDirection.download:
+        recommendation = '建议：检测到服务器有新数据，推荐下载';
+        recommendationColor = Colors.orange;
+        recommendationIcon = Icons.cloud_download;
+        break;
+      case SyncDirection.upload:
+        recommendation = '建议：检测到本地有数据，推荐上传';
+        recommendationColor = Colors.green;
+        recommendationIcon = Icons.cloud_upload;
+        break;
+      case SyncDirection.conflict:
+        recommendation = '注意：本地和服务器都有数据，请谨慎选择';
+        recommendationColor = Colors.red;
+        recommendationIcon = Icons.warning;
+        break;
+      case SyncDirection.none:
+        recommendation = '提示：数据已同步，可选择跳过';
+        recommendationColor = Colors.blue;
+        recommendationIcon = Icons.check_circle;
+        break;
+    }
+
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false, // 不允许点击外部关闭
+      builder: (context) => AlertDialog(
+        title: const Text('初始同步'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('WebDAV配置已完成！请选择如何进行初始数据同步：'),
+            const SizedBox(height: 16),
+            
+            // 显示当前同步状态
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      syncCheckResult.message,
+                      style: TextStyle(
+                        color: Colors.blue.shade800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // 显示智能建议
+            if (recommendation.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: recommendationColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: recommendationColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(recommendationIcon, color: recommendationColor, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        recommendation,
+                        style: TextStyle(
+                          color: recommendationColor.withValues(alpha: 0.8),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
+            const Text(
+              '• 下载：从服务器获取数据到本地\n'
+              '• 上传：将本地数据上传到服务器\n'
+              '• 跳过：稍后手动同步',
+              style: TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('skip'),
+            child: const Text('跳过'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('upload'),
+            style: TextButton.styleFrom(
+              backgroundColor: syncCheckResult.direction == SyncDirection.upload 
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : null,
+            ),
+            child: const Text('上传'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop('download'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: syncCheckResult.direction == SyncDirection.download 
+                  ? Colors.orange 
+                  : null,
+            ),
+            child: const Text('下载'),
+          ),
+        ],
+      ),
+    );
+
+    // 根据用户选择执行相应操作
+    if (result != null && result != 'skip') {
+      if (result == 'download') {
+        await _downloadDatabase();
+      } else if (result == 'upload') {
+        await _uploadDatabase();
+      }
+    }
   }
 
   Future<ConflictAction> _showConflictDialog(SyncConflict conflict) async {

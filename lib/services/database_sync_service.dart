@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'webdav_client.dart';
 import 'webdav_config.dart';
+import '../utils/etag_utils.dart';
 
 class DatabaseSyncService {
   static const String _databaseFileName = 'flowm_database.sqlite';
@@ -113,15 +114,33 @@ class DatabaseSyncService {
         print('[DatabaseSyncService] 强制上传模式，跳过冲突检测');
         
         final uploadStartTime = DateTime.now();
-        final success = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
+        final uploadResult = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
         final uploadEndTime = DateTime.now();
         final uploadDuration = uploadEndTime.difference(uploadStartTime);
         print('[DatabaseSyncService] 强制上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
 
-        if (success) {
-          // 快速更新同步记录
+        if (uploadResult.success) {
+          // 优先使用上传返回的 ETag，如果没有则重新获取
           final localHash = await calculateFileHash(dbFile);
-          await _updateSyncRecord(localHash, localHash);
+          String? remoteEtag = uploadResult.etag;
+          
+          if (remoteEtag == null || !ETagUtils.isValidEtag(remoteEtag)) {
+            // 重新获取文件信息以获得 ETag
+            try {
+              final uploadedFileInfo = await webdavClient.getFileInfo(_remoteDatabasePath);
+              remoteEtag = uploadedFileInfo?.etag;
+            } catch (e) {
+              print('[DatabaseSyncService] 获取上传后文件信息失败: $e');
+            }
+          }
+          
+          // 更新同步记录
+          if (ETagUtils.isValidEtag(remoteEtag)) {
+            await _updateSyncRecord(localHash, remoteEtag: remoteEtag);
+          } else {
+            // 如果获取 ETag 失败，使用 Hash 作为备用
+            await _updateSyncRecord(localHash, remoteHash: localHash);
+          }
 
           final totalDuration = DateTime.now().difference(startTime);
           print('[DatabaseSyncService] 强制上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
@@ -157,14 +176,32 @@ class DatabaseSyncService {
 
       // 执行上传
       final uploadStartTime = DateTime.now();
-      final success = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
+      final uploadResult = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
       final uploadEndTime = DateTime.now();
       final uploadDuration = uploadEndTime.difference(uploadStartTime);
       print('[DatabaseSyncService] 上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
 
-      if (success) {
+      if (uploadResult.success) {
+        // 优先使用上传返回的 ETag，如果没有则重新获取
+        String? remoteEtag = uploadResult.etag;
+        
+        if (remoteEtag == null || !ETagUtils.isValidEtag(remoteEtag)) {
+          // 重新获取文件信息以获得 ETag
+          try {
+            final uploadedFileInfo = await webdavClient.getFileInfo(_remoteDatabasePath);
+            remoteEtag = uploadedFileInfo?.etag;
+          } catch (e) {
+            print('[DatabaseSyncService] 获取上传后文件信息失败: $e');
+          }
+        }
+        
         // 更新同步记录
-        await _updateSyncRecord(localHash, localHash);
+        if (ETagUtils.isValidEtag(remoteEtag)) {
+          await _updateSyncRecord(localHash, remoteEtag: remoteEtag);
+        } else {
+          // 如果获取 ETag 失败，使用 Hash 作为备用
+          await _updateSyncRecord(localHash, remoteHash: localHash);
+        }
 
         final totalDuration = DateTime.now().difference(startTime);
         print('[DatabaseSyncService] 上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
@@ -245,10 +282,10 @@ class DatabaseSyncService {
         final writeDuration = writeEndTime.difference(writeStartTime);
         print('[DatabaseSyncService] 写入本地文件完成，耗时: ${writeDuration.inMilliseconds}ms');
 
-        // 快速更新同步记录（使用远程文件信息，避免重新计算哈希）
+        // 快速更新同步记录（使用远程文件的 ETag 信息）
         onProgress?.call('正在更新记录...');
         final remoteHash = md5.convert(remoteData).toString();
-        await _updateSyncRecord(remoteHash, remoteHash);
+        await _updateSyncRecord(remoteHash, remoteEtag: remoteFileInfo.etag);
 
         final totalDuration = DateTime.now().difference(startTime);
         print('[DatabaseSyncService] 强制下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
@@ -318,7 +355,7 @@ class DatabaseSyncService {
       
       // 只计算一次哈希用于同步记录
       final remoteHash = md5.convert(remoteData).toString();
-      await _updateSyncRecord(remoteHash, remoteHash);
+      await _updateSyncRecord(remoteHash, remoteEtag: remoteFileInfo.etag);
       
       final writeEndTime = DateTime.now();
       final writeDuration = writeEndTime.difference(writeStartTime);
@@ -343,79 +380,153 @@ class DatabaseSyncService {
     }
   }
 
-  // 检测同步冲突
+  // 检测同步冲突（基于 ETag/Hash）
   Future<SyncConflict?> detectConflict(
       String localHash, WebDAVFileInfo remoteFileInfo) async {
     try {
-      final lastLocalHash = await WebDAVConfig.getLastLocalHash();
-      final lastRemoteHash = await WebDAVConfig.getLastRemoteHash();
-
-      // 快速检查：如果没有上次同步记录，不算冲突
-      if (lastLocalHash == null || lastRemoteHash == null) {
+      print('[DatabaseSyncService] 开始基于 ETag/Hash 的冲突检测');
+      
+      // 1. 获取上次同步记录
+      final syncRecord = await WebDAVConfig.getSyncRecord();
+      
+      // 2. 快速检查：如果没有有效的同步记录，不算冲突（首次同步场景）
+      if (!syncRecord.hasValidRecord) {
+        print('[DatabaseSyncService] 无有效同步记录，不算冲突');
         return null;
       }
-
-      // 快速检查：如果本地文件没有变化，不算冲突
-      if (localHash == lastLocalHash) {
+      
+      // 3. 检查本地文件是否有变化
+      final localChanged = syncRecord.lastLocalHash != localHash;
+      print('[DatabaseSyncService] 本地文件是否变化: $localChanged');
+      
+      // 4. 检查远程文件是否有变化
+      bool remoteChanged = false;
+      String? currentRemoteAnchor;
+      
+      // 优先使用 ETag 进行比较
+      if (ETagUtils.isValidEtag(remoteFileInfo.etag)) {
+        final normalizedEtag = ETagUtils.normalizeEtag(remoteFileInfo.etag);
+        currentRemoteAnchor = normalizedEtag;
+        
+        if (syncRecord.lastRemoteEtag != null) {
+          final lastNormalizedEtag = ETagUtils.normalizeEtag(syncRecord.lastRemoteEtag);
+          remoteChanged = !ETagUtils.etagEquals(normalizedEtag, lastNormalizedEtag);
+          print('[DatabaseSyncService] 使用 ETag 比较，远程是否变化: $remoteChanged');
+        } else {
+          // 如果上次同步没有 ETag 记录，但现在有，说明远程可能有变化
+          remoteChanged = true;
+          print('[DatabaseSyncService] 上次无 ETag 记录，现在有，认为远程有变化');
+        }
+      } else {
+        // 降级到 Hash 比较，需要下载文件
+        print('[DatabaseSyncService] ETag 不可用，降级到 Hash 比较');
+        try {
+          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          final remoteHash = md5.convert(remoteData).toString();
+          currentRemoteAnchor = remoteHash;
+          
+          if (syncRecord.lastRemoteHash != null) {
+            remoteChanged = remoteHash != syncRecord.lastRemoteHash;
+            print('[DatabaseSyncService] 使用 Hash 比较，远程是否变化: $remoteChanged');
+          } else {
+            // 如果上次同步没有 Hash 记录，但现在有，说明远程可能有变化
+            remoteChanged = true;
+            print('[DatabaseSyncService] 上次无 Hash 记录，现在有，认为远程有变化');
+          }
+        } catch (e) {
+          print('[DatabaseSyncService] 下载远程文件计算 Hash 失败: $e');
+          // 如果无法获取远程哈希，保守地认为有冲突
+          remoteChanged = true;
+          currentRemoteAnchor = 'unknown';
+        }
+      }
+      
+      // 5. 冲突判断：只有本地和远程都有变化时才算冲突
+      if (!localChanged && !remoteChanged) {
+        print('[DatabaseSyncService] 双方都没变化，无冲突');
         return null;
-      }
-
-      // 只有在确实需要时才下载远程文件计算哈希
-      // 先基于文件大小和修改时间做快速判断
-      final dbFile = await getDatabaseFile();
-      final localStat = await dbFile.stat();
-      
-      // 如果文件大小和上次记录的相同，且本地有变化，可能有冲突
-      // 但避免立即下载，先检查时间戳
-      final timeDiff = remoteFileInfo.lastModified.difference(localStat.modified).abs();
-      
-      // 如果时间差小于5秒，可能是同一次操作，不算冲突
-      if (timeDiff.inSeconds < 5) {
+      } else if (localChanged && !remoteChanged) {
+        print('[DatabaseSyncService] 仅本地变化，无冲突');
         return null;
+      } else if (!localChanged && remoteChanged) {
+        print('[DatabaseSyncService] 仅远程变化，无冲突');
+        return null;
+      } else {
+        // 双方都有变化，检查内容是否相同
+        if (currentRemoteAnchor != 'unknown' && 
+            currentRemoteAnchor == localHash) {
+          print('[DatabaseSyncService] 双方变化但内容相同，无冲突');
+          return null;
+        }
+        
+        print('[DatabaseSyncService] 双方都有变化且内容不同，存在冲突');
+        return await _buildSyncConflict(localHash, remoteFileInfo, currentRemoteAnchor);
       }
-
-      // 只有在真正需要时才下载远程文件计算哈希
-      print('[DatabaseSyncService] 需要下载远程文件进行冲突检测');
-      final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
-      final remoteHash = md5.convert(remoteData).toString();
-
-      // 检查远程是否有变化
-      final remoteChanged = remoteHash != lastRemoteHash;
-      
-      // 只有本地和远程都有变化，且哈希不同，才是真正的冲突
-      if (remoteChanged && localHash != remoteHash) {
-        return SyncConflict(
-          localModified: localStat.modified,
-          remoteModified: remoteFileInfo.lastModified,
-          localSize: localStat.size,
-          remoteSize: remoteFileInfo.size,
-          localHash: localHash,
-          remoteHash: remoteHash,
-        );
-      }
-
-      return null;
     } catch (e) {
-      print('[DatabaseSyncService] 冲突检测出错，为安全起见报告冲突: $e');
-      // 如果检测冲突失败，谨慎起见返回冲突
+      print('[DatabaseSyncService] 冲突检测过程出错，为安全起见报告冲突: $e');
+      // 如果检测过程失败，保守地返回冲突
+      return await _buildSyncConflict(localHash, remoteFileInfo, 'unknown');
+    }
+  }
+  
+  // 构建冲突信息
+  Future<SyncConflict> _buildSyncConflict(
+    String localHash, 
+    WebDAVFileInfo remoteFileInfo, 
+    String? remoteAnchor
+  ) async {
+    try {
       final dbFile = await getDatabaseFile();
       final localStat = await dbFile.stat();
-
+      
+      // 如果远程锚点是 Hash 格式，直接使用；否则尝试计算
+      String remoteHash = remoteAnchor ?? 'unknown';
+      if (remoteAnchor == null || remoteAnchor == 'unknown') {
+        try {
+          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          remoteHash = md5.convert(remoteData).toString();
+        } catch (e) {
+          print('[DatabaseSyncService] 构建冲突信息时获取远程哈希失败: $e');
+          remoteHash = 'unknown';
+        }
+      } else if (ETagUtils.isValidEtag(remoteAnchor)) {
+        // 如果远程锚点是 ETag，需要下载文件计算 Hash
+        try {
+          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          remoteHash = md5.convert(remoteData).toString();
+        } catch (e) {
+          print('[DatabaseSyncService] 从 ETag 转换为 Hash 失败: $e');
+          remoteHash = remoteAnchor; // 使用 ETag 作为标识
+        }
+      }
+      
       return SyncConflict(
         localModified: localStat.modified,
         remoteModified: remoteFileInfo.lastModified,
         localSize: localStat.size,
         remoteSize: remoteFileInfo.size,
         localHash: localHash,
-        remoteHash: 'unknown',
+        remoteHash: remoteHash,
+      );
+    } catch (e) {
+      print('[DatabaseSyncService] 构建冲突信息失败: $e');
+      // 返回基本冲突信息
+      return SyncConflict(
+        localModified: DateTime.now(),
+        remoteModified: remoteFileInfo.lastModified,
+        localSize: 0,
+        remoteSize: remoteFileInfo.size,
+        localHash: localHash,
+        remoteHash: remoteAnchor ?? 'unknown',
       );
     }
   }
 
-  // 更新同步记录
-  Future<void> _updateSyncRecord(String localHash, String remoteHash) async {
+  // 更新同步记录（支持 ETag）
+  Future<void> _updateSyncRecord(String localHash, {String? remoteEtag, String? remoteHash}) async {
     await WebDAVConfig.saveSyncStatus(
       localHash: localHash,
+      remoteEtag: remoteEtag,
       remoteHash: remoteHash,
     );
   }

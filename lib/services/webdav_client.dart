@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../utils/etag_utils.dart';
 
 class WebDAVClient {
   final String baseUrl;
@@ -117,7 +118,7 @@ class WebDAVClient {
   }
 
   // 上传文件
-  Future<bool> uploadFile(String remotePath, File localFile) async {
+  Future<WebDAVUploadResult> uploadFile(String remotePath, File localFile) async {
     try {
       if (!await localFile.exists()) {
         throw Exception('本地文件不存在: ${localFile.path}');
@@ -147,7 +148,27 @@ class WebDAVClient {
           .timeout(timeout);
 
       if (response.statusCode == 201 || response.statusCode == 204) {
-        return true;
+        // 尝试从响应头中提取 ETag
+        String? etag = response.headers['etag'];
+        
+        // 如果响应头中没有 ETag，尝试重新获取文件信息
+        if (etag == null || !ETagUtils.isValidEtag(etag)) {
+          print('[WebDAVClient] 上传响应中未找到有效 ETag，尝试重新获取文件信息');
+          try {
+            final fileInfo = await getFileInfo(remotePath);
+            etag = fileInfo?.etag;
+          } catch (e) {
+            print('[WebDAVClient] 重新获取文件信息失败: $e');
+          }
+        }
+        
+        final normalizedEtag = ETagUtils.normalizeEtag(etag);
+        print('[WebDAVClient] 上传成功，获取到 ETag: "$etag" → "$normalizedEtag"');
+        
+        return WebDAVUploadResult(
+          success: true,
+          etag: normalizedEtag.isNotEmpty ? normalizedEtag : null,
+        );
       } else {
         throw Exception('上传失败: HTTP ${response.statusCode} - ${response.body}');
       }
@@ -188,6 +209,7 @@ class WebDAVClient {
   <D:prop>
     <D:displayname/>
     <D:getcontentlength/>
+    <D:getetag/>
     <D:getlastmodified/>
     <D:resourcetype/>
   </D:prop>
@@ -232,8 +254,13 @@ class WebDAVClient {
       // 支持多种命名空间前缀格式的XML解析
       final lastModifiedRegex =
           RegExp(r'<[dD]:getlastmodified[^>]*>([^<]+)</[dD]:getlastmodified>');
-      final contentLengthRegex =
-          RegExp(r'<[dD]:getcontentlength[^>]*>([^<]+)</[dD]:getcontentlength>');
+      final contentLengthRegex = RegExp(
+          r'<[dD]:getcontentlength[^>]*>([^<]+)</[dD]:getcontentlength>');
+      
+      // 改进的 ETag 正则表达式，支持更多格式
+      final etagRegex = RegExp(r'<[dD]:getetag[^>]*>([^<]*)</[dD]:getetag>', caseSensitive: false);
+      // 备用 ETag 正则，用于某些服务器返回的格式
+      final etagRegexAlt = RegExp(r'<etag[^>]*>([^<]*)</etag>', caseSensitive: false);
 
       final lastModifiedMatch = lastModifiedRegex.firstMatch(xmlBody);
       final contentLengthMatch = contentLengthRegex.firstMatch(xmlBody);
@@ -247,9 +274,25 @@ class WebDAVClient {
         // 转换为本地时间用于比较
         final lastModified = lastModifiedUtc.toLocal();
 
+        final etagMatch = etagRegex.firstMatch(xmlBody);
+        final etagMatchAlt = etagRegexAlt.firstMatch(xmlBody);
+        
+        // 尝试两种 ETag 格式
+        final rawEtag = etagMatch?.group(1) ?? etagMatchAlt?.group(1) ?? '';
+        
+        // 使用 ETagUtils 进行标准化处理
+        final etag = ETagUtils.normalizeEtag(rawEtag);
+        
+        print('[WebDAVClient] 解析 ETag: 原始值="$rawEtag", 标准化后="$etag"');
+        
+        // 验证 ETag 有效性
+        if (!ETagUtils.isValidEtag(etag)) {
+          print('[WebDAVClient] 警告：解析的 ETag 无效，将使用空值');
+        }
         return WebDAVFileInfo(
           path: remotePath,
           size: contentLength,
+          etag: etag,
           lastModified: lastModified,
         );
       }
@@ -319,20 +362,38 @@ class WebDAVClient {
   }
 }
 
+// WebDAV 上传结果类
+class WebDAVUploadResult {
+  final bool success;
+  final String? etag;
+
+  WebDAVUploadResult({
+    required this.success,
+    this.etag,
+  });
+
+  @override
+  String toString() {
+    return 'WebDAVUploadResult(success: $success, etag: $etag)';
+  }
+}
+
 // WebDAV 文件信息类
 class WebDAVFileInfo {
   final String path;
   final int size;
+  final String etag;
   final DateTime lastModified;
 
   WebDAVFileInfo({
     required this.path,
     required this.size,
     required this.lastModified,
+    required this.etag,
   });
 
   @override
   String toString() {
-    return 'WebDAVFileInfo(path: $path, size: $size, lastModified: $lastModified)';
+    return 'WebDAVFileInfo(path: $path, size: $size, lastModified: $lastModified, etag: $etag)';
   }
 }
