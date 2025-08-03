@@ -10,6 +10,8 @@ import '../utils/file_time_utils.dart';
 import '../utils/global_refresh_service.dart';
 import '../services/sync_analyzer.dart';
 import '../models/sync_record.dart';
+import '../components/conflict_dialog.dart';
+import '../navigation/app_router.dart';
 
 /// 同步检查结果类
 class SyncCheckResult {
@@ -474,9 +476,23 @@ class AutoSyncService {
       final result = await syncService.uploadDatabase(forceOverwrite: false);
 
       if (result.conflict != null) {
-        print('[AutoSyncService] 后台上传检测到冲突，等待应用程序显示对话框');
-        // 运行时冲突需要应用程序主动处理，这里只记录冲突信息
-        // 实际的冲突对话框将由应用程序的其他部分触发显示
+        print('[AutoSyncService] 后台上传检测到冲突，显示对话框让用户选择');
+        
+        // 使用全局上下文显示冲突对话框（使用启动模式避免Overlay问题）
+        final context = AppRouter.navigatorKey.currentContext;
+        if (context != null && context.mounted) {
+          final action = await ConflictDialogService.showConflictDialog(
+            context, 
+            result.conflict!,
+            isStartup: true, // 使用启动模式，避免Overlay依赖
+          );
+          
+          if (context.mounted) {
+            await _handleConflictAction(action, syncService, ref);
+          }
+        } else {
+          print('[AutoSyncService] 无法获取有效上下文，跳过冲突处理');
+        }
       } else if (result.success) {
         print('[AutoSyncService] 后台上传成功');
       } else {
@@ -486,6 +502,42 @@ class AutoSyncService {
       print('[AutoSyncService] 后台上传异常: $e');
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  /// 处理冲突用户选择
+  static Future<void> _handleConflictAction(
+    ConflictAction? action, 
+    DatabaseSyncService syncService, 
+    WidgetRef ref,
+  ) async {
+    if (action == null || action == ConflictAction.cancel) {
+      print('[AutoSyncService] 用户取消冲突处理');
+      return;
+    }
+    
+    try {
+      if (action == ConflictAction.useLocal) {
+        print('[AutoSyncService] 用户选择使用本地版本，强制上传');
+        final uploadResult = await syncService.uploadDatabase(forceOverwrite: true);
+        if (uploadResult.success) {
+          print('[AutoSyncService] 强制上传成功');
+        } else {
+          print('[AutoSyncService] 强制上传失败: ${uploadResult.message}');
+        }
+      } else if (action == ConflictAction.useRemote) {
+        print('[AutoSyncService] 用户选择使用服务器版本，下载覆盖本地');
+        final downloadResult = await syncService.downloadDatabase(forceOverwrite: true);
+        if (downloadResult.success) {
+          print('[AutoSyncService] 下载覆盖成功，刷新应用数据');
+          // 刷新应用数据，因为本地数据库文件被替换了
+          GlobalRefreshService.refreshAllData(ref);
+        } else {
+          print('[AutoSyncService] 下载覆盖失败: ${downloadResult.message}');
+        }
+      }
+    } catch (e) {
+      print('[AutoSyncService] 处理冲突选择时发生异常: $e');
     }
   }
 
