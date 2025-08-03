@@ -473,15 +473,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 _syncStatus = '正在刷新应用数据...';
               });
               
-              // 尝试使用实验性的轻量级刷新
-              try {
-                print('[WebdavConfig] 尝试轻量级数据刷新');
-                await GlobalRefreshService.refreshDatabaseFile(ref);
-                print('[WebdavConfig] 轻量级数据刷新成功');
-              } catch (e) {
-                print('[WebdavConfig] 轻量级刷新失败，使用完整刷新: $e');
-                GlobalRefreshService.refreshAllData(ref);
-              }
+              // 使用完整的数据库刷新，因为文件已被替换
+              GlobalRefreshService.refreshAllData(ref);
               
               final refreshEndTime = DateTime.now();
               final refreshDuration = refreshEndTime.difference(refreshStartTime);
@@ -552,15 +545,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             _syncStatus = '正在刷新应用数据...';
           });
           
-          // 尝试使用实验性的轻量级刷新
-          try {
-            print('[WebdavConfig] 尝试轻量级数据刷新');
-            await GlobalRefreshService.refreshDatabaseFile(ref);
-            print('[WebdavConfig] 轻量级数据刷新成功');
-          } catch (e) {
-            print('[WebdavConfig] 轻量级刷新失败，使用完整刷新: $e');
-            GlobalRefreshService.refreshAllData(ref);
-          }
+          // 使用完整的数据库刷新，因为文件已被替换
+          GlobalRefreshService.refreshAllData(ref);
           
           final refreshEndTime = DateTime.now();
           final refreshDuration = refreshEndTime.difference(refreshStartTime);
