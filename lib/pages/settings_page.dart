@@ -37,20 +37,6 @@ class _SettingsPageState extends State<SettingsPage> {
             spacing: 12,
             children: [
               SettingsDataSection(
-                title: '数据同步',
-                items: [
-                  SettingsDataItem(
-                    icon: Icons.cloud_sync,
-                    title: 'WebDAV配置',
-                    subtitle: '配置WebDAV服务器同步数据',
-                    showArrow: true,
-                    onTap: () {
-                      context.pushNamed('webdav-config');
-                    },
-                  ),
-                ],
-              ),
-              SettingsDataSection(
                 title: '关于',
                 items: [
                   SettingsDataItem(
@@ -68,6 +54,29 @@ class _SettingsPageState extends State<SettingsPage> {
                     showArrow: true,
                     onTap: () {
                       context.pushNamed('developer');
+                    },
+                  ),
+                ],
+              ),
+              SettingsDataSection(
+                title: '系统设置',
+                items: [
+                  SettingsDataItem(
+                    icon: Icons.cloud_sync,
+                    title: 'WebDAV配置',
+                    subtitle: '配置WebDAV服务器同步数据',
+                    showArrow: true,
+                    onTap: () {
+                      context.pushNamed('webdav-config');
+                    },
+                  ),
+                  SettingsDataItem(
+                    icon: Icons.manage_accounts,
+                    title: '账户管理',
+                    subtitle: '管理应用账户',
+                    showArrow: true,
+                    onTap: () {
+                      context.pushNamed('accountManagement');
                     },
                   ),
                 ],

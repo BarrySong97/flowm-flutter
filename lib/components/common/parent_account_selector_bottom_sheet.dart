@@ -8,12 +8,14 @@ class ParentAccountSelectorBottomSheet extends ConsumerStatefulWidget {
   final String title;
   final AccountSelectorType accountType;
   final Account? selectedAccount;
+  final bool onlyShowRootAccounts; // 只显示根节点账户
 
   const ParentAccountSelectorBottomSheet({
     super.key,
     required this.title,
     required this.accountType,
     this.selectedAccount,
+    this.onlyShowRootAccounts = false,
   });
 
   static Future<Account?> show(
@@ -21,6 +23,7 @@ class ParentAccountSelectorBottomSheet extends ConsumerStatefulWidget {
     required String title,
     required AccountSelectorType accountType,
     Account? selectedAccount,
+    bool onlyShowRootAccounts = false,
   }) {
     return showModalBottomSheet<Account>(
       context: context,
@@ -32,6 +35,7 @@ class ParentAccountSelectorBottomSheet extends ConsumerStatefulWidget {
         title: title,
         accountType: accountType,
         selectedAccount: selectedAccount,
+        onlyShowRootAccounts: onlyShowRootAccounts,
       ),
     );
   }
@@ -147,6 +151,7 @@ class _ParentAccountSelectorBottomSheetState
           Navigator.of(context).pop(selectedAccount);
         },
         isRootLevel: true, // 标记为根级别账户
+        onlyShowRootAccounts: widget.onlyShowRootAccounts,
       );
     }).toList();
   }
@@ -157,12 +162,14 @@ class _ParentAccountItem extends StatefulWidget {
   final Account? selectedAccount;
   final void Function(Account account) onTap;
   final bool isRootLevel; // 是否为根级别账户
+  final bool onlyShowRootAccounts; // 只显示根节点账户
 
   const _ParentAccountItem({
     required this.account,
     this.selectedAccount,
     required this.onTap,
     this.isRootLevel = false,
+    this.onlyShowRootAccounts = false,
   });
 
   @override
@@ -178,8 +185,16 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
         widget.account.children != null && widget.account.children!.isNotEmpty;
     final bool isSelected = widget.selectedAccount?.id == widget.account.id;
     
-    // 判断是否可以选择：只允许选择一级账户（根级别账户）
-    final bool canSelect = widget.isRootLevel;
+    // 判断是否可以选择的逻辑
+    bool canSelect;
+    if (widget.onlyShowRootAccounts) {
+      // 如果只显示根节点，则只允许选择一级账户（根级别账户）
+      // 确保账户树只有两层：只有一级节点才能被选为父账户，二级节点不能被选择
+      canSelect = widget.isRootLevel;
+    } else {
+      // 原有逻辑：只允许选择根级别账户
+      canSelect = widget.isRootLevel;
+    }
 
     if (hasChildren) {
       return Container(
@@ -217,6 +232,7 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
                   selectedAccount: widget.selectedAccount,
                   onTap: widget.onTap,
                   isRootLevel: false, // 子账户不是根级别
+                  onlyShowRootAccounts: widget.onlyShowRootAccounts,
                 ),
               );
             }).toList(),
