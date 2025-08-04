@@ -265,7 +265,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '长按账户拖拽到其他账户上，可将其变成子账户，最多2层结构；点击账户可以编辑',
+                      '点击展开按钮查看子账户，点击账户名称进行编辑；长按拖拽账户到其他账户上可重组结构，最多支持2层账户',
                       style: TextStyle(
                           color: Colors.blue,
                           fontSize: 14,
@@ -607,8 +607,6 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                   ),
                 ),
               ),
-            ] else if (depth == 0) ...[
-              const SizedBox(width: 44), // 占位空间，仅对顶级账户
             ],
             
             // 账户图标
