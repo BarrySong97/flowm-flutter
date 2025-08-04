@@ -12,7 +12,7 @@ import '../components/common/account_selector_bottom_sheet.dart';
 
 // 树形节点数据模型，基于真实的Account数据
 class TreeNode {
-  final account_ui.Account account;
+  account_ui.Account account;
   bool isExpanded;
   List<TreeNode> children;
   TreeNode? parent;
@@ -54,7 +54,7 @@ class AccountManagementPage extends ConsumerStatefulWidget {
 }
 
 class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   List<TreeNode> treeData = [];
   int? _dragOverNodeId;
   String _insertPosition = 'none'; // 'above', 'below', 'inside', 'none'
@@ -75,6 +75,9 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
 
   // 保存展开状态
   final Map<int, bool> _expandedState = {};
+
+  // 排序状态
+  bool _isAscending = true;
 
   @override
   void initState() {
@@ -339,107 +342,192 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    // 使用类似assets_page的CustomScrollView结构
+    return CustomScrollView(
+      slivers: [
+        // 排序控制区域
+        SliverPadding(
+          padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$category列表',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black54,
+                  ),
+                ),
+                GestureDetector(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 4,
+                    children: [
+                      Icon(
+                        _isAscending
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      Text(
+                        _isAscending ? '升序' : '降序',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _isAscending = !_isAscending;
+                    });
+                  },
+                )
+              ],
+            ),
+          ),
+        ),
+        // 账户列表
+        SliverPadding(
+          padding: const EdgeInsets.only(
+              top: 16, bottom: 16.0, left: 16, right: 16),
+          sliver: _buildAccountSliverList(accounts),
+        ),
+      ],
+    );
+  }
+
+  /// 构建账户Sliver列表 
+  SliverList _buildAccountSliverList(List<TreeNode> accounts) {
+    final double totalTopLevelAmount = accounts
+        .fold(0.0, (sum, node) => sum + node.account.amount.abs());
+
+    // 直接在原有节点上更新百分比信息，避免创建新对象导致状态丢失
+    for (var node in accounts) {
+      double percentage = totalTopLevelAmount == 0
+          ? 0.0
+          : (node.account.amount.abs() / totalTopLevelAmount) * 100;
+      
+      // 更新账户的百分比信息
+      node.account = account_ui.Account(
+        id: node.account.id,
+        name: node.account.name,
+        amount: node.account.amount,
+        type: node.account.type,
+        icon: node.account.icon,
+        children: node.account.children,
+        currencySymbol: node.account.currencySymbol,
+        percentage: percentage,
+      );
+    }
+
+    // 根据排序状态排序（直接排序原数组，保持TreeNode对象不变）
+    accounts.sort((a, b) {
+      if (_isAscending) {
+        return a.account.amount.compareTo(b.account.amount);
+      } else {
+        return b.account.amount.compareTo(a.account.amount);
+      }
+    });
+
+    return SliverList.builder(
       itemCount: accounts.length,
       itemBuilder: (context, index) {
-        return _buildTreeNode(accounts[index], 0);
+        final node = accounts[index];
+        return _buildEnhancedTreeNode(node, 0);
       },
     );
   }
 
-  Widget _buildTreeNode(TreeNode node, int depth) {
+  Widget _buildEnhancedTreeNode(TreeNode node, int depth) {
     return Column(
-      key: ValueKey(node.id),
       children: [
-        Container(
-          margin: EdgeInsets.only(
-            bottom: 12,
-            left: depth > 0 ? 24 : 0,
-          ),
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            elevation: depth == 0 ? 2 : 1,
-            shadowColor: Colors.black.withValues(alpha: 0.05),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                border: depth > 0
-                    ? Border.all(
-                        color: Colors.grey.withValues(alpha: 0.2), width: 1)
-                    : null,
+        // 主账户项，使用AccountItem样式但支持拖拽
+        _buildAccountItemWithDrag(node, depth),
+        // 展开的子账户 - 只有顶级账户(depth == 0)才能展开，仅高度动画
+        if (depth == 0 && node.children.isNotEmpty)
+          ClipRect(
+            child: AnimatedAlign(
+              alignment: Alignment.topCenter,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              heightFactor: node.isExpanded ? 1.0 : 0.0,
+              widthFactor: 1.0, // 宽度保持不变
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: node.children.map((child) {
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+                    child: _buildAccountItemWithDrag(child, depth + 1),
+                  );
+                }).toList(),
               ),
-              child: GestureDetector(
-                onTap: () {
-                  _showAccountUpdateBottomSheet(node);
-                },
-                child: node.children.isEmpty
-                    ? LongPressDraggable<TreeNode>(
-                        data: node,
-                        feedback: Material(
-                          elevation: 8,
-                          borderRadius: BorderRadius.circular(6),
-                          shadowColor: Colors.black.withValues(alpha: 0.2),
-                          child: Container(
-                            width: MediaQuery.of(context).size.width - 64,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(6),
-                              color: Colors.white,
-                            ),
-                            child: _buildNodeContent(node, depth,
-                                isDragging: true),
-                          ),
-                        ),
-                        childWhenDragging: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: Colors.grey.withValues(alpha: 0.5),
-                              width: 2,
-                              style: BorderStyle.solid,
-                            ),
-                          ),
-                          child: _buildNodeContent(node, depth,
-                              isPlaceholder: true),
-                        ),
-                        child: _buildDragTarget(node, depth),
-                      )
-                    : _buildDragTarget(node, depth), // 有子账户时不允许拖拽
-              ),
-            ),
-          ),
-        ),
-        if (node.isExpanded && depth == 0)
-          // 子账户容器
-          Container(
-            margin: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Column(
-              children: node.children
-                  .map(
-                    (child) => _buildTreeNode(child, depth + 1),
-                  )
-                  .toList(),
             ),
           ),
       ],
     );
   }
 
-  Widget _buildDragTarget(TreeNode node, int depth) {
+  Widget _buildAccountItemWithDrag(TreeNode node, int depth) {
+    bool canDrag = node.children.isEmpty; // 只有没有子节点的账户可以拖拽
+
+    Widget accountCard = Card(
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      elevation: depth == 0 ? 2 : 1,
+      shadowColor: Colors.black.withValues(alpha: 0.05),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+      child: _buildAccountRowContent(node, depth),
+    );
+
+    if (canDrag) {
+      return LongPressDraggable<TreeNode>(
+        data: node,
+        feedback: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(8),
+          shadowColor: Colors.black.withValues(alpha: 0.2),
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width - 64,
+            child: Card(
+              margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+              child: _buildAccountRowContent(node, depth, isDragging: true),
+            ),
+          ),
+        ),
+        childWhenDragging: Card(
+          margin: const EdgeInsets.symmetric(vertical: 4.0),
+          elevation: 0,
+          color: Colors.grey.withValues(alpha: 0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+            side: BorderSide(
+              color: Colors.grey.withValues(alpha: 0.5),
+              width: 2,
+            ),
+          ),
+          child: _buildAccountRowContent(node, depth, isPlaceholder: true),
+        ),
+        child: _buildDragTargetWrapper(accountCard, node, depth),
+      );
+    } else {
+      return _buildDragTargetWrapper(accountCard, node, depth);
+    }
+  }
+
+  Widget _buildDragTargetWrapper(Widget child, TreeNode node, int depth) {
     return DragTarget<TreeNode>(
       onWillAcceptWithDetails: (details) {
         final draggedNode = details.data;
-        if (draggedNode.id == node.id) {
-          return false;
-        }
-
-        // 检查层级限制
         return _canAcceptDrop(draggedNode, node, depth);
       },
       onAcceptWithDetails: (details) {
-        _handleDrop(details.data, node, _insertPosition);
+        _handleDrop(details.data, node, 'inside');
         setState(() {
           _dragOverNodeId = null;
           _insertPosition = 'none';
@@ -461,20 +549,153 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: isHovered && _insertPosition == 'inside'
-                ? Colors.blue.withValues(alpha: 0.08)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             border: isHovered && _insertPosition == 'inside'
                 ? Border.all(
-                    color: canAccept ? Colors.blue : Colors.red, width: 2)
+                    color: canAccept ? Colors.blue : Colors.red, 
+                    width: 2,
+                  )
                 : null,
           ),
-          child: _buildNodeContent(node, depth),
+          child: child,
         );
       },
     );
   }
+
+  Widget _buildAccountRowContent(TreeNode node, int depth, {bool isDragging = false, bool isPlaceholder = false}) {
+    bool hasChildren = node.children.isNotEmpty;
+    
+    return InkWell(
+      onTap: () {
+        if (depth == 0 && hasChildren) {
+          setState(() {
+            node.isExpanded = !node.isExpanded;
+          });
+        } else {
+          _showAccountUpdateBottomSheet(node);
+        }
+      },
+      onLongPress: (depth == 0 && hasChildren) ? () => _showAccountUpdateBottomSheet(node) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            // 展开/折叠按钮 - 只有顶级账户(depth == 0)且有子账户时才显示
+            if (depth == 0 && hasChildren) ...[
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    node.isExpanded = !node.isExpanded;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: AnimatedRotation(
+                    turns: node.isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 300),
+                    child: Icon(
+                      Icons.expand_more,
+                      color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ] else if (depth == 0) ...[
+              const SizedBox(width: 44), // 占位空间，仅对顶级账户
+            ],
+            
+            // 账户图标
+            if (node.account.icon != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  node.account.icon,
+                  size: 20,
+                  color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
+                ),
+              ),
+            ],
+            
+            // 账户名称和金额
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    node.account.name,
+                    style: TextStyle(
+                      fontSize: depth == 0 ? 16 : 15,
+                      fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
+                      color: isPlaceholder ? Colors.grey : Colors.black87,
+                    ),
+                  ),
+                  if (node.account.percentage != null && depth == 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${node.account.percentage!.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            
+            // 金额显示
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${node.account.currencySymbol}${node.account.amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: depth == 0 ? 16 : 15,
+                    fontWeight: FontWeight.w600,
+                    color: isPlaceholder 
+                        ? Colors.grey 
+                        : node.account.amount >= 0 
+                            ? Colors.green.shade600 
+                            : Colors.red.shade600,
+                  ),
+                ),
+              ],
+            ),
+            
+            // 拖拽指示器
+            if (!isDragging && !isPlaceholder && !hasChildren) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  Icons.drag_indicator,
+                  color: Colors.grey,
+                  size: 20,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
 
   // 检查是否可以接受拖拽放置
   bool _canAcceptDrop(
@@ -514,83 +735,6 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     return false;
   }
 
-  Widget _buildNodeContent(TreeNode node, int depth,
-      {bool isDragging = false, bool isPlaceholder = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          // 展开/折叠按钮和连接线
-          if (depth == 0) ..._buildParentNodeLeading(node, isPlaceholder),
-          if (depth > 0) ..._buildChildNodeLeading(node, isPlaceholder),
-
-          if (depth == 0 && node.children.isEmpty) const SizedBox(width: 32),
-          if (depth > 0) const SizedBox(width: 12),
-
-          // 账户信息
-          Expanded(
-            child: Text(
-              node.name,
-              style: TextStyle(
-                fontSize: depth == 0 ? 16 : 15,
-                fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
-                color: isPlaceholder ? Colors.grey : Colors.black87,
-              ),
-            ),
-          ),
-
-          // 拖拽指示器 - 只有没有子节点的账户才显示拖拽图标
-          if (!isDragging && !isPlaceholder && node.children.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(
-                Icons.drag_indicator,
-                color: Colors.grey,
-                size: 20,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildParentNodeLeading(TreeNode node, bool isPlaceholder) {
-    return [
-      if (node.children.isNotEmpty)
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              node.isExpanded = !node.isExpanded;
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              node.isExpanded ? Icons.expand_less : Icons.expand_more,
-              color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
-              size: 20,
-            ),
-          ),
-        )
-      else
-        const SizedBox(width: 0),
-    ];
-  }
-
-  List<Widget> _buildChildNodeLeading(TreeNode node, bool isPlaceholder) {
-    return [
-      const SizedBox(width: 0),
-    ];
-  }
 
   void _updateDropPosition(DragTargetDetails details, TreeNode targetNode) {
     setState(() {
