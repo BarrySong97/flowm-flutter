@@ -6,7 +6,9 @@ import '../components/account/account_item.dart' as account_ui;
 import '../db/tables/account_table.dart';
 import '../utils/provider_invalidator.dart';
 import '../utils/snackbar_utils.dart';
-
+import '../components/common/account_creation_bottom_sheet.dart';
+import '../components/common/account_update_bottom_sheet.dart';
+import '../components/common/account_selector_bottom_sheet.dart';
 
 // 树形节点数据模型，基于真实的Account数据
 class TreeNode {
@@ -47,7 +49,8 @@ class AccountManagementPage extends ConsumerStatefulWidget {
   const AccountManagementPage({super.key});
 
   @override
-  ConsumerState<AccountManagementPage> createState() => _AccountManagementPageState();
+  ConsumerState<AccountManagementPage> createState() =>
+      _AccountManagementPageState();
 }
 
 class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
@@ -70,6 +73,9 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
   bool _isLoading = true;
   String? _errorMessage;
 
+  // 保存展开状态
+  final Map<int, bool> _expandedState = {};
+
   @override
   void initState() {
     super.initState();
@@ -84,7 +90,12 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
   }
 
   // 加载真实账户数据
-  Future<void> _loadAccountData() async {
+  Future<void> _loadAccountData({bool preserveExpansion = false}) async {
+    // 如果需要保持展开状态，先保存当前状态
+    if (preserveExpansion && !_isLoading) {
+      _saveExpandedState();
+    }
+
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -108,6 +119,11 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           categorizedData['收入账户'] = _buildTreeFromAccounts(futures[3]);
           _isLoading = false;
         });
+
+        // 如果需要保持展开状态，恢复之前的状态
+        if (preserveExpansion) {
+          _restoreExpandedState();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -122,13 +138,15 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
 
   // 将Account列表转换为TreeNode树形结构
   List<TreeNode> _buildTreeFromAccounts(List<account_ui.Account> accounts) {
-    return accounts.map((account) => _buildTreeNodeFromAccount(account)).toList();
+    return accounts
+        .map((account) => _buildTreeNodeFromAccount(account))
+        .toList();
   }
 
   // 递归构建TreeNode
   TreeNode _buildTreeNodeFromAccount(account_ui.Account account) {
     TreeNode node = TreeNode(account: account);
-    
+
     if (account.children != null && account.children!.isNotEmpty) {
       for (var child in account.children!) {
         TreeNode childNode = _buildTreeNodeFromAccount(child);
@@ -136,8 +154,59 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
         node.children.add(childNode);
       }
     }
-    
+
     return node;
+  }
+
+  // 保存当前展开状态
+  void _saveExpandedState() {
+    _expandedState.clear();
+    for (String category in categorizedData.keys) {
+      for (TreeNode node in categorizedData[category]!) {
+        _saveNodeExpandedState(node);
+      }
+    }
+  }
+
+  void _saveNodeExpandedState(TreeNode node) {
+    _expandedState[node.id] = node.isExpanded;
+    for (TreeNode child in node.children) {
+      _saveNodeExpandedState(child);
+    }
+  }
+
+  // 恢复展开状态
+  void _restoreExpandedState() {
+    for (String category in categorizedData.keys) {
+      for (TreeNode node in categorizedData[category]!) {
+        _restoreNodeExpandedState(node);
+      }
+    }
+  }
+
+  void _restoreNodeExpandedState(TreeNode node) {
+    if (_expandedState.containsKey(node.id)) {
+      node.isExpanded = _expandedState[node.id]!;
+    }
+    for (TreeNode child in node.children) {
+      _restoreNodeExpandedState(child);
+    }
+  }
+
+  // 根据当前tab索引获取对应的AccountSelectorType
+  AccountSelectorType _getCurrentAccountSelectorType() {
+    switch (_tabController.index) {
+      case 0: // 资产账户
+        return AccountSelectorType.asset;
+      case 1: // 负债账户
+        return AccountSelectorType.liability;
+      case 2: // 支出账户
+        return AccountSelectorType.expense;
+      case 3: // 收入账户
+        return AccountSelectorType.income;
+      default:
+        return AccountSelectorType.asset; // 默认为资产账户
+    }
   }
 
   @override
@@ -151,19 +220,22 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.help_outline),
+            icon: const Icon(Icons.add),
             onPressed: () {
-              _showHelpDialog();
+              _showAccountCreationBottomSheet();
             },
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.blue,
+          labelColor: Colors.black,
           unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.blue,
+          indicatorColor: Colors.black,
           labelStyle: const TextStyle(fontWeight: FontWeight.w600),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+          dividerColor: Colors.transparent, // 消除tab下面的border
+          splashFactory: NoSplash.splashFactory, // 禁用点击时的绿色splash效果
+          overlayColor: WidgetStateProperty.all(Colors.transparent), // 禁用悬停效果
           tabs: const [
             Tab(text: '资产账户'),
             Tab(text: '负债账户'),
@@ -181,7 +253,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
               ),
               child: const Row(
@@ -190,8 +262,11 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '长按账户拖拽到其他账户上，可将其变成子账户，最多2层结构',
-                      style: TextStyle(color: Colors.blue, fontSize: 14, fontWeight: FontWeight.w500),
+                      '长按账户拖拽到其他账户上，可将其变成子账户，最多2层结构；点击账户可以编辑',
+                      style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -242,7 +317,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadAccountData,
+              onPressed: () => _loadAccountData(),
               child: const Text('重新加载'),
             ),
           ],
@@ -284,44 +359,54 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           ),
           child: Material(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(6),
             elevation: depth == 0 ? 2 : 1,
             shadowColor: Colors.black.withValues(alpha: 0.05),
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: depth > 0 
-                  ? Border.all(color: Colors.grey.withValues(alpha: 0.2), width: 1)
-                  : null,
+                borderRadius: BorderRadius.circular(6),
+                border: depth > 0
+                    ? Border.all(
+                        color: Colors.grey.withValues(alpha: 0.2), width: 1)
+                    : null,
               ),
-              child: Draggable<TreeNode>(
-                data: node,
-                feedback: Material(
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(16),
-                  shadowColor: Colors.black.withValues(alpha: 0.2),
-                  child: Container(
-                    width: MediaQuery.of(context).size.width - 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white,
-                    ),
-                    child: _buildNodeContent(node, depth, isDragging: true),
-                  ),
-                ),
-                childWhenDragging: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.grey.withValues(alpha: 0.5),
-                      width: 2,
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: _buildNodeContent(node, depth, isPlaceholder: true),
-                ),
-                child: _buildDragTarget(node, depth),
+              child: GestureDetector(
+                onTap: () {
+                  _showAccountUpdateBottomSheet(node);
+                },
+                child: node.children.isEmpty
+                    ? LongPressDraggable<TreeNode>(
+                        data: node,
+                        feedback: Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(6),
+                          shadowColor: Colors.black.withValues(alpha: 0.2),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width - 64,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(6),
+                              color: Colors.white,
+                            ),
+                            child: _buildNodeContent(node, depth,
+                                isDragging: true),
+                          ),
+                        ),
+                        childWhenDragging: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.grey.withValues(alpha: 0.5),
+                              width: 2,
+                              style: BorderStyle.solid,
+                            ),
+                          ),
+                          child: _buildNodeContent(node, depth,
+                              isPlaceholder: true),
+                        ),
+                        child: _buildDragTarget(node, depth),
+                      )
+                    : _buildDragTarget(node, depth), // 有子账户时不允许拖拽
               ),
             ),
           ),
@@ -331,9 +416,11 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           Container(
             margin: const EdgeInsets.only(left: 8, bottom: 8),
             child: Column(
-              children: node.children.map(
-                (child) => _buildTreeNode(child, depth + 1),
-              ).toList(),
+              children: node.children
+                  .map(
+                    (child) => _buildTreeNode(child, depth + 1),
+                  )
+                  .toList(),
             ),
           ),
       ],
@@ -370,19 +457,17 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
       builder: (context, candidateData, rejectedData) {
         bool isHovered = _dragOverNodeId == node.id;
         bool canAccept = candidateData.isNotEmpty;
-        
+
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
             color: isHovered && _insertPosition == 'inside'
                 ? Colors.blue.withValues(alpha: 0.08)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(6),
             border: isHovered && _insertPosition == 'inside'
                 ? Border.all(
-                    color: canAccept ? Colors.blue : Colors.red, 
-                    width: 2
-                  )
+                    color: canAccept ? Colors.blue : Colors.red, width: 2)
                 : null,
           ),
           child: _buildNodeContent(node, depth),
@@ -438,12 +523,10 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           // 展开/折叠按钮和连接线
           if (depth == 0) ..._buildParentNodeLeading(node, isPlaceholder),
           if (depth > 0) ..._buildChildNodeLeading(node, isPlaceholder),
-          
-          if (depth == 0 && node.children.isEmpty)
-            const SizedBox(width: 32),
-          if (depth > 0)
-            const SizedBox(width: 12),
-          
+
+          if (depth == 0 && node.children.isEmpty) const SizedBox(width: 32),
+          if (depth > 0) const SizedBox(width: 12),
+
           // 账户信息
           Expanded(
             child: Text(
@@ -451,20 +534,18 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
               style: TextStyle(
                 fontSize: depth == 0 ? 16 : 15,
                 fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
-                color: isPlaceholder 
-                    ? Colors.grey 
-                    : Colors.black87,
+                color: isPlaceholder ? Colors.grey : Colors.black87,
               ),
             ),
           ),
-          
-          // 拖拽指示器
-          if (!isDragging && !isPlaceholder)
+
+          // 拖拽指示器 - 只有没有子节点的账户才显示拖拽图标
+          if (!isDragging && !isPlaceholder && node.children.isEmpty)
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(
                 Icons.drag_indicator,
@@ -488,30 +569,28 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           },
           child: Container(
             padding: const EdgeInsets.all(6),
+            margin: const EdgeInsets.only(right: 12),
             decoration: BoxDecoration(
               color: Colors.grey.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
               node.isExpanded ? Icons.expand_less : Icons.expand_more,
-              color: isPlaceholder 
-                  ? Colors.grey 
-                  : Colors.grey.shade600,
+              color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
               size: 20,
             ),
           ),
         )
       else
-        const SizedBox(width: 32),
-    ];
-  }
-  
-  List<Widget> _buildChildNodeLeading(TreeNode node, bool isPlaceholder) {
-    return [
-      const SizedBox(width: 24),
+        const SizedBox(width: 0),
     ];
   }
 
+  List<Widget> _buildChildNodeLeading(TreeNode node, bool isPlaceholder) {
+    return [
+      const SizedBox(width: 0),
+    ];
+  }
 
   void _updateDropPosition(DragTargetDetails details, TreeNode targetNode) {
     setState(() {
@@ -536,32 +615,30 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     });
   }
 
-  Future<void> _handleDrop(TreeNode draggedNode, TreeNode targetNode, String position) async {
+  Future<void> _handleDrop(
+      TreeNode draggedNode, TreeNode targetNode, String position) async {
     if (draggedNode.id == targetNode.id) return;
 
     try {
       // 调用真实的数据库更新
       await ref.read(accountRepositoryProvider).editAccount(
-        accountId: draggedNode.id,
-        name: draggedNode.name,
-        type: draggedNode.type,
-        ledgerId: (await ref.read(selectedLedgerProvider.future))!.ledgerId,
-        parentId: position == 'inside' ? targetNode.id : null,
-      );
+            accountId: draggedNode.id,
+            name: draggedNode.name,
+            type: draggedNode.type,
+            ledgerId: (await ref.read(selectedLedgerProvider.future))!.ledgerId,
+            parentId: position == 'inside' ? targetNode.id : null,
+          );
 
       // 刷新账户数据
-      invalidateProvidersForTransaction(ref, 
-        fromAccountType: draggedNode.type,
-        toAccountType: targetNode.type);
+      invalidateProvidersForTransaction(ref,
+          fromAccountType: draggedNode.type, toAccountType: targetNode.type);
 
       // 重新加载数据
-      await _loadAccountData();
+      await _loadAccountData(preserveExpansion: true);
 
       if (mounted) {
         SnackBarUtils.showOverlaySuccess(
-          context, 
-          '已将 "${draggedNode.name}" 移动到 "${targetNode.name}" 账户内'
-        );
+            context, '已将 "${draggedNode.name}" 移动到 "${targetNode.name}" 账户内');
       }
     } catch (e) {
       // 记录错误日志
@@ -571,104 +648,41 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     }
   }
 
-
-  void _showHelpDialog() {
-    showDialog(
+  // 显示账户创建底部表单
+  void _showAccountCreationBottomSheet() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.help_outline,
-                color: Colors.blue,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              '使用说明',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-          ],
+        child: AccountCreationBottomSheet(
+          defaultAccountType: _getCurrentAccountSelectorType(),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHelpItem(Icons.tab, '使用Tab切换不同账户分类'),
-            _buildHelpItem(Icons.expand_more, '点击箭头展开/折叠子账户'),  
-            _buildHelpItem(Icons.drag_indicator, '长按拖拽设置子账户关系'),
-            _buildHelpItem(Icons.check_circle_outline, '绿色边框表示可接收拖拽'),
-            _buildHelpItem(Icons.account_tree, '支持最多2层账户结构'),
-            _buildHelpItem(Icons.block, '已有子账户的不能再移动'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.blue.withValues(alpha: 0.1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              '我知道了',
-              style: TextStyle(
-                color: Colors.blue,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
-    );
+    ).then((_) {
+      // 账户创建后刷新数据
+      _loadAccountData(preserveExpansion: true);
+    });
   }
-  
-  Widget _buildHelpItem(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: Colors.blue,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
+
+  // 显示账户更新底部表单
+  void _showAccountUpdateBottomSheet(TreeNode node) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: AccountUpdateBottomSheet(accountToUpdate: node.account),
       ),
-    );
+    ).then((_) {
+      // 账户更新后刷新数据
+      _loadAccountData(preserveExpansion: true);
+    });
   }
 }
