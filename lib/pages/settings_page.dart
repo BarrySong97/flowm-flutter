@@ -58,6 +58,20 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ],
               ),
+              SettingsDataSection(
+                title: '系统设置',
+                items: [
+                  SettingsDataItem(
+                    icon: Icons.manage_accounts,
+                    title: '账户管理',
+                    subtitle: '管理应用账户',
+                    showArrow: true,
+                    onTap: () {
+                      context.pushNamed('accountManagement');
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
         ),

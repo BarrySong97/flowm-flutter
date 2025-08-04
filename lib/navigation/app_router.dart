@@ -16,6 +16,7 @@ import 'package:flowm/pages/add_page.dart';
 import 'package:flowm/pages/version_page.dart';
 import 'package:flowm/pages/developer_page.dart';
 import 'package:flowm/pages/monthly_details_page.dart';
+import 'package:flowm/pages/account_management_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -131,7 +132,8 @@ class AppRouter {
             throw ArgumentError('Missing required accountId parameter');
           }
           return SwipeablePage(
-            builder: (context) => TopAssetsAccountDetailPage(accountId: accountId),
+            builder: (context) =>
+                TopAssetsAccountDetailPage(accountId: accountId),
           );
         },
       ),
@@ -146,7 +148,8 @@ class AppRouter {
             throw ArgumentError('Missing required accountId parameter');
           }
           return SwipeablePage(
-            builder: (context) => TopLiabilitiesAccountDetailPage(accountId: accountId),
+            builder: (context) =>
+                TopLiabilitiesAccountDetailPage(accountId: accountId),
           );
         },
       ),
@@ -199,6 +202,15 @@ class AppRouter {
           final month = extra?['month'] as String? ?? '未知月份';
           return SwipeablePage(
             builder: (context) => MonthlyDetailsPage(month: month),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/account-management',
+        name: 'accountManagement',
+        pageBuilder: (context, state) {
+          return SwipeablePage(
+            builder: (context) => const AccountManagementPage(),
           );
         },
       ),
