@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flowm/components/common/account_creation_bottom_sheet.dart';
-import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 
 class AddBottomSheet extends StatelessWidget {
   final int currentIndex;
@@ -69,12 +67,9 @@ class AddBottomSheet extends StatelessWidget {
                       icon: Icons.account_balance_wallet,
                       label: _getAccountButtonLabel(),
                       color: Colors.green,
-                      onTap: () async {
+                      onTap: () {
                         Navigator.pop(context);
-                        await AccountCreationBottomSheet.show(
-                          context,
-                          defaultAccountType: _getDefaultAccountType(),
-                        );
+                        context.push('/account-management');
                       },
                     ),
                   ],
@@ -89,34 +84,9 @@ class AddBottomSheet extends StatelessWidget {
   }
 
   String _getAccountButtonLabel() {
-    switch (currentIndex) {
-      case 1: // 资产
-        return '添加资产账户';
-      case 2: // 支出
-        return '添加支出分类(账户)';
-      case 3: // 收入
-        return '添加收入分类(账户)';
-      case 4: // 负债
-        return '添加负债账户';
-      default:
-        return '添加账户';
-    }
+    return '管理账户';
   }
 
-  AccountSelectorType _getDefaultAccountType() {
-    switch (currentIndex) {
-      case 1: // 资产
-        return AccountSelectorType.asset;
-      case 2: // 支出
-        return AccountSelectorType.expense;
-      case 3: // 收入
-        return AccountSelectorType.income;
-      case 4: // 负债
-        return AccountSelectorType.liability;
-      default:
-        return AccountSelectorType.asset;
-    }
-  }
 
   Widget _buildActionButton({
     required IconData icon,
