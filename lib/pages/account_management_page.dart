@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../state/account/account_repository.dart';
+import '../state/ledger/ledger_repository.dart';
+import '../components/account/account_item.dart' as account_ui;
+import '../db/tables/account_table.dart';
+import '../utils/provider_invalidator.dart';
+import '../utils/snackbar_utils.dart';
 
 
-// 树形节点数据模型
+// 树形节点数据模型，基于真实的Account数据
 class TreeNode {
-  String id;
-  String name;
-  String type;
-  double balance;
+  final account_ui.Account account;
   bool isExpanded;
   List<TreeNode> children;
   TreeNode? parent;
 
   TreeNode({
-    required this.id,
-    required this.name,
-    required this.type,
-    this.balance = 0.0,
+    required this.account,
     this.isExpanded = false,
     List<TreeNode>? children,
     this.parent,
   }) : children = children ?? <TreeNode>[];
 
+  // 便利方法访问account属性
+  int get id => account.id;
+  String get name => account.name;
+  AccountType get type => account.type;
+  double get balance => account.amount;
+
   TreeNode copyWith({
-    String? id,
-    String? name,
-    String? type,
-    double? balance,
+    account_ui.Account? account,
     bool? isExpanded,
     List<TreeNode>? children,
     TreeNode? parent,
   }) {
     return TreeNode(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      type: type ?? this.type,
-      balance: balance ?? this.balance,
+      account: account ?? this.account,
       isExpanded: isExpanded ?? this.isExpanded,
       children: children ?? List.from(this.children),
       parent: parent ?? this.parent,
@@ -42,17 +43,17 @@ class TreeNode {
   }
 }
 
-class AccountManagementPage extends StatefulWidget {
+class AccountManagementPage extends ConsumerStatefulWidget {
   const AccountManagementPage({super.key});
 
   @override
-  State<AccountManagementPage> createState() => _AccountManagementPageState();
+  ConsumerState<AccountManagementPage> createState() => _AccountManagementPageState();
 }
 
-class _AccountManagementPageState extends State<AccountManagementPage>
+class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     with SingleTickerProviderStateMixin {
   List<TreeNode> treeData = [];
-  String? _dragOverNodeId;
+  int? _dragOverNodeId;
   String _insertPosition = 'none'; // 'above', 'below', 'inside', 'none'
 
   late TabController _tabController;
@@ -61,14 +62,19 @@ class _AccountManagementPageState extends State<AccountManagementPage>
   Map<String, List<TreeNode>> categorizedData = {
     '资产账户': [],
     '负债账户': [],
-    '投资账户': [],
+    '支出账户': [],
+    '收入账户': [],
   };
+
+  // 加载状态
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _initializeMockData();
+    _tabController = TabController(length: 4, vsync: this);
+    _loadAccountData();
   }
 
   @override
@@ -77,59 +83,61 @@ class _AccountManagementPageState extends State<AccountManagementPage>
     super.dispose();
   }
 
-  void _initializeMockData() {
-    // 资产账户
-    categorizedData['资产账户'] = [
-      TreeNode(
-        id: '1.1',
-        name: '现金账户',
-        type: 'account',
-        balance: 5000.0,
-        children: [
-          TreeNode(id: '1.1.1', name: '钱包现金', type: 'account', balance: 500.0),
-          TreeNode(id: '1.1.2', name: '零钱', type: 'account', balance: 200.0),
-        ],
-      ),
-      TreeNode(
-        id: '1.2',
-        name: '银行账户',
-        type: 'account',
-        balance: 25000.0,
-        children: [
-          TreeNode(
-              id: '1.2.1', name: '工商银行', type: 'account', balance: 15000.0),
-          TreeNode(
-              id: '1.2.2', name: '建设银行', type: 'account', balance: 10000.0),
-        ],
-      ),
-      TreeNode(id: '1.3', name: '支付宝', type: 'account', balance: 3000.0),
-      TreeNode(id: '1.4', name: '微信钱包', type: 'account', balance: 1500.0),
-    ];
+  // 加载真实账户数据
+  Future<void> _loadAccountData() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
-    // 负债账户
-    categorizedData['负债账户'] = [
-      TreeNode(
-        id: '2.1',
-        name: '信用卡',
-        type: 'account',
-        balance: -8000.0,
-        children: [
-          TreeNode(
-              id: '2.1.1', name: '招商银行信用卡', type: 'account', balance: -5000.0),
-          TreeNode(
-              id: '2.1.2', name: '工商银行信用卡', type: 'account', balance: -3000.0),
-        ],
-      ),
-      TreeNode(id: '2.2', name: '房贷', type: 'account', balance: -500000.0),
-      TreeNode(id: '2.3', name: '花呗', type: 'account', balance: -2000.0),
-    ];
+    try {
+      final futures = await Future.wait([
+        ref.read(assetsAccountTreeProvider.future),
+        ref.read(liabilityAccountTreeProvider.future),
+        ref.read(expenseAccountTreeProvider.future),
+        ref.read(incomeAccountTreeProvider.future),
+      ]);
 
-    // 投资账户
-    categorizedData['投资账户'] = [
-      TreeNode(id: '3.1', name: '股票账户', type: 'account', balance: 15000.0),
-      TreeNode(id: '3.2', name: '基金账户', type: 'account', balance: 8000.0),
-      TreeNode(id: '3.3', name: '余额宝', type: 'account', balance: 12000.0),
-    ];
+      if (mounted) {
+        setState(() {
+          categorizedData['资产账户'] = _buildTreeFromAccounts(futures[0]);
+          categorizedData['负债账户'] = _buildTreeFromAccounts(futures[1]);
+          categorizedData['支出账户'] = _buildTreeFromAccounts(futures[2]);
+          categorizedData['收入账户'] = _buildTreeFromAccounts(futures[3]);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = '加载账户数据失败: $e';
+          _isLoading = false;
+        });
+        SnackBarUtils.showOverlayError(context, '加载账户数据失败');
+      }
+    }
+  }
+
+  // 将Account列表转换为TreeNode树形结构
+  List<TreeNode> _buildTreeFromAccounts(List<account_ui.Account> accounts) {
+    return accounts.map((account) => _buildTreeNodeFromAccount(account)).toList();
+  }
+
+  // 递归构建TreeNode
+  TreeNode _buildTreeNodeFromAccount(account_ui.Account account) {
+    TreeNode node = TreeNode(account: account);
+    
+    if (account.children != null && account.children!.isNotEmpty) {
+      for (var child in account.children!) {
+        TreeNode childNode = _buildTreeNodeFromAccount(child);
+        childNode.parent = node;
+        node.children.add(childNode);
+      }
+    }
+    
+    return node;
   }
 
   @override
@@ -159,7 +167,8 @@ class _AccountManagementPageState extends State<AccountManagementPage>
           tabs: const [
             Tab(text: '资产账户'),
             Tab(text: '负债账户'),
-            Tab(text: '投资账户'),
+            Tab(text: '支出账户'),
+            Tab(text: '收入账户'),
           ],
         ),
       ),
@@ -194,7 +203,8 @@ class _AccountManagementPageState extends State<AccountManagementPage>
                 children: [
                   _buildAccountList('资产账户'),
                   _buildAccountList('负债账户'),
-                  _buildAccountList('投资账户'),
+                  _buildAccountList('支出账户'),
+                  _buildAccountList('收入账户'),
                 ],
               ),
             ),
@@ -205,6 +215,41 @@ class _AccountManagementPageState extends State<AccountManagementPage>
   }
 
   Widget _buildAccountList(String category) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadAccountData,
+              child: const Text('重新加载'),
+            ),
+          ],
+        ),
+      );
+    }
+
     final accounts = categorizedData[category] ?? [];
 
     if (accounts.isEmpty) {
@@ -491,69 +536,41 @@ class _AccountManagementPageState extends State<AccountManagementPage>
     });
   }
 
-  void _handleDrop(TreeNode draggedNode, TreeNode targetNode, String position) {
+  Future<void> _handleDrop(TreeNode draggedNode, TreeNode targetNode, String position) async {
     if (draggedNode.id == targetNode.id) return;
 
-    setState(() {
-      // 从原位置移除
-      _removeNodeFromTree(draggedNode);
+    try {
+      // 调用真实的数据库更新
+      await ref.read(accountRepositoryProvider).editAccount(
+        accountId: draggedNode.id,
+        name: draggedNode.name,
+        type: draggedNode.type,
+        ledgerId: (await ref.read(selectedLedgerProvider.future))!.ledgerId,
+        parentId: position == 'inside' ? targetNode.id : null,
+      );
 
-      // 只支持内部插入
-      if (position == 'inside') {
-        _insertInside(draggedNode, targetNode);
+      // 刷新账户数据
+      invalidateProvidersForTransaction(ref, 
+        fromAccountType: draggedNode.type,
+        toAccountType: targetNode.type);
+
+      // 重新加载数据
+      await _loadAccountData();
+
+      if (mounted) {
+        SnackBarUtils.showOverlaySuccess(
+          context, 
+          '已将 "${draggedNode.name}" 移动到 "${targetNode.name}" 账户内'
+        );
       }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('已将 "${draggedNode.name}" 移动到 "${targetNode.name}" 账户内'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _insertInside(TreeNode draggedNode, TreeNode targetNode) {
-    targetNode.children.add(draggedNode);
-    draggedNode.parent = targetNode;
-    // 如果目标账户未展开，自动展开
-    if (!targetNode.isExpanded) {
-      targetNode.isExpanded = true;
-    }
-  }
-
-  void _removeNodeFromTree(TreeNode nodeToRemove) {
-    // 在所有分类中查找并删除节点
-    for (String category in categorizedData.keys) {
-      final accounts = categorizedData[category]!;
-
-      // 检查是否是一级账户
-      if (accounts.remove(nodeToRemove)) {
-        return;
-      }
-
-      // 在子树中查找
-      for (var account in accounts) {
-        if (_removeNodeFromSubTree(account, nodeToRemove)) {
-          return;
-        }
+    } catch (e) {
+      // 记录错误日志
+      if (mounted) {
+        SnackBarUtils.showOverlayError(context, '移动账户失败: $e');
       }
     }
   }
 
-  bool _removeNodeFromSubTree(TreeNode parent, TreeNode nodeToRemove) {
-    if (parent.children.remove(nodeToRemove)) {
-      return true; // 找到并删除了节点
-    }
-
-    // 继续在子节点中查找
-    for (var child in parent.children) {
-      if (_removeNodeFromSubTree(child, nodeToRemove)) {
-        return true;
-      }
-    }
-
-    return false; // 没有找到节点
-  }
 
   void _showHelpDialog() {
     showDialog(
