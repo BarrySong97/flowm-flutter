@@ -806,12 +806,19 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FB),
       appBar: AppBar(
-        title: const Text('WebDAV配置'),
-        backgroundColor: Colors.transparent,
+        title: const Text(
+          'WebDAV配置',
+          style: TextStyle(fontSize: 16),
+        ),
+        backgroundColor: const Color(0xFFF5F6FB),
         elevation: 0,
+        foregroundColor: Colors.black87,
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveWebdavConfig,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black87,
+            ),
             child: const Text('保存'),
           ),
         ],
@@ -824,7 +831,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // WebDAV配置卡片
                 Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -837,15 +848,21 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         TextFormField(
                           controller: _urlController,
                           decoration: const InputDecoration(
                             labelText: 'WebDAV URL',
                             hintText: 'https://example.com/webdav',
-                            prefixIcon: Icon(Icons.link),
-                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.link, size: 20),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            labelStyle: TextStyle(fontSize: 14),
+                            hintStyle: TextStyle(fontSize: 14),
                           ),
+                          style: const TextStyle(fontSize: 14),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return '请输入WebDAV URL';
@@ -857,14 +874,19 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         TextFormField(
                           controller: _usernameController,
                           decoration: const InputDecoration(
                             labelText: '用户名',
-                            prefixIcon: Icon(Icons.person),
-                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person, size: 20),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            labelStyle: TextStyle(fontSize: 14),
                           ),
+                          style: const TextStyle(fontSize: 14),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return '请输入用户名';
@@ -872,18 +894,19 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: !_isPasswordVisible,
                           decoration: InputDecoration(
                             labelText: '密码',
-                            prefixIcon: const Icon(Icons.lock),
+                            prefixIcon: const Icon(Icons.lock, size: 20),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _isPasswordVisible
                                     ? Icons.visibility
                                     : Icons.visibility_off,
+                                size: 20,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -891,8 +914,13 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                                 });
                               },
                             ),
-                            border: const OutlineInputBorder(),
+                            border: const OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            labelStyle: const TextStyle(fontSize: 14),
                           ),
+                          style: const TextStyle(fontSize: 14),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return '请输入密码';
@@ -900,25 +928,15 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             return null;
                           },
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                        const SizedBox(height: 20),
                         const Text(
-                          '操作',
+                          '连接测试',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
@@ -933,6 +951,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                                   )
                                 : const Icon(Icons.wifi_protected_setup),
                             label: Text(_isLoading ? '测试中...' : '测试连接'),
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6.0),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -940,25 +963,37 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // 新的同步状态显示组件
-                SyncStatusWidget(
-                  statusInfo: _statusInfo.copyWith(isLoading: _isLoadingStatus),
-                ),
-                const SizedBox(height: 16),
+                // 合并同步状态和同步操作卡片
                 Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '同步操作',
+                          '数据同步',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        // 同步状态组件
+                        SyncStatusWidget(
+                          statusInfo: _statusInfo.copyWith(isLoading: _isLoadingStatus),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          '同步操作',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
@@ -982,6 +1017,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green.shade600,
                                   foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6.0),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1007,6 +1045,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange.shade600,
                                   foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6.0),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1036,17 +1077,21 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // 使用说明卡片
                 Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6.0),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '说明',
+                          '使用说明',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 8),

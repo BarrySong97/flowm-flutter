@@ -58,39 +58,34 @@ class SyncStatusWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.sync, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  '同步状态',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                if (statusInfo.isLoading)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
+            const Icon(Icons.sync, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              '同步状态',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: 16),
-            _buildTimeInfoSection(),
-            const SizedBox(height: 12),
-            _buildStatusSection(),
+            const Spacer(),
+            if (statusInfo.isLoading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        _buildTimeInfoSection(),
+        const SizedBox(height: 12),
+        _buildStatusSection(),
+      ],
     );
   }
 
@@ -212,7 +207,7 @@ class SyncStatusWidget extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: borderColor),
       ),
       child: Row(
