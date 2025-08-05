@@ -281,7 +281,9 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     // 当provider被invalidate后，如果数据为空且不在加载中，主动获取数据
     if (state.transactions.isEmpty && !state.isLoading && state.error == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(flowTransactionsProvider.notifier).fetchTransactions();
+        if (mounted) {
+          ref.read(flowTransactionsProvider.notifier).fetchTransactions();
+        }
       });
     }
 

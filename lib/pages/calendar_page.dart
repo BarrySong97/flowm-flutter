@@ -113,7 +113,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     return item.nature == TransactionNature.OUTFLOW;
   }
 
-
   @override
   Widget build(BuildContext context) {
     final newFormattedHeader = DateFormat('yyyy年MM月').format(_focusedDay);
@@ -181,7 +180,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
-                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                    final selectedLedger =
+                        ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         // Get the summary for the specific 'day' from the monthly map
@@ -215,7 +215,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
-                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                    final selectedLedger =
+                        ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         final daySummary = summaryMap[day.day];
@@ -248,7 +249,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
-                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                    final selectedLedger =
+                        ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         final daySummary = summaryMap[day.day];
@@ -322,8 +324,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           // 时间日期标题和收支数据
           Consumer(
             builder: (context, ref, child) {
-              final monthKey = DateTime(_selectedDay.year, _selectedDay.month, 1);
-              final monthlySummaryAsyncValue = ref.watch(monthlyCalendarSummaryProvider(monthKey));
+              final monthKey =
+                  DateTime(_selectedDay.year, _selectedDay.month, 1);
+              final monthlySummaryAsyncValue =
+                  ref.watch(monthlyCalendarSummaryProvider(monthKey));
               final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
               return monthlySummaryAsyncValue.when(
@@ -332,7 +336,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   final income = daySummary?.income ?? 0.0;
                   final expenses = daySummary?.expenses ?? 0.0;
                   final net = income - expenses;
-                  final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
+                  final currencyFormat = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥');
 
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
@@ -353,27 +359,34 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _isTransactionSortAscending = !_isTransactionSortAscending;
+                                  _isTransactionSortAscending =
+                                      !_isTransactionSortAscending;
                                 });
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.grey.shade300),
+                                  border:
+                                      Border.all(color: Colors.grey.shade300),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      _isTransactionSortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                      _isTransactionSortAscending
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
                                       size: 16,
                                       color: Colors.grey.shade600,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      _isTransactionSortAscending ? '时间升序' : '时间降序',
+                                      _isTransactionSortAscending
+                                          ? '时间升序'
+                                          : '时间降序',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey.shade600,
@@ -444,7 +457,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(6),
@@ -516,7 +530,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(6),
@@ -582,9 +597,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     ref.watch(selectedDayTransactionsProvider(_selectedDay));
 
                 return Consumer(builder: (context, ref, child) {
-                  final selectedLedger = ref.watch(selectedLedgerProvider).value;
-                  final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥', decimalDigits: 2);
-                  
+                  final selectedLedger =
+                      ref.watch(selectedLedgerProvider).value;
+                  final currencyFormat = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥',
+                      decimalDigits: 2);
+
                   return selectedDayTransactionsAsync.when(
                     data: (transactionsWithAmount) {
                       if (transactionsWithAmount.isEmpty) {
@@ -614,12 +633,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       }
 
                       // 对交易进行排序
-                      final sortedTransactions = List<TransactionWithAmount>.from(transactionsWithAmount);
+                      final sortedTransactions =
+                          List<TransactionWithAmount>.from(
+                              transactionsWithAmount);
                       sortedTransactions.sort((a, b) {
                         if (_isTransactionSortAscending) {
-                          return a.transaction.transactionDate.compareTo(b.transaction.transactionDate);
+                          return a.transaction.transactionDate
+                              .compareTo(b.transaction.transactionDate);
                         } else {
-                          return b.transaction.transactionDate.compareTo(a.transaction.transactionDate);
+                          return b.transaction.transactionDate
+                              .compareTo(a.transaction.transactionDate);
                         }
                       });
 
@@ -628,25 +651,31 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         itemBuilder: (context, index) {
                           final item = sortedTransactions[index];
                           final transaction = item.transaction;
-                          final amountString = currencyFormat.format(item.amount.abs());
+                          final amountString =
+                              currencyFormat.format(item.amount.abs());
 
                           // 改进时间显示逻辑 - 参考top_expense_detail_page的实现
                           String subtitle = '';
-                          final timeStr = DateFormat('HH:mm').format(transaction.transactionDate);
-                          
+                          final timeStr = DateFormat('HH:mm')
+                              .format(transaction.transactionDate);
+
                           // 优先显示账户信息，时间作为补充
-                          if (item.fromAccount != null && item.toAccount != null) {
-                            subtitle = '${item.fromAccount!.accountName} → ${item.toAccount!.accountName}';
+                          if (item.fromAccount != null &&
+                              item.toAccount != null) {
+                            subtitle =
+                                '${item.fromAccount!.accountName} -> ${item.toAccount!.accountName}';
                             // 如果不是00:00，添加时间显示
                             if (timeStr != '00:00') {
-                              subtitle += ' • $timeStr';
+                              subtitle += ' · $timeStr';
                             }
-                          } else if (item.nature == TransactionNature.OUTFLOW && item.toAccount != null) {
+                          } else if (item.nature == TransactionNature.OUTFLOW &&
+                              item.toAccount != null) {
                             subtitle = item.toAccount!.accountName;
                             if (timeStr != '00:00') {
                               subtitle += ' • $timeStr';
                             }
-                          } else if (item.nature == TransactionNature.INFLOW && item.fromAccount != null) {
+                          } else if (item.nature == TransactionNature.INFLOW &&
+                              item.fromAccount != null) {
                             subtitle = item.fromAccount!.accountName;
                             if (timeStr != '00:00') {
                               subtitle += ' • $timeStr';
@@ -678,15 +707,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                                   monthlyCalendarSummaryProvider(monthKey));
 
                               // 刷新当天交易列表
-                              ref.invalidate(
-                                  selectedDayTransactionsProvider(_selectedDay));
+                              ref.invalidate(selectedDayTransactionsProvider(
+                                  _selectedDay));
 
                               // 刷新其他相关的providers
                               if (item.fromAccount?.accountType != null &&
                                   item.toAccount?.accountType != null) {
                                 invalidateProvidersForTransaction(
                                   ref,
-                                  fromAccountType: item.fromAccount?.accountType,
+                                  fromAccountType:
+                                      item.fromAccount?.accountType,
                                   toAccountType: item.toAccount?.accountType,
                                 );
                               }
@@ -695,12 +725,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         },
                       );
                     },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (error, stackTrace) => Center(
-                    child: Text('错误: $error\n$stackTrace'),
-                  ),
-                );
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stackTrace) => Center(
+                      child: Text('错误: $error\n$stackTrace'),
+                    ),
+                  );
                 });
               },
             ),
