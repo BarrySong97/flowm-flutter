@@ -18,7 +18,9 @@
       "Bash(flutter clean)",
       "Bash(flutter analyze lib/services/auto_sync_service.dart)",
       "Bash(mkdir:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfeat(WebDAV配置): 修复首次配置流程和同步状态显示问题\n\n主要改进:\n1. 测试连接成功后自动保存配置并触发首次同步选择\n2. 修复同步状态显示矛盾问题，统一使用AutoSyncService的ETag/Hash分析\n3. 简化SyncStatusWidget，移除基于时间的错误判断逻辑\n4. 优化初始同步对话框，显示基于分析结果的智能建议\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat(WebDAV配置): 修复首次配置流程和同步状态显示问题\n\n主要改进:\n1. 测试连接成功后自动保存配置并触发首次同步选择\n2. 修复同步状态显示矛盾问题，统一使用AutoSyncService的ETag/Hash分析\n3. 简化SyncStatusWidget，移除基于时间的错误判断逻辑\n4. 优化初始同步对话框，显示基于分析结果的智能建议\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git log:*)",
+      "Bash(flutter test)"
     ],
     "deny": []
   }

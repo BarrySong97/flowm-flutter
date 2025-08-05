@@ -184,12 +184,12 @@ class _ParentAccountItemState extends State<_ParentAccountItem> {
     final bool hasChildren =
         widget.account.children != null && widget.account.children!.isNotEmpty;
     final bool isSelected = widget.selectedAccount?.id == widget.account.id;
-    
+
     // 判断是否可以选择的逻辑
     bool canSelect;
     if (widget.onlyShowRootAccounts) {
       // 如果只显示根节点，则只允许选择一级账户（根级别账户）
-      // 确保账户树只有两层：只有一级节点才能被选为父账户，二级节点不能被选择
+      // 确保账户树只有两层：只有一级节点才能被选为一级账户，二级节点不能被选择
       canSelect = widget.isRootLevel;
     } else {
       // 原有逻辑：只允许选择根级别账户
@@ -280,7 +280,7 @@ class _AccountRow extends StatelessWidget {
     final TextStyle nameStyle = TextStyle(
       fontSize: 15.0,
       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-      color: isDisabled 
+      color: isDisabled
           ? Colors.grey[400]
           : (isSelected ? Colors.blue[700] : Colors.black87),
     );
@@ -293,7 +293,7 @@ class _AccountRow extends StatelessWidget {
             Icon(
               account.icon,
               size: 24,
-              color: isDisabled 
+              color: isDisabled
                   ? Colors.grey[300]
                   : (isSelected ? Colors.blue[700] : Colors.grey[600]),
             ),
@@ -310,7 +310,7 @@ class _AccountRow extends StatelessWidget {
               '${account.currencySymbol}${account.amount.toStringAsFixed(2)}',
               style: TextStyle(
                 fontSize: 14.0,
-                color: isDisabled 
+                color: isDisabled
                     ? Colors.grey[300]
                     : (isSelected ? Colors.blue[600] : Colors.grey[600]),
               ),

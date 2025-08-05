@@ -86,7 +86,8 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
       account: widget.account,
       percentage: widget.account.percentage,
       showCurrencySymbolInAmount: !hasChildren,
-      isSelected: hasChildren ? false : widget.isSelected, // 有子账户的父账户永远不显示为选中状态
+      isSelected:
+          hasChildren ? false : widget.isSelected, // 有子账户的一级账户永远不显示为选中状态
       isLeafNode: !hasChildren, // 传入是否为叶子节点
       onLongPress: () => _handleLongPress(widget.account), // 添加长按回调
     );
@@ -95,9 +96,9 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         decoration: BoxDecoration(
-          color: Colors.white, // 父账户容器背景色始终为白色
+          color: Colors.white, // 一级账户容器背景色始终为白色
           borderRadius: BorderRadius.circular(8.0),
-          border: Border.all(color: Colors.grey[200]!, width: 1), // 父账户边框始终为灰色
+          border: Border.all(color: Colors.grey[200]!, width: 1), // 一级账户边框始终为灰色
         ),
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -223,8 +224,9 @@ class _AccountSelectorRow extends StatelessWidget {
     );
 
     // 获取用户友好的金额显示
-    final userFriendlyAmount = _getUserFriendlyAmount(account.amount, account.type);
-    
+    final userFriendlyAmount =
+        _getUserFriendlyAmount(account.amount, account.type);
+
     String displayedAmount;
     if (showCurrencySymbolInAmount) {
       displayedAmount =

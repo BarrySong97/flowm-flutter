@@ -43,7 +43,7 @@ final assetsAccountTreeProvider =
   }
 });
 
-/// 根据父账户ID获取资产账户子树
+/// 根据一级账户ID获取资产账户子树
 final assetSubAccountTreeProvider = FutureProvider.family
     .autoDispose<List<account_ui.Account>, int>((ref, parentId) async {
   final repository = ref.watch(accountRepositoryProvider);
@@ -57,7 +57,7 @@ final assetSubAccountTreeProvider = FutureProvider.family
   }
 });
 
-/// 根据父账户ID获取负债账户子树
+/// 根据一级账户ID获取负债账户子树
 final liabilitySubAccountTreeProvider = FutureProvider.family
     .autoDispose<List<account_ui.Account>, int>((ref, parentId) async {
   final repository = ref.watch(accountRepositoryProvider);
@@ -790,15 +790,15 @@ class AccountRepository {
     String parentPath = '';
 
     if (parentId != null) {
-      // 通过 parentId 查找父账户
+      // 通过 parentId 查找一级账户
       final parentAccount = await _accountDao.getAccountById(parentId);
       if (parentAccount != null) {
-        // 如果父账户存在，使用其 fullPath 作为新路径的前缀
+        // 如果一级账户存在，使用其 fullPath 作为新路径的前缀
         parentPath = parentAccount.fullPath;
       }
     }
 
-    // 如果父路径为空（即没有父账户或父账户未找到），新账户的 fullPath 就是其名称
+    // 如果父路径为空（即没有一级账户或一级账户未找到），新账户的 fullPath 就是其名称
     // 否则，路径是 "父路径:新账户名"
     fullPath = parentPath.isEmpty ? name : '$parentPath:$name';
 
@@ -851,7 +851,7 @@ class AccountRepository {
         // 根据账户类型确定借贷方向
         int fromAccountId;
         int toAccountId;
-        
+
         if (type == AccountType.ASSET) {
           // 资产账户：借记新账户，贷记期初余额
           fromAccountId = openingBalanceAccount.accountId;
@@ -998,7 +998,9 @@ class AccountRepository {
     ));
 
     // 如果需要设置为默认资产账户
-    if (result && isDefaultAsset == true && account.accountType == AccountType.ASSET) {
+    if (result &&
+        isDefaultAsset == true &&
+        account.accountType == AccountType.ASSET) {
       await setDefaultAssetAccount(id, account.ledgerId);
     }
 
@@ -1022,8 +1024,9 @@ class AccountRepository {
       }
 
       // 检查是否为系统保护账户（期初余额账户）
-      if (account.accountType == AccountType.EQUITY && 
-          (account.accountName == '期初余额' || account.accountName == 'Opening Balance')) {
+      if (account.accountType == AccountType.EQUITY &&
+          (account.accountName == '期初余额' ||
+              account.accountName == 'Opening Balance')) {
         return DeleteAccountResult.isSystemAccount;
       }
 
@@ -1063,15 +1066,15 @@ class AccountRepository {
   /// 获取账户树
   ///
   /// [ledgerId] 账本ID.
-  /// [parentId] 如果提供，则只获取该父账户下的子树.
+  /// [parentId] 如果提供，则只获取该一级账户下的子树.
   /// 返回一个包含所有顶级账户及其子账户的嵌套结构
   Future<List<AccountWithChildren>> getAccountTree(
       {int? ledgerId, int? parentId}) async {
     // 获取所有账户
     final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId ?? 0);
 
-    // 找出顶级账户（父账户ID与`parentId`匹配的账户）
-    // 如果 parentId 为 null, 则查找没有父账户的顶级账户.
+    // 找出顶级账户（一级账户ID与`parentId`匹配的账户）
+    // 如果 parentId 为 null, 则查找没有一级账户的顶级账户.
     final rootAccounts = allAccounts
         .where((account) => account.parentAccountId == parentId)
         .toList();
@@ -1814,8 +1817,10 @@ class AccountRepository {
     try {
       final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
       final openingBalanceAccount = allAccounts.firstWhere(
-        (account) => account.accountType == AccountType.EQUITY &&
-            (account.accountName == '期初余额' || account.accountName == 'Opening Balance'),
+        (account) =>
+            account.accountType == AccountType.EQUITY &&
+            (account.accountName == '期初余额' ||
+                account.accountName == 'Opening Balance'),
         orElse: () => throw Exception('期初余额账户未找到'),
       );
       return openingBalanceAccount;
@@ -1865,7 +1870,7 @@ class AccountRepository {
           createdAt: result.read<DateTime>('created_at'),
         );
       }
-      
+
       return null;
     } catch (e) {
       print('[AccountRepository] 获取最近使用的资产账户失败: $e');
@@ -1877,49 +1882,55 @@ class AccountRepository {
   Future<Account?> getDefaultAssetAccount(int ledgerId) async {
     try {
       final allAccounts = await _accountDao.getAccountsByLedgerId(ledgerId);
-      
+
       // 1. 首先尝试找到设置为默认的资产账户
-      final defaultAssetAccount = allAccounts.where((account) => 
-        account.accountType == AccountType.ASSET && 
-        account.isActive &&
-        (account.defaultUseAssets ?? false)
-      ).firstOrNull;
-      
+      final defaultAssetAccount = allAccounts
+          .where((account) =>
+              account.accountType == AccountType.ASSET &&
+              account.isActive &&
+              (account.defaultUseAssets ?? false))
+          .firstOrNull;
+
       if (defaultAssetAccount != null) {
-        print('[AccountRepository] 使用设置的默认资产账户: ${defaultAssetAccount.accountName}');
+        print(
+            '[AccountRepository] 使用设置的默认资产账户: ${defaultAssetAccount.accountName}');
         return defaultAssetAccount;
       }
-      
+
       // 2. 如果没有设置默认账户，尝试获取最近使用的资产账户
       final lastUsedAssetAccount = await getLastUsedAssetAccount(ledgerId);
       if (lastUsedAssetAccount != null) {
-        print('[AccountRepository] 使用最近使用的资产账户: ${lastUsedAssetAccount.accountName}');
+        print(
+            '[AccountRepository] 使用最近使用的资产账户: ${lastUsedAssetAccount.accountName}');
         return lastUsedAssetAccount;
       }
-      
+
       // 3. 如果没有历史记录，返回第一个活跃的叶子资产账户（优先选择没有子账户的账户）
-      final activeAssetAccounts = allAccounts.where((account) => 
-        account.accountType == AccountType.ASSET && 
-        account.isActive
-      ).toList();
-      
+      final activeAssetAccounts = allAccounts
+          .where((account) =>
+              account.accountType == AccountType.ASSET && account.isActive)
+          .toList();
+
       // 找出所有叶子账户（没有子账户的账户）
       final leafAssetAccounts = activeAssetAccounts.where((account) {
-        // 检查是否有其他账户以此账户为父账户
-        final hasChildren = allAccounts.any((child) => child.parentAccountId == account.accountId);
+        // 检查是否有其他账户以此账户为一级账户
+        final hasChildren = allAccounts
+            .any((child) => child.parentAccountId == account.accountId);
         return !hasChildren;
       }).toList();
-      
+
       // 优先选择叶子账户
-      final firstAssetAccount = leafAssetAccounts.isNotEmpty 
-        ? leafAssetAccounts.first 
-        : activeAssetAccounts.firstOrNull;
-      
+      final firstAssetAccount = leafAssetAccounts.isNotEmpty
+          ? leafAssetAccounts.first
+          : activeAssetAccounts.firstOrNull;
+
       if (firstAssetAccount != null) {
-        final accountType = leafAssetAccounts.contains(firstAssetAccount) ? '叶子资产账户' : '资产账户';
-        print('[AccountRepository] 使用第一个活跃的$accountType: ${firstAssetAccount.accountName}');
+        final accountType =
+            leafAssetAccounts.contains(firstAssetAccount) ? '叶子资产账户' : '资产账户';
+        print(
+            '[AccountRepository] 使用第一个活跃的$accountType: ${firstAssetAccount.accountName}');
       }
-      
+
       return firstAssetAccount;
     } catch (e) {
       print('[AccountRepository] 获取默认资产账户失败: $e');
@@ -1939,7 +1950,7 @@ class AccountRepository {
             Variable.withString(AccountType.ASSET.name),
           ],
         );
-        
+
         // 然后将指定账户的defaultUseAssets设置为true
         await _accountDao.customUpdate(
           'UPDATE accounts SET default_use_assets = 1 WHERE account_id = ?',
@@ -1948,7 +1959,7 @@ class AccountRepository {
           ],
         );
       });
-      
+
       // 清理相关缓存
       _clearLedgerRelatedCache(ledgerId);
       _updateHomeWidgetAccountData(ledgerId);

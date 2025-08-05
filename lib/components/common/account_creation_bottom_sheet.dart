@@ -134,7 +134,7 @@ class _AccountCreationBottomSheetState
         return;
       }
 
-      // 检查账户层级限制：如果选择的父账户还有父账户，则不能创建
+      // 检查账户层级限制：如果选择的一级账户还有一级账户，则不能创建
       if (_selectedParentAccount != null) {
         final parentAccount = await ref
             .read(accountRepositoryProvider)
@@ -143,7 +143,7 @@ class _AccountCreationBottomSheetState
         if (parentAccount != null && parentAccount.parentAccountId != null) {
           if (mounted) {
             SnackBarUtils.showOverlayError(
-                context, '不能创建账户：所选父账户已经是子账户，只支持两级账户层级');
+                context, '不能创建账户：所选一级账户已经是子账户，只支持两级账户层级');
           }
           return;
         }
@@ -447,7 +447,7 @@ class _AccountCreationBottomSheetState
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Text(
-                      '系统最多支持两层账户结构，选择一级账户作为父账户',
+                      '系统最多支持两层账户结构，选择一级账户作为一级账户',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],

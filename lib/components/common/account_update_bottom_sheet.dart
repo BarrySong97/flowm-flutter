@@ -61,14 +61,14 @@ class _AccountUpdateBottomSheetState
     _currentAccountType = _getAccountSelectorType(widget.accountToUpdate.type);
 
     // 检查是否有子账户
-    _hasChildAccounts = widget.accountToUpdate.children != null && 
-                       widget.accountToUpdate.children!.isNotEmpty;
+    _hasChildAccounts = widget.accountToUpdate.children != null &&
+        widget.accountToUpdate.children!.isNotEmpty;
 
-    // 异步获取当前账户的完整信息（包括父账户和默认状态）
+    // 异步获取当前账户的完整信息（包括一级账户和默认状态）
     _initializeAccountData();
   }
 
-  /// 初始化账户数据（包括父账户和默认状态）
+  /// 初始化账户数据（包括一级账户和默认状态）
   Future<void> _initializeAccountData() async {
     try {
       // 从数据库获取当前账户的完整信息
@@ -83,9 +83,9 @@ class _AccountUpdateBottomSheetState
         });
 
         if (dbAccount.parentAccountId != null) {
-          // 如果有父账户，获取父账户信息
-          final parentAccount =
-              await accountRepository.getAccountById(dbAccount.parentAccountId!);
+          // 如果有一级账户，获取一级账户信息
+          final parentAccount = await accountRepository
+              .getAccountById(dbAccount.parentAccountId!);
 
           if (parentAccount != null && mounted) {
             // 将数据库的Account转换为UI的Account
@@ -93,15 +93,15 @@ class _AccountUpdateBottomSheetState
               _selectedParentAccount = Account(
                 id: parentAccount.accountId,
                 name: parentAccount.accountName,
-                amount: 0.0, // 父账户选择不需要金额信息
+                amount: 0.0, // 一级账户选择不需要金额信息
                 type: parentAccount.accountType,
                 currencySymbol: '¥',
               );
             });
-            print('已设置父账户: ${_selectedParentAccount?.name}');
+            print('已设置一级账户: ${_selectedParentAccount?.name}');
           }
         }
-        
+
         print('已设置默认资产账户状态: $_isDefaultAssetAccount');
       }
     } catch (e) {
@@ -177,11 +177,13 @@ class _AccountUpdateBottomSheetState
         return;
       }
 
-      // 验证父账户类型
-      final currentAccountType = _getAccountTypeFromSelector(_currentAccountType);
-      if (_selectedParentAccount != null && _selectedParentAccount!.type != currentAccountType) {
+      // 验证一级账户类型
+      final currentAccountType =
+          _getAccountTypeFromSelector(_currentAccountType);
+      if (_selectedParentAccount != null &&
+          _selectedParentAccount!.type != currentAccountType) {
         if (mounted) {
-          SnackBarUtils.showOverlayWarning(context, '父账户类型必须与当前账户类型一致');
+          SnackBarUtils.showOverlayWarning(context, '一级账户类型必须与当前账户类型一致');
         }
         return;
       }
@@ -196,7 +198,8 @@ class _AccountUpdateBottomSheetState
               type: _getAccountTypeFromSelector(_currentAccountType),
               ledgerId: selectedLedger.ledgerId,
               parentId: _selectedParentAccount?.id,
-              isDefaultAsset: _hasChildAccounts ? false : _isDefaultAssetAccount,
+              isDefaultAsset:
+                  _hasChildAccounts ? false : _isDefaultAssetAccount,
             );
 
         print('账户更新成功');
@@ -274,7 +277,8 @@ class _AccountUpdateBottomSheetState
             print('账户删除成功');
 
             // 刷新所有账户相关的provider
-            invalidateProvidersForTransaction(ref, accountType: widget.accountToUpdate.type);
+            invalidateProvidersForTransaction(ref,
+                accountType: widget.accountToUpdate.type);
             break;
 
           case DeleteAccountResult.hasChildAccounts:
@@ -432,9 +436,10 @@ class _AccountUpdateBottomSheetState
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // 设为默认资产账户选项（仅资产账户且无子账户时显示）
-                  if (_currentAccountType == AccountSelectorType.asset && !_hasChildAccounts)
+                  if (_currentAccountType == AccountSelectorType.asset &&
+                      !_hasChildAccounts)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -452,9 +457,10 @@ class _AccountUpdateBottomSheetState
                         const SizedBox(height: 16),
                       ],
                     ),
-                  
+
                   // 如果是有子账户的资产账户，显示提示信息
-                  if (_currentAccountType == AccountSelectorType.asset && _hasChildAccounts)
+                  if (_currentAccountType == AccountSelectorType.asset &&
+                      _hasChildAccounts)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -463,11 +469,13 @@ class _AccountUpdateBottomSheetState
                           decoration: BoxDecoration(
                             color: Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                            border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                              Icon(Icons.info_outline,
+                                  color: Colors.orange, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -484,8 +492,8 @@ class _AccountUpdateBottomSheetState
                         const SizedBox(height: 16),
                       ],
                     ),
-                    
-                  // 父账户选择区域
+
+                  // 一级账户选择区域
                   if (_hasChildAccounts)
                     // 有子账户时，显示禁用状态和提示信息
                     Column(
@@ -496,18 +504,20 @@ class _AccountUpdateBottomSheetState
                           decoration: BoxDecoration(
                             color: Colors.grey.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                            border: Border.all(
+                                color: Colors.grey.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.block, color: Colors.grey[600], size: 20),
+                              Icon(Icons.block,
+                                  color: Colors.grey[600], size: 20),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '无法设置父账户',
+                                      '无法设置一级账户',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w500,
@@ -531,7 +541,7 @@ class _AccountUpdateBottomSheetState
                       ],
                     )
                   else
-                    // 无子账户时，允许选择父账户
+                    // 无子账户时，允许选择一级账户
                     Row(
                       children: [
                         Expanded(
@@ -541,13 +551,13 @@ class _AccountUpdateBottomSheetState
                               side: BorderSide(color: Colors.grey.shade300),
                             ),
                             title: Text(
-                                _selectedParentAccount?.name ?? '选择父账户 (可选)'),
+                                _selectedParentAccount?.name ?? '选择一级账户 (可选)'),
                             trailing: const Icon(Icons.keyboard_arrow_right),
                             onTap: () async {
                               final selectedAccount =
                                   await ParentAccountSelectorBottomSheet.show(
                                 context,
-                                title: '选择父账户',
+                                title: '选择一级账户',
                                 accountType: _currentAccountType,
                                 selectedAccount: _selectedParentAccount,
                                 onlyShowRootAccounts: true, // 只显示根节点账户

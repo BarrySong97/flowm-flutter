@@ -114,7 +114,7 @@ class LedgerRepository {
       return;
     }
 
-    // 按父账户ID对源账户进行分组，以便按层级复制
+    // 按一级账户ID对源账户进行分组，以便按层级复制
     final Map<int?, List<Account>> accountsByParent = {};
     for (final acc in sourceAccounts) {
       (accountsByParent[acc.parentAccountId] ??= []).add(acc);

@@ -166,7 +166,8 @@ class TopIncomeDetailPage extends ConsumerStatefulWidget {
   const TopIncomeDetailPage({super.key, required this.accountId});
 
   @override
-  ConsumerState<TopIncomeDetailPage> createState() => _TopIncomeDetailPageState();
+  ConsumerState<TopIncomeDetailPage> createState() =>
+      _TopIncomeDetailPageState();
 }
 
 class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
@@ -448,7 +449,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
   @override
   Widget build(BuildContext context) {
     // 动态获取账户信息
-    final accountAsync = ref.watch(accountExpenseNodeProvider(widget.accountId));
+    final accountAsync =
+        ref.watch(accountExpenseNodeProvider(widget.accountId));
     return accountAsync.when(
       data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
@@ -527,7 +529,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                   context,
                   accountToUpdate: uiAccount,
                 );
-                
+
                 // 如果账户被删除，退出详情页面
                 if (isDeleted == true && mounted) {
                   Navigator.of(context).pop();
@@ -842,14 +844,14 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                       ));
                     }
 
-                    // 计算父账户总金额（所有子账户余额之和）
+                    // 计算一级账户总金额（所有子账户余额之和）
                     final double parentAccountBalance = childrenNodes.fold(
                         0.0, (sum, node) => sum + node.balance);
 
                     // 先为原始数据分配颜色，保持颜色映射关系
                     final Map<String, Color> accountColorMap = {};
                     final List<Map<String, dynamic>> pieChartIncomeData = [];
-                    
+
                     for (int i = 0; i < childrenNodes.length; i++) {
                       final node = childrenNodes[i];
                       final color = pieColors[i % pieColors.length];
@@ -862,7 +864,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                     }
 
                     // 根据排序状态对childrenNodes进行排序，但保持原有颜色
-                    final sortedNodes = List<AccountExpenseNode>.from(childrenNodes);
+                    final sortedNodes =
+                        List<AccountExpenseNode>.from(childrenNodes);
                     sortedNodes.sort((a, b) {
                       if (_isAscending) {
                         return a.balance.compareTo(b.balance);
@@ -873,7 +876,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
 
                     final List<StyledAccount> styledAccounts = [];
                     for (final node in sortedNodes) {
-                      final color = accountColorMap[node.accountData.accountName]!;
+                      final color =
+                          accountColorMap[node.accountData.accountName]!;
                       final double percentageOfParent = parentAccountBalance > 0
                           ? (node.balance / parentAccountBalance) * 100
                           : 0.0;
@@ -894,8 +898,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                           children: [
                             SizedBox(
                               height: 260,
-                              child:
-                                  CustomPieChart(expenseData: pieChartIncomeData),
+                              child: CustomPieChart(
+                                  expenseData: pieChartIncomeData),
                             ),
                             Positioned(
                               top: 8,
@@ -907,7 +911,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.8),
                                     borderRadius: BorderRadius.circular(4),
@@ -916,7 +921,9 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                        _isAscending
+                                            ? Icons.arrow_upward
+                                            : Icons.arrow_downward,
                                         size: 14,
                                         color: Colors.grey[600],
                                       ),
