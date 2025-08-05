@@ -6,7 +6,8 @@ import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
 import 'package:flowm/components/chart/fl_line_chart.dart' as fl_linechart;
 import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/state/icome/income_repository.dart';
-import 'package:flowm/state/expense/expense_providers.dart' as expense_providers;
+import 'package:flowm/state/expense/expense_providers.dart'
+    as expense_providers;
 import 'package:flowm/components/chart/fullscreen_chart_page.dart';
 import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
@@ -26,7 +27,8 @@ final previousPeriodIncomeProviderFamily = FutureProvider.autoDispose
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
-  final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+  final timeRangeType =
+      ref.watch(expense_providers.selectedTimeRangeTypeProvider);
 
   if (selectedLedger == null) {
     return [];
@@ -72,14 +74,15 @@ final incomeChartDataProvider = FutureProvider.autoDispose
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
-  final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+  final timeRangeType =
+      ref.watch(expense_providers.selectedTimeRangeTypeProvider);
 
   if (selectedLedger == null) {
     return [];
   }
 
   DateTime startDate, endDate;
-  
+
   switch (timeRangeType) {
     case '90days':
       startDate = DateTime.now().subtract(const Duration(days: 90));
@@ -117,10 +120,11 @@ final accountMonthlyIncomeProvider =
     FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
   final repository = ref.watch(IncomeRepositoryProvider);
   final selectedDate = ref.watch(selectedMonthProvider);
-  final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
-  
+  final timeRangeType =
+      ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+
   DateTime startDate, endDate;
-  
+
   switch (timeRangeType) {
     case '90days':
       startDate = DateTime.now().subtract(const Duration(days: 90));
@@ -175,8 +179,9 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
 
   DateTime? _getStartDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
         return DateTime.now().subtract(const Duration(days: 90));
@@ -194,8 +199,9 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
 
   DateTime? _getEndDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
       case '60days':
@@ -209,7 +215,8 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   }
 
   String _getCurrentTimeRangeTitle() {
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
     switch (timeRangeType) {
       case '90days':
         return '最近90天';
@@ -226,7 +233,8 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   }
 
   String _getCurrentPeriodTitle() {
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
     switch (timeRangeType) {
       case '90days':
         return '90天总收入';
@@ -244,8 +252,9 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
 
   int _getCurrentDaysInPeriod() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
         return 90;
@@ -319,9 +328,11 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
     );
   }
 
-  Widget _buildStatsRow(List<barchart.ChartData> currentData, List<barchart.ChartData> previousData) {
+  Widget _buildStatsRow(List<barchart.ChartData> currentData,
+      List<barchart.ChartData> previousData) {
     final selectedMonth = ref.watch(selectedMonthProvider);
-    final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+    final timeRangeType =
+        ref.watch(expense_providers.selectedTimeRangeTypeProvider);
 
     // Current period total
     double currentTotal = currentData.fold(0.0, (sum, item) => sum + item.y);
@@ -350,7 +361,10 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
         periodTitle = '全年总收入';
         dailyTitle = '全年日均';
         comparisonTitle = '较去年同期';
-        final daysInYear = DateTime(selectedMonth.year, 12, 31).difference(DateTime(selectedMonth.year, 1, 1)).inDays + 1;
+        final daysInYear = DateTime(selectedMonth.year, 12, 31)
+                .difference(DateTime(selectedMonth.year, 1, 1))
+                .inDays +
+            1;
         dailyAverage = currentTotal / daysInYear;
         break;
       case 'all':
@@ -366,18 +380,22 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
         periodTitle = '当月总收入';
         dailyTitle = '当月日均';
         comparisonTitle = '较上月收入';
-        final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+        final daysInMonth =
+            DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
         dailyAverage = daysInMonth > 0 ? currentTotal / daysInMonth : 0.0;
         break;
     }
 
     // Change vs previous period
     double previousTotal = previousData.fold(0.0, (sum, item) => sum + item.y);
-    tooltipMessage = '上期收入: ¥ ${_formatCurrency(previousTotal)}';
-    
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+    tooltipMessage =
+        '上期收入: ${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(previousTotal)}';
+
     double changePercent = 0;
     if (previousTotal.abs() > 0.001) {
-      changePercent = ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
+      changePercent =
+          ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
     } else if (currentTotal.abs() > 0.001) {
       changePercent = currentTotal > 0 ? 100.0 : -100.0;
     }
@@ -388,12 +406,12 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
       children: [
         _buildStatsItem(
           periodTitle,
-          '¥ ${_formatCurrency(currentTotal)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(currentTotal)}',
         ),
         const SizedBox(width: 10),
         _buildStatsItem(
           dailyTitle,
-          '¥ ${_formatCurrency(dailyAverage)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(dailyAverage)}',
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -490,8 +508,9 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   @override
   Widget build(BuildContext context) {
     // 动态获取账户信息
-    final accountAsync = ref.watch(accountExpenseNodeProvider(widget.accountId));
-    
+    final accountAsync =
+        ref.watch(accountExpenseNodeProvider(widget.accountId));
+
     return accountAsync.when(
       data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
@@ -506,17 +525,20 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
   }
 
   Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
-    final chartDataAsync = ref
-        .watch(incomeChartDataProvider(account.accountData.accountId));
-    final previousPeriodDataAsync = ref
-        .watch(previousPeriodIncomeProviderFamily(account.accountData.accountId));
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+    final chartDataAsync =
+        ref.watch(incomeChartDataProvider(account.accountData.accountId));
+    final previousPeriodDataAsync = ref.watch(
+        previousPeriodIncomeProviderFamily(account.accountData.accountId));
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
-    ref.watch(expense_providers.selectedTimeRangeTypeProvider); // Watch for state changes
-    final monthlyIncomeAsync = ref.watch(
-        accountMonthlyIncomeProvider(account.accountData.accountId));
-    final overallIncomeAsync = ref.watch(
-        accountOverallIncomeProvider(account.accountData.accountId));
-    final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+    ref.watch(expense_providers
+        .selectedTimeRangeTypeProvider); // Watch for state changes
+    final monthlyIncomeAsync =
+        ref.watch(accountMonthlyIncomeProvider(account.accountData.accountId));
+    final overallIncomeAsync =
+        ref.watch(accountOverallIncomeProvider(account.accountData.accountId));
+    final currencyFormat = NumberFormat.currency(
+        locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
 
     Widget buildValueText(double value) {
       return Text(
@@ -606,12 +628,15 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                   children: [
                                     monthlyIncomeAsync.when(
                                       data: (total) => _buildStatisticItem(
-                                          _getCurrentPeriodTitle(), buildValueText(total)),
+                                          _getCurrentPeriodTitle(),
+                                          buildValueText(total)),
                                       loading: () => _buildStatisticItem(
-                                          _getCurrentPeriodTitle(), buildLoadingIndicator()),
+                                          _getCurrentPeriodTitle(),
+                                          buildLoadingIndicator()),
                                       error: (err, stack) =>
                                           _buildStatisticItem(
-                                              _getCurrentPeriodTitle(), buildErrorText()),
+                                              _getCurrentPeriodTitle(),
+                                              buildErrorText()),
                                     ),
                                     overallIncomeAsync.when(
                                       data: (total) => _buildStatisticItem(
@@ -643,20 +668,24 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                 IconButton(
                   icon: const Icon(Icons.more_vert, color: Colors.white),
                   onPressed: () async {
+                    // Get current ledger for currency symbol
+                    final currentLedger =
+                        await ref.read(selectedLedgerProvider.future);
+
                     // Convert database Account to UI Account
                     final uiAccount = ui.Account(
                       id: account.accountData.accountId,
                       name: account.accountData.accountName,
                       amount: account.balance,
                       type: account.accountData.accountType,
-                      currencySymbol: '¥',
+                      currencySymbol: currentLedger?.currencySymbol ?? '¥',
                     );
-                    
+
                     final isDeleted = await AccountUpdateBottomSheet.show(
                       context,
                       accountToUpdate: uiAccount,
                     );
-                    
+
                     // 如果账户被删除，退出详情页面
                     if (isDeleted == true && mounted) {
                       Navigator.of(context).pop();
@@ -711,20 +740,24 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                     newDate;
                               },
                               onLongRangeSelected: () async {
-                                await Future.delayed(const Duration(milliseconds: 100));
-                                
+                                await Future.delayed(
+                                    const Duration(milliseconds: 100));
+
                                 try {
-                                  final chartDataValue = ref.read(incomeChartDataProvider(account.accountData.accountId));
+                                  final chartDataValue = ref.read(
+                                      incomeChartDataProvider(
+                                          account.accountData.accountId));
                                   if (!chartDataValue.hasValue) return;
                                   final chartData = chartDataValue.value!;
-                                  
+
                                   String title = _getCurrentTimeRangeTitle();
                                   int daysInPeriod = _getCurrentDaysInPeriod();
-                                  
+
                                   if (context.mounted) {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (context) => FullscreenChartPage(
+                                        builder: (context) =>
+                                            FullscreenChartPage(
                                           chartData: chartData,
                                           daysInPeriod: daysInPeriod,
                                           startDate: _getStartDateForChart(),
@@ -749,7 +782,8 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                             chartDataAsync.when(
                               data: (currentData) {
                                 return previousPeriodDataAsync.when(
-                                  data: (previousData) => _buildStatsRow(currentData, previousData),
+                                  data: (previousData) =>
+                                      _buildStatsRow(currentData, previousData),
                                   loading: () => Container(
                                     height: 54,
                                     decoration: BoxDecoration(
@@ -757,10 +791,12 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Center(
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
                                     ),
                                   ),
-                                  error: (error, stack) => const SizedBox.shrink(),
+                                  error: (error, stack) =>
+                                      const SizedBox.shrink(),
                                 );
                               },
                               loading: () => Container(
@@ -770,7 +806,8 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               ),
                               error: (error, stack) => const SizedBox.shrink(),
@@ -788,9 +825,11 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                 children: [
                                   // Chart title and buttons
                                   Container(
-                                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 0),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         const Text(
                                           '收入统计图',
@@ -811,25 +850,36 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                                 });
                                               },
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
                                                 decoration: BoxDecoration(
                                                   color: Colors.grey.shade100,
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
                                                 ),
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
                                                     Icon(
-                                                      _isLineChart ? Icons.show_chart : Icons.bar_chart,
+                                                      _isLineChart
+                                                          ? Icons.show_chart
+                                                          : Icons.bar_chart,
                                                       size: 16,
-                                                      color: Colors.grey.shade600,
+                                                      color:
+                                                          Colors.grey.shade600,
                                                     ),
                                                     const SizedBox(width: 4),
                                                     Text(
-                                                      _isLineChart ? '折线图' : '柱状图',
+                                                      _isLineChart
+                                                          ? '折线图'
+                                                          : '柱状图',
                                                       style: TextStyle(
                                                         fontSize: 12,
-                                                        color: Colors.grey.shade600,
+                                                        color: Colors
+                                                            .grey.shade600,
                                                       ),
                                                     ),
                                                   ],
@@ -841,26 +891,41 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                             GestureDetector(
                                               onTap: () async {
                                                 if (!mounted) return;
-                                                
+
                                                 try {
-                                                  final chartDataValue = ref.read(incomeChartDataProvider(account.accountData.accountId));
-                                                  if (!chartDataValue.hasValue) return;
-                                                  final chartData = chartDataValue.value!;
-                                                  
-                                                  String title = _getCurrentTimeRangeTitle();
-                                                  int daysInPeriod = _getCurrentDaysInPeriod();
-                                                  
+                                                  final chartDataValue = ref.read(
+                                                      incomeChartDataProvider(
+                                                          account.accountData
+                                                              .accountId));
+                                                  if (!chartDataValue.hasValue)
+                                                    return;
+                                                  final chartData =
+                                                      chartDataValue.value!;
+
+                                                  String title =
+                                                      _getCurrentTimeRangeTitle();
+                                                  int daysInPeriod =
+                                                      _getCurrentDaysInPeriod();
+
                                                   if (context.mounted) {
                                                     Navigator.of(context).push(
                                                       MaterialPageRoute(
-                                                        builder: (context) => FullscreenChartPage(
+                                                        builder: (context) =>
+                                                            FullscreenChartPage(
                                                           chartData: chartData,
-                                                          daysInPeriod: daysInPeriod,
-                                                          startDate: _getStartDateForChart(),
-                                                          endDate: _getEndDateForChart(),
+                                                          ledger:
+                                                              selectedLedger,
+                                                          daysInPeriod:
+                                                              daysInPeriod,
+                                                          startDate:
+                                                              _getStartDateForChart(),
+                                                          endDate:
+                                                              _getEndDateForChart(),
                                                           timeRangeTitle: title,
-                                                          isLineChart: _isLineChart,
-                                                          chartType: ChartType.income,
+                                                          isLineChart:
+                                                              _isLineChart,
+                                                          chartType:
+                                                              ChartType.income,
                                                         ),
                                                       ),
                                                     );
@@ -870,10 +935,14 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                                 }
                                               },
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 4),
                                                 decoration: BoxDecoration(
                                                   color: Colors.blue.shade50,
-                                                  borderRadius: BorderRadius.circular(4),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
                                                 ),
                                                 child: Icon(
                                                   Icons.fullscreen,
@@ -890,24 +959,37 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                   // Chart content
                                   chartDataAsync.when(
                                     data: (chartData) {
-                                      final daysInPeriod = _getCurrentDaysInPeriod();
+                                      final daysInPeriod =
+                                          _getCurrentDaysInPeriod();
                                       return _isLineChart
                                           ? fl_linechart.FlLineChart(
                                               lineColor: Colors.green,
+                                              currencySymbol: selectedLedger
+                                                      ?.currencySymbol ??
+                                                  '¥',
                                               chartData: chartData
-                                                  .map((e) => fl_linechart.ChartData(e.x, e.y, e.day))
+                                                  .map((e) =>
+                                                      fl_linechart.ChartData(
+                                                          e.x, e.y, e.day))
                                                   .toList(),
                                               daysInMonth: daysInPeriod,
-                                              startDate: _getStartDateForChart(),
+                                              startDate:
+                                                  _getStartDateForChart(),
                                               endDate: _getEndDateForChart(),
                                             )
                                           : fl_barchart.FlBarChart(
                                               barColor: Colors.green,
+                                              currencySymbol: selectedLedger
+                                                      ?.currencySymbol ??
+                                                  "",
                                               chartData: chartData
-                                                  .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
+                                                  .map((e) =>
+                                                      fl_barchart.ChartData(
+                                                          e.x, e.y, e.day))
                                                   .toList(),
                                               daysInMonth: daysInPeriod,
-                                              startDate: _getStartDateForChart(),
+                                              startDate:
+                                                  _getStartDateForChart(),
                                               endDate: _getEndDateForChart(),
                                             );
                                     },
@@ -1056,7 +1138,8 @@ class AccountTransactionList extends ConsumerWidget {
 
               // 对每日内的交易按时间降序排序（最新的在前）
               groupedTransactions.forEach((date, transactions) {
-                transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+                transactions.sort((a, b) => b.transaction.transactionDate
+                    .compareTo(a.transaction.transactionDate));
               });
 
               // 按日期降序排列
@@ -1088,8 +1171,11 @@ class AccountTransactionList extends ConsumerWidget {
                     }
                   }
 
-                  final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final selectedLedger =
+                      ref.watch(selectedLedgerProvider).value;
+                  final formatter = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥');
                   final formattedDailyIn = formatter.format(dailyIn);
                   final formattedDailyOut = formatter.format(dailyOut);
 
@@ -1147,15 +1233,21 @@ class AccountTransactionList extends ConsumerWidget {
                           final bool isIncome = transactionWithAmount.nature ==
                               TransactionNature.INFLOW;
 
+                          final selectedLedger =
+                              ref.watch(selectedLedgerProvider).value;
                           final formatter = NumberFormat.currency(
-                              locale: 'zh_CN', symbol: '¥');
+                              locale: 'zh_CN',
+                              symbol: selectedLedger?.currencySymbol ?? '¥');
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 
                           // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
                           final timeFormatter = DateFormat('HH:mm');
-                          final formattedTime = timeFormatter.format(transaction.transactionDate);
-                          final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+                          final formattedTime =
+                              timeFormatter.format(transaction.transactionDate);
+                          final timeDisplay = formattedTime == '00:00'
+                              ? ''
+                              : ' · $formattedTime';
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(

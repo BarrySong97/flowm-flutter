@@ -1,14 +1,20 @@
+import 'package:flowm/db/app_database.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
 import '../../state/liabilities/liabilities_repository.dart';
+import '../../config/app_constants.dart';
 
 /// 负债趋势线图组件
 ///
 /// 显示负债变化趋势，数据通过参数传入
 class LiabilityTrendChart extends StatelessWidget {
   final List<LiabilityHistoryData> liabilityData;
-  const LiabilityTrendChart({super.key, required this.liabilityData});
+  final String currencySymbol;
+  const LiabilityTrendChart(
+      {super.key,
+      required this.liabilityData,
+      this.currencySymbol = AppConstants.currencySymbol});
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +31,12 @@ class LiabilityTrendChart extends StatelessWidget {
           }
 
           // 格式化货币显示
-          final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+          final formatter =
+              NumberFormat.currency(locale: 'zh_CN', symbol: currencySymbol);
 
           // 检测是否所有数据都为0
-          final bool allDataIsZero = liabilityData.every((data) => data.totalLiabilities == 0.0);
+          final bool allDataIsZero =
+              liabilityData.every((data) => data.totalLiabilities == 0.0);
 
           return SfCartesianChart(
             plotAreaBorderWidth: 0,

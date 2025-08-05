@@ -1,6 +1,7 @@
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/components/overview/assets_overview_grid.dart';
 import 'package:flowm/components/overview/monthly_overview_card.dart';
+import 'package:flowm/db/app_database.dart';
 import 'package:flowm/db/dao/account_dao.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/db/tables/account_table.dart';
@@ -21,7 +22,7 @@ import '../../pages/main_screen.dart';
 
 class OverviewPage extends ConsumerStatefulWidget {
   final Function(int)? onPageTap;
-  
+
   const OverviewPage({super.key, this.onPageTap});
 
   @override
@@ -79,7 +80,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
   // 构建月度总览卡片
   Widget _buildMonthlyOverviewCard(
       AsyncValue<({double expense, double income, double balance})>
-          monthlyOverviewDataAsync) {
+          monthlyOverviewDataAsync,
+      Ledger? selectedLedger) {
     return monthlyOverviewDataAsync.when(
         data: (data) {
           double fixNegativeZero(double value) {
@@ -87,7 +89,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             return value.abs() < 0.00001 ? 0.0 : value;
           }
 
-          final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+          final formatter = NumberFormat.currency(
+              locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
           final formattedExpense =
               formatter.format(fixNegativeZero(data.expense));
           final formattedIncome =
@@ -126,7 +129,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
   // 构建资产总览网格
   Widget _buildAssetsOverview(
       AsyncValue<List<AccountWithBalance>> topAssetsAsync,
-      AsyncValue<double> totalLiabilitiesAsync) {
+      AsyncValue<double> totalLiabilitiesAsync,
+      Ledger? selectedLedger) {
     return topAssetsAsync.when(
       data: (allAccounts) {
         return totalLiabilitiesAsync.when(
@@ -148,7 +152,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                   amountNumber: 0,
                   name: '',
                   symbol: '资产账户 ${index + 1}',
-                  amount: '¥--',
+                  amount: '${selectedLedger?.currencySymbol ?? '¥'}--',
                   changePercentage: 0.0,
                   backgroundColor: const Color(0xFFF5F5F5),
                   percent: '--%',
@@ -161,6 +165,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                 final formattedBalance = NumberFormatUtils.smartFormatCurrency(
                     accountWithBalance.balance,
                     useWan: true,
+                    symbol: selectedLedger?.currencySymbol ?? "¥",
                     minFormatThreshold: 10000000);
 
                 // 计算该账户余额占总资产的百分比
@@ -171,7 +176,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                 return AssetItem(
                   id: accountWithBalance.account.accountId,
                   name: accountWithBalance.account.accountName,
-                  symbol: "¥",
+                  symbol: selectedLedger?.currencySymbol ?? '¥',
                   amountNumber: accountWithBalance.balance,
                   amount: formattedBalance,
                   changePercentage: percentValue,
@@ -185,16 +190,19 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             final formattedTotalAssets = NumberFormatUtils.smartFormatCurrency(
                 totalAssets,
                 useWan: true,
+                symbol: selectedLedger?.currencySymbol ?? "¥",
                 minFormatThreshold: 100000);
             final formattedTotalLiabilities =
                 NumberFormatUtils.smartFormatCurrency(
                     totalLiabilitiesValue.abs(),
+                    symbol: selectedLedger?.currencySymbol ?? "¥",
                     useWan: true,
                     minFormatThreshold: 100000);
             final netAssets = totalAssets + totalLiabilitiesValue;
             final formattedNetAssets = NumberFormatUtils.smartFormatCurrency(
                 netAssets,
                 useWan: true,
+                symbol: selectedLedger?.currencySymbol ?? "¥",
                 minFormatThreshold: 100000);
 
             return AssetsOverviewGrid(
@@ -239,7 +247,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
 
   // 构建最近交易列表
   Widget _buildRecentTransactions(
-      AsyncValue<List<TransactionWithAmount>> latestTransactionsAsync) {
+      AsyncValue<List<TransactionWithAmount>> latestTransactionsAsync,
+      Ledger? selectedLedger) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 0,
@@ -294,10 +303,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
             // Sort dates in descending order and sort transactions within each date
             final sortedDates = groupedTransactions.keys.toList()
               ..sort((a, b) => b.compareTo(a));
-            
+
             // Sort transactions within each date by time (newest first)
             groupedTransactions.forEach((date, transactions) {
-              transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+              transactions.sort((a, b) => b.transaction.transactionDate
+                  .compareTo(a.transaction.transactionDate));
             });
 
             return Container(
@@ -327,8 +337,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                     }
                   }
 
-                  final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formatter = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥');
                   final formattedDailyIn = formatter.format(dailyIn);
                   final formattedDailyOut = formatter.format(dailyOut);
 
@@ -397,15 +408,19 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
                                     TransactionNature.OUTFLOW;
 
                             final formatter = NumberFormat.currency(
-                                locale: 'zh_CN', symbol: '¥');
+                                locale: 'zh_CN',
+                                symbol: selectedLedger?.currencySymbol ?? '¥');
                             // Display the absolute amount, as nature handles inflow/outflow distinction
                             final formattedAmount = formatter
                                 .format(transactionWithAmount.amount.abs());
 
                             // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
                             final timeFormatter = DateFormat('HH:mm');
-                            final formattedTime = timeFormatter.format(transaction.transactionDate);
-                            final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+                            final formattedTime = timeFormatter
+                                .format(transaction.transactionDate);
+                            final timeDisplay = formattedTime == '00:00'
+                                ? ''
+                                : ' · $formattedTime';
 
                             return TransactionListItem(
                               title: transaction.description ?? '无描述',
@@ -500,6 +515,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     final monthlyOverviewDataAsync = ref.watch(monthlyOverviewDataProvider);
     final latestTransactionsAsync = ref.watch(latestTransactionsProvider);
     final totalLiabilitiesAsync = ref.watch(totalLiabilitiesProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return SingleChildScrollView(
       child: Padding(
@@ -511,13 +527,14 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
           spacing: 16,
           children: [
             // Monthly Overview Card
-            _buildMonthlyOverviewCard(monthlyOverviewDataAsync),
+            _buildMonthlyOverviewCard(monthlyOverviewDataAsync, selectedLedger),
 
             // Assets Overview
-            _buildAssetsOverview(topAssetsAsync, totalLiabilitiesAsync),
+            _buildAssetsOverview(
+                topAssetsAsync, totalLiabilitiesAsync, selectedLedger),
 
             // Recent Transactions
-            _buildRecentTransactions(latestTransactionsAsync),
+            _buildRecentTransactions(latestTransactionsAsync, selectedLedger),
           ],
         ),
       ),

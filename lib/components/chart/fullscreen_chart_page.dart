@@ -1,3 +1,4 @@
+import 'package:flowm/db/app_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flowm/components/chart/fl_bar_chart.dart' as fl_barchart;
@@ -13,6 +14,7 @@ class FullscreenChartPage extends StatefulWidget {
   final DateTime? endDate;
   final String timeRangeTitle;
   final bool isLineChart;
+  final Ledger? ledger;
   final ChartType chartType; // 新增：图表类型参数
 
   const FullscreenChartPage({
@@ -23,6 +25,7 @@ class FullscreenChartPage extends StatefulWidget {
     this.startDate,
     this.endDate,
     this.isLineChart = false,
+    this.ledger,
     this.chartType = ChartType.expense, // 默认为支出（红色）
   });
 
@@ -239,6 +242,8 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                             child: _isLineChart
                                 ? fl_linechart.FlLineChart(
                                     lineColor: chartColor,
+                                    currencySymbol:
+                                        widget.ledger?.currencySymbol ?? '¥',
                                     chartData: widget.chartData
                                         .map((e) => fl_linechart.ChartData(
                                             e.x, e.y, e.day))
@@ -250,6 +255,8 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                                   )
                                 : fl_barchart.FlBarChart(
                                     barColor: chartColor,
+                                    currencySymbol:
+                                        widget.ledger?.currencySymbol ?? '¥',
                                     chartData: widget.chartData
                                         .map((e) => fl_barchart.ChartData(
                                             e.x, e.y, e.day))
@@ -264,6 +271,8 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                       : _isLineChart
                           ? fl_linechart.FlLineChart(
                               lineColor: chartColor,
+                              currencySymbol:
+                                  widget.ledger?.currencySymbol ?? '¥',
                               chartData: widget.chartData
                                   .map((e) =>
                                       fl_linechart.ChartData(e.x, e.y, e.day))
@@ -280,6 +289,8 @@ class _FullscreenChartPageState extends State<FullscreenChartPage> {
                                       fl_barchart.ChartData(e.x, e.y, e.day))
                                   .toList(),
                               daysInMonth: widget.daysInPeriod,
+                              currencySymbol:
+                                  widget.ledger?.currencySymbol ?? '¥',
                               startDate: widget.startDate,
                               endDate: widget.endDate,
                               isLandscape: true,

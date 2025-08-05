@@ -1,8 +1,10 @@
+import 'package:flowm/db/app_database.dart' as db;
 import 'package:flowm/db/dao/account_dao.dart';
 import 'package:flowm/components/common/popover_select.dart';
 // ignore: depend_on_referenced_packages
 import 'package:collection/collection.dart';
 import 'package:flowm/state/account/account_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/chart/asset_trend_chart.dart';
@@ -31,6 +33,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
     final asyncAssetsPageData = ref.watch(assetsPageDataProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return asyncAssetsPageData.when(
       data: (data) {
@@ -74,11 +77,11 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   spacing: 16,
                   children: [
-                    _buildTotalAssetsSection(
-                        context, ref, totalAssets, data.assetTrend),
+                    _buildTotalAssetsSection(context, ref, totalAssets,
+                        data.assetTrend, selectedLedger),
                     _buildAssetDistributionTitle(),
                     _buildTreemapContainer(context, data.accounts,
-                        displayedAccounts, isDrilledDown),
+                        displayedAccounts, isDrilledDown, selectedLedger),
                   ],
                 ),
               ),
@@ -132,7 +135,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
             SliverPadding(
               padding: const EdgeInsets.only(
                   top: 16, bottom: 16.0, left: 16, right: 16),
-              sliver: _buildAccountList(context, data.accounts),
+              sliver: _buildAccountList(context, data.accounts, selectedLedger),
             ),
           ],
         );
@@ -145,8 +148,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   }
 
   /// 构建总资产区域
-  Widget _buildTotalAssetsSection(BuildContext context, WidgetRef ref,
-      double totalAssets, List<AssetHistoryData> assetTrend) {
+  Widget _buildTotalAssetsSection(
+      BuildContext context,
+      WidgetRef ref,
+      double totalAssets,
+      List<AssetHistoryData> assetTrend,
+      db.Ledger? selectedLedger) {
     final List<PopoverSelectItem> dateRangeOptions = [
       PopoverSelectItem(value: 'month', label: '本月'),
       PopoverSelectItem(value: '15days', label: '最近15天'),
@@ -186,7 +193,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              '¥${totalAssets.toStringAsFixed(2)}',
+              '${selectedLedger?.currencySymbol ?? '¥'}${totalAssets.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Colors.black,
                 fontSize: 32,
@@ -194,7 +201,10 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
               ),
             ),
           ),
-          AssetTrendChart(assetData: assetTrend),
+          AssetTrendChart(
+            assetData: assetTrend,
+            ledger: selectedLedger,
+          ),
         ],
       ),
     );
@@ -235,8 +245,12 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   }
 
   /// 构建包含 Treemap 的容器
-  Widget _buildTreemapContainer(BuildContext context, List<Account> allAccounts,
-      List<dynamic> displayedAccounts, bool isDrilledDown) {
+  Widget _buildTreemapContainer(
+      BuildContext context,
+      List<Account> allAccounts,
+      List<dynamic> displayedAccounts,
+      bool isDrilledDown,
+      db.Ledger? selectedLedger) {
     return Container(
       height:
           isDrilledDown ? 280 : 240, // Adjust height if back button is shown
@@ -245,14 +259,18 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         borderRadius: BorderRadius.circular(6),
       ),
       clipBehavior: Clip.hardEdge,
-      child:
-          _buildTreemap(context, allAccounts, displayedAccounts, isDrilledDown),
+      child: _buildTreemap(context, allAccounts, displayedAccounts,
+          isDrilledDown, selectedLedger),
     );
   }
 
   /// 构建 Treemap 图表
-  Widget _buildTreemap(BuildContext context, List<Account> allAccounts,
-      List<dynamic> displayedAccounts, bool isDrilledDown) {
+  Widget _buildTreemap(
+      BuildContext context,
+      List<Account> allAccounts,
+      List<dynamic> displayedAccounts,
+      bool isDrilledDown,
+      db.Ledger? selectedLedger) {
     final double totalValueAtThisLevel = displayedAccounts
         .where((account) => account.amount > 0)
         .fold(0.0, (sum, account) => sum + account.amount);
@@ -318,7 +336,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
                   '${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
               title: isDrilledDown ? '资产分布 > $_drilledDownAccountName' : '资产分布',
               dataItems: treeMapData,
-              tooltipValueSuffix: ' ¥',
+              tooltipValueSuffix: ' ${selectedLedger?.currencySymbol ?? "¥"}',
               drilledDownAccountName: _drilledDownAccountName,
               onDrillDownSelected: (accountName) {
                 final selectedAccount = displayedAccounts
@@ -357,8 +375,8 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
   }
 
   /// 构建账户列表
-  SliverList _buildAccountList(
-      BuildContext context, List<Account> allAccounts) {
+  SliverList _buildAccountList(BuildContext context, List<Account> allAccounts,
+      db.Ledger? selectedLedger) {
     final double totalTopLevelAmount =
         allAccounts.fold(0.0, (sum, account) => sum + account.amount.abs());
 
@@ -373,7 +391,7 @@ class _AssetsPageState extends ConsumerState<AssetsPage>
         type: account.type,
         icon: account.icon,
         children: account.children,
-        currencySymbol: account.currencySymbol,
+        currencySymbol: selectedLedger?.currencySymbol ?? "¥",
         percentage: percentage,
       );
     }).toList();

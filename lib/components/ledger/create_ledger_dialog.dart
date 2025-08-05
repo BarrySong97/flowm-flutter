@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../state/ledger/ledger_repository.dart';
 import '../../db/app_database.dart' as db;
+import '../../config/app_constants.dart';
 
 class CreateLedgerDialog extends ConsumerStatefulWidget {
   final db.Ledger? ledger;
@@ -25,9 +26,9 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
     if (_isEditMode) {
       _nameController.text = widget.ledger!.name;
       _descriptionController.text = widget.ledger!.description ?? '';
-      _currencySymbolController.text = widget.ledger!.currencySymbol ?? '¥';
+      _currencySymbolController.text = widget.ledger!.currencySymbol ?? AppConstants.currencySymbol;
     } else {
-      _currencySymbolController.text = '¥';
+      _currencySymbolController.text = AppConstants.currencySymbol;
     }
   }
 
@@ -134,7 +135,7 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
               controller: _currencySymbolController,
               decoration: inputDecoration.copyWith(
                 labelText: '货币符号',
-                hintText: '¥',
+                hintText: AppConstants.currencySymbol,
               ),
               maxLength: 1,
               buildCounter: (context,

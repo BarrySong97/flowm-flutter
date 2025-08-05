@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import '../../config/app_constants.dart';
 
 class ChartData {
   ChartData(this.x, this.y, this.day);
@@ -17,6 +18,7 @@ class FlLineChart extends StatelessWidget {
     this.startDate,
     this.endDate,
     this.isLandscape = false,
+    this.currencySymbol = AppConstants.currencySymbol,
   });
 
   final List<ChartData> chartData;
@@ -25,6 +27,7 @@ class FlLineChart extends StatelessWidget {
   final DateTime? startDate;
   final DateTime? endDate;
   final bool isLandscape;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +103,7 @@ class FlLineChart extends StatelessWidget {
               ),
               children: <TextSpan>[
                 TextSpan(
-                  text: '¥${barSpot.y.toStringAsFixed(0)}',
+                  text: '$currencySymbol${barSpot.y.toStringAsFixed(0)}',
                   style: const TextStyle(
                     color: Colors.yellow,
                     fontSize: 12,

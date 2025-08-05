@@ -7,6 +7,7 @@ import 'package:flowm/components/common/time_range_selector.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/account/account_info_provider.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
@@ -14,6 +15,7 @@ import 'package:flowm/db/tables/account_table.dart';
 import 'package:sankey_flutter/sankey_helpers.dart';
 import 'package:intl/intl.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
+import 'package:flowm/config/app_constants.dart';
 
 class AssetsDetailPage extends ConsumerStatefulWidget {
   final int accountId;
@@ -69,7 +71,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
   Widget build(BuildContext context) {
     // 动态获取账户信息
     final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
-    
+
     return accountAsync.when(
       data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
@@ -97,6 +99,8 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
               flexibleSpace: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
                   // Create a boolean to determine if the SliverAppBar is collapsed
+                  final selectedLedger =
+                      ref.watch(selectedLedgerProvider).value;
                   return Stack(
                     children: [
                       // 白色背景
@@ -178,7 +182,9 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                                                   child: Text('暂无该时间段资产趋势数据'));
                                             }
                                             return AssetTrendChart(
-                                                assetData: assetData);
+                                              assetData: assetData,
+                                              ledger: selectedLedger,
+                                            );
                                           },
                                           loading: () => const Center(
                                               child:
@@ -230,7 +236,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                       context,
                       accountToUpdate: account,
                     );
-                    
+
                     // 如果账户被删除，退出详情页面
                     if (isDeleted == true && mounted) {
                       Navigator.of(context).pop();
@@ -423,11 +429,14 @@ class SankeyChartWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     final sankeyChartDataAsync = ref.watch(assetsSankeyChartDataProvider((
       accountId: account.id,
       flow: selectedFlow,
       timeRange: selectedTimeRange,
       limit: 50,
+      currencySymbol:
+          selectedLedger?.currencySymbol ?? AppConstants.currencySymbol,
     )));
 
     return Container(
@@ -613,6 +622,7 @@ class AccountTransactionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     final transactionsAsync = ref.watch(accountTransactionsProvider((
       accountId: account.id,
       timeRange: selectedTimeRange,
@@ -712,7 +722,8 @@ class AccountTransactionList extends ConsumerWidget {
 
               // 对每日内的交易按时间降序排序（最新的在前）
               groupedTransactions.forEach((date, transactions) {
-                transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+                transactions.sort((a, b) => b.transaction.transactionDate
+                    .compareTo(a.transaction.transactionDate));
               });
 
               // 按日期降序排列
@@ -744,8 +755,9 @@ class AccountTransactionList extends ConsumerWidget {
                     }
                   }
 
-                  final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                  final formatter = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥');
                   final formattedDailyIn = formatter.format(dailyIn);
                   final formattedDailyOut = formatter.format(dailyOut);
 
@@ -804,14 +816,18 @@ class AccountTransactionList extends ConsumerWidget {
                               TransactionNature.OUTFLOW;
 
                           final formatter = NumberFormat.currency(
-                              locale: 'zh_CN', symbol: '¥');
+                              locale: 'zh_CN',
+                              symbol: selectedLedger?.currencySymbol ?? '¥');
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 
                           // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
                           final timeFormatter = DateFormat('HH:mm');
-                          final formattedTime = timeFormatter.format(transaction.transactionDate);
-                          final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+                          final formattedTime =
+                              timeFormatter.format(transaction.transactionDate);
+                          final timeDisplay = formattedTime == '00:00'
+                              ? ''
+                              : ' · $formattedTime';
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(

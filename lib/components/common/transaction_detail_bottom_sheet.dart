@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../db/tables/account_table.dart';
 import '../../state/transaction/transaction_repository.dart';
+import '../../state/ledger/ledger_repository.dart';
 import 'package:flowm/utils/snackbar_utils.dart';
 import '../../utils/transaction_type_map.dart';
 import '../../utils/account_transaction_validator.dart';
+import '../../config/app_constants.dart';
 
 class TransactionDetailBottomSheet extends ConsumerWidget {
   final String amount;
@@ -107,7 +109,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
   }
 
   // 计算账户金额变化
-  String _getAccountAmountChange(bool isFromAccount) {
+  String _getAccountAmountChange(bool isFromAccount, {String currencySymbol = AppConstants.currencySymbol}) {
     double amountValue = transactionAmount ?? 0.0;
 
     // 如果没有传入 transactionAmount，尝试从 amount 字符串中解析
@@ -124,14 +126,14 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
         counterpartAccountType: isFromAccount ? toAccountType : fromAccountType,
       );
       
-      return '$symbol¥${amountValue.toStringAsFixed(2)}';
+      return '$symbol$currencySymbol${amountValue.toStringAsFixed(2)}';
     }
 
     // 退回到简单逻辑作为默认值
     if (isFromAccount) {
-      return '-¥${amountValue.toStringAsFixed(2)}';
+      return '-$currencySymbol${amountValue.toStringAsFixed(2)}';
     } else {
-      return '+¥${amountValue.toStringAsFixed(2)}';
+      return '+$currencySymbol${amountValue.toStringAsFixed(2)}';
     }
   }
 
@@ -197,6 +199,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     final accountNames = _parseAccountNames();
 
     return Container(
@@ -307,7 +310,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
                       children: [
                         _buildAccountDetailItem(
                           accountName: accountNames['fromAccount']!,
-                          amountChange: _getAccountAmountChange(true),
+                          amountChange: _getAccountAmountChange(true, currencySymbol: selectedLedger?.currencySymbol ?? '¥'),
                           isFromAccount: true,
                         ),
                         const Divider(
@@ -317,7 +320,7 @@ class TransactionDetailBottomSheet extends ConsumerWidget {
                         ),
                         _buildAccountDetailItem(
                           accountName: accountNames['toAccount']!,
-                          amountChange: _getAccountAmountChange(false),
+                          amountChange: _getAccountAmountChange(false, currencySymbol: selectedLedger?.currencySymbol ?? '¥'),
                           isFromAccount: false,
                         ),
                         const Divider(

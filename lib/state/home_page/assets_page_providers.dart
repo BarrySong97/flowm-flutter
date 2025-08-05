@@ -52,7 +52,7 @@ final assetsPageDataProvider =
   }
 
   final accountsFuture =
-      repository.getAssetsAccountTree(ledgerId: ledger.ledgerId);
+      repository.getAssetsAccountTree(ledgerId: ledger.ledgerId, currencySymbol: ledger.currencySymbol);
   final assetTrendFuture = repository.getAssetHistoryByTimeRange(
     startDate,
     endDate,

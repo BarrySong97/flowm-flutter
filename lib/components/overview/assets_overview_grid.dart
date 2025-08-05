@@ -160,7 +160,8 @@ class _AssetsOverviewGridState extends ConsumerState<AssetsOverviewGrid> {
                   children: [
                     _buildOverviewItem('净资产', widget.netAssets, Colors.purple),
                     _buildOverviewItem('总资产', widget.totalAssets, Colors.blue),
-                    _buildOverviewItem('总负债', widget.totalLiabilities, Colors.orange),
+                    _buildOverviewItem(
+                        '总负债', widget.totalLiabilities, Colors.orange),
                   ],
                 ),
               ),

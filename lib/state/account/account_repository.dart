@@ -37,7 +37,10 @@ final assetsAccountTreeProvider =
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    return repository.getAssetsAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getAssetsAccountTree(
+      ledgerId: ledger.ledgerId, 
+      currencySymbol: ledger.currencySymbol
+    );
   } else {
     return [];
   }
@@ -51,7 +54,9 @@ final assetSubAccountTreeProvider = FutureProvider.family
 
   if (ledger != null) {
     return repository.getAssetsAccountTree(
-        ledgerId: ledger.ledgerId, parentId: parentId);
+        ledgerId: ledger.ledgerId, 
+        parentId: parentId, 
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -65,7 +70,9 @@ final liabilitySubAccountTreeProvider = FutureProvider.family
 
   if (ledger != null) {
     return repository.getLiabilityAccountTree(
-        ledgerId: ledger.ledgerId, parentId: parentId);
+        ledgerId: ledger.ledgerId, 
+        parentId: parentId, 
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -78,7 +85,9 @@ final liabilityAccountTreeProvider =
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    return repository.getLiabilityAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getLiabilityAccountTree(
+        ledgerId: ledger.ledgerId, 
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -91,7 +100,9 @@ final expenseAccountTreeProvider =
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    return repository.getExpenseAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getExpenseAccountTree(
+        ledgerId: ledger.ledgerId,
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -104,7 +115,9 @@ final incomeAccountTreeProvider =
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    return repository.getIncomeAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getIncomeAccountTree(
+        ledgerId: ledger.ledgerId,
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -117,7 +130,9 @@ final equityAccountTreeProvider =
   final ledger = await ref.watch(selectedLedgerProvider.future);
 
   if (ledger != null) {
-    return repository.getEquityAccountTree(ledgerId: ledger.ledgerId);
+    return repository.getEquityAccountTree(
+        ledgerId: ledger.ledgerId,
+        currencySymbol: ledger.currencySymbol);
   } else {
     return [];
   }
@@ -1446,7 +1461,7 @@ class AccountRepository {
 
   // 递归将AccountWithChildren转换为UI格式的Account并计算余额（用于资产账户）
   Future<List<account_ui.Account>> _convertAccountsToUIFormat(
-      List<AccountWithChildren> accounts) async {
+      List<AccountWithChildren> accounts, {String currencySymbol = '¥'}) async {
     if (accounts.isEmpty) {
       return [];
     }
@@ -1464,7 +1479,7 @@ class AccountRepository {
 
       // 2. 如果有子账户，递归处理子账户并累加其UI显示的金额
       if (acc.children.isNotEmpty) {
-        uiChildren = await _convertAccountsToUIFormat(acc.children);
+        uiChildren = await _convertAccountsToUIFormat(acc.children, currencySymbol: currencySymbol);
         for (final childUiAccount in uiChildren) {
           // childUiAccount.amount 已经是经过递归计算的完整余额（自身+其子项）
           childrensTotalAmount += childUiAccount.amount;
@@ -1481,7 +1496,7 @@ class AccountRepository {
         type: acc.account.accountType,
         amount: totalAmountForUI, // 使用新计算的总金额
         children: uiChildren, // 传递已经处理过的UI子账户列表
-        currencySymbol: '¥', // 使用账户的货币代码，默认为人民币符号
+        currencySymbol: currencySymbol, // 使用传入的货币符号
       ));
     }
 
@@ -1490,7 +1505,7 @@ class AccountRepository {
 
   /// 优化后的转换方法，使用批量查询避免N+1问题
   Future<List<account_ui.Account>> _convertAccountsToUIFormatOptimized(
-      List<AccountWithChildren> accounts, int ledgerId) async {
+      List<AccountWithChildren> accounts, int ledgerId, {String currencySymbol = '¥'}) async {
     if (accounts.isEmpty) {
       return [];
     }
@@ -1512,7 +1527,7 @@ class AccountRepository {
     final balanceMap = await _batchGetAccountBalances(allAccountIds.toList());
 
     // 3. 递归转换为UI格式，使用预先查询的余额数据
-    return _convertAccountsToUIFormatWithBalanceMap(accounts, balanceMap);
+    return _convertAccountsToUIFormatWithBalanceMap(accounts, balanceMap, currencySymbol: currencySymbol);
   }
 
   /// 批量获取账户余额，避免N+1查询问题
@@ -1557,7 +1572,7 @@ class AccountRepository {
 
   /// 使用预先查询的余额数据转换账户格式
   List<account_ui.Account> _convertAccountsToUIFormatWithBalanceMap(
-      List<AccountWithChildren> accounts, Map<int, double> balanceMap) {
+      List<AccountWithChildren> accounts, Map<int, double> balanceMap, {String currencySymbol = '¥'}) {
     if (accounts.isEmpty) {
       return [];
     }
@@ -1574,7 +1589,7 @@ class AccountRepository {
       // 2. 如果有子账户，递归处理子账户
       if (acc.children.isNotEmpty) {
         uiChildren =
-            _convertAccountsToUIFormatWithBalanceMap(acc.children, balanceMap);
+            _convertAccountsToUIFormatWithBalanceMap(acc.children, balanceMap, currencySymbol: currencySymbol);
         for (final childUiAccount in uiChildren) {
           childrensTotalAmount += childUiAccount.amount;
         }
@@ -1590,7 +1605,7 @@ class AccountRepository {
         type: acc.account.accountType,
         amount: totalAmountForUI,
         children: uiChildren,
-        currencySymbol: '¥',
+        currencySymbol: currencySymbol,
       ));
     }
 
@@ -1599,7 +1614,7 @@ class AccountRepository {
 
   // 递归将AccountWithChildren转换为UI格式的Account但不计算余额（用于非资产账户）
   List<account_ui.Account> _convertAccountsToUIFormatWithoutBalance(
-      List<AccountWithChildren> accounts) {
+      List<AccountWithChildren> accounts, {String currencySymbol = '¥'}) {
     if (accounts.isEmpty) {
       return [];
     }
@@ -1611,7 +1626,7 @@ class AccountRepository {
 
       // 如果有子账户，递归处理子账户
       if (acc.children.isNotEmpty) {
-        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children);
+        uiChildren = _convertAccountsToUIFormatWithoutBalance(acc.children, currencySymbol: currencySymbol);
       }
 
       // 创建UI需要的Account对象，金额设为0
@@ -1621,7 +1636,7 @@ class AccountRepository {
         type: acc.account.accountType,
         amount: 0.0, // 不计算余额，设为0
         children: uiChildren,
-        currencySymbol: '¥',
+        currencySymbol: currencySymbol,
         icon: _getAccountIcon(acc.account.accountType), // 根据账户类型设置图标
       ));
     }
@@ -1654,7 +1669,7 @@ class AccountRepository {
   /// 获取UI展示所需的账户树
   /// 将数据库中的账户转换为UI组件所需的格式
   Future<List<account_ui.Account>> getAssetsAccountTree(
-      {int? ledgerId, int? parentId}) async {
+      {int? ledgerId, int? parentId, String currencySymbol = '¥'}) async {
     try {
       if (ledgerId == null) {
         return [];
@@ -1670,7 +1685,7 @@ class AccountRepository {
 
       // 递归转换为UI需要的Account格式
       final result =
-          await _convertAccountsToUIFormatOptimized(assetAccounts, ledgerId);
+          await _convertAccountsToUIFormatOptimized(assetAccounts, ledgerId, currencySymbol: currencySymbol);
       return result;
     } catch (e) {
       print('[AccountRepository] Error in getAssetsAccountTree: $e');
@@ -1680,7 +1695,7 @@ class AccountRepository {
 
   /// 获取负债账户树
   Future<List<account_ui.Account>> getLiabilityAccountTree(
-      {int? ledgerId, int? parentId}) async {
+      {int? ledgerId, int? parentId, String currencySymbol = '¥'}) async {
     try {
       if (ledgerId == null) {
         return [];
@@ -1691,7 +1706,7 @@ class AccountRepository {
           .where((acc) => acc.account.accountType == AccountType.LIABILITY)
           .toList();
       return await _convertAccountsToUIFormatOptimized(
-          liabilityAccounts, ledgerId);
+          liabilityAccounts, ledgerId, currencySymbol: currencySymbol);
     } catch (e) {
       return [];
     }
@@ -1699,7 +1714,7 @@ class AccountRepository {
 
   /// 获取支出账户树
   Future<List<account_ui.Account>> getExpenseAccountTree(
-      {int? ledgerId}) async {
+      {int? ledgerId, String currencySymbol = '¥'}) async {
     try {
       if (ledgerId == null) {
         return [];
@@ -1709,14 +1724,14 @@ class AccountRepository {
           .where((acc) => acc.account.accountType == AccountType.EXPENSE)
           .toList();
       return await _convertAccountsToUIFormatOptimized(
-          expenseAccounts, ledgerId);
+          expenseAccounts, ledgerId, currencySymbol: currencySymbol);
     } catch (e) {
       return [];
     }
   }
 
   /// 获取收入账户树
-  Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId}) async {
+  Future<List<account_ui.Account>> getIncomeAccountTree({int? ledgerId, String currencySymbol = '¥'}) async {
     try {
       if (ledgerId == null) {
         return [];
@@ -1726,14 +1741,14 @@ class AccountRepository {
           .where((acc) => acc.account.accountType == AccountType.INCOME)
           .toList();
       return await _convertAccountsToUIFormatOptimized(
-          incomeAccounts, ledgerId);
+          incomeAccounts, ledgerId, currencySymbol: currencySymbol);
     } catch (e) {
       return [];
     }
   }
 
   /// 获取权益账户树
-  Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId}) async {
+  Future<List<account_ui.Account>> getEquityAccountTree({int? ledgerId, String currencySymbol = '¥'}) async {
     try {
       if (ledgerId == null) {
         return [];
@@ -1743,7 +1758,7 @@ class AccountRepository {
           .where((acc) => acc.account.accountType == AccountType.EQUITY)
           .toList();
       return await _convertAccountsToUIFormatOptimized(
-          equityAccounts, ledgerId);
+          equityAccounts, ledgerId, currencySymbol: currencySymbol);
     } catch (e) {
       return [];
     }

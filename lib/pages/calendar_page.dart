@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flowm/components/calendar/calendar_day.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import '../../db/dao/transaction_dao.dart';
 import '../../state/transaction/calendar_provider.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
@@ -180,6 +181,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         // Get the summary for the specific 'day' from the monthly map
@@ -190,17 +192,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           isSelected: isSameDay(_selectedDay, day),
                           income: daySummary?.income,
                           expense: daySummary?.expenses,
+                          currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                         );
                       },
                       loading: () => CalendarDay(
                         day: day,
                         isToday: isSameDay(day, DateTime.now()),
                         isSelected: isSameDay(_selectedDay, day),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                       error: (err, stack) => CalendarDay(
                         day: day,
                         isToday: isSameDay(day, DateTime.now()),
                         isSelected: isSameDay(_selectedDay, day),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                     );
                   });
@@ -210,6 +215,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         final daySummary = summaryMap[day.day];
@@ -219,17 +225,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           isSelected: isSameDay(_selectedDay, day),
                           income: daySummary?.income,
                           expense: daySummary?.expenses,
+                          currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                         );
                       },
                       loading: () => CalendarDay(
                         day: day,
                         isToday: true,
                         isSelected: isSameDay(_selectedDay, day),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                       error: (err, stack) => CalendarDay(
                         day: day,
                         isToday: true,
                         isSelected: isSameDay(_selectedDay, day),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                     );
                   });
@@ -239,6 +248,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     final monthKey = DateTime(day.year, day.month, 1);
                     final monthlySummaryAsyncValue =
                         ref.watch(monthlyCalendarSummaryProvider(monthKey));
+                    final selectedLedger = ref.watch(selectedLedgerProvider).value;
                     return monthlySummaryAsyncValue.when(
                       data: (summaryMap) {
                         final daySummary = summaryMap[day.day];
@@ -248,17 +258,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           isToday: isSameDay(day, DateTime.now()),
                           income: daySummary?.income,
                           expense: daySummary?.expenses,
+                          currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                         );
                       },
                       loading: () => CalendarDay(
                         day: day,
                         isSelected: true,
                         isToday: isSameDay(day, DateTime.now()),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                       error: (err, stack) => CalendarDay(
                         day: day,
                         isSelected: true,
                         isToday: isSameDay(day, DateTime.now()),
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                       ),
                     );
                   });
@@ -311,6 +324,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             builder: (context, ref, child) {
               final monthKey = DateTime(_selectedDay.year, _selectedDay.month, 1);
               final monthlySummaryAsyncValue = ref.watch(monthlyCalendarSummaryProvider(monthKey));
+              final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
               return monthlySummaryAsyncValue.when(
                 data: (summaryMap) {
@@ -318,6 +332,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   final income = daySummary?.income ?? 0.0;
                   final expenses = daySummary?.expenses ?? 0.0;
                   final net = income - expenses;
+                  final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
 
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
@@ -377,7 +392,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           children: [
                             Expanded(
                               child: Text(
-                                '收入: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(income)}',
+                                '收入: ${currencyFormat.format(income)}',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey.shade700,
@@ -387,7 +402,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             ),
                             Expanded(
                               child: Text(
-                                '支出: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(expenses)}',
+                                '支出: ${currencyFormat.format(expenses)}',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 14,
@@ -398,7 +413,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             ),
                             Expanded(
                               child: Text(
-                                '结余: ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(net)}',
+                                '结余: ${currencyFormat.format(net)}',
                                 textAlign: TextAlign.end,
                                 style: TextStyle(
                                   fontSize: 14,
@@ -450,7 +465,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              '收入: ¥0.00',
+                              '收入: ${selectedLedger?.currencySymbol ?? '¥'}0.00',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade700,
@@ -460,7 +475,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           ),
                           Expanded(
                             child: Text(
-                              '支出: ¥0.00',
+                              '支出: ${selectedLedger?.currencySymbol ?? '¥'}0.00',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
@@ -471,7 +486,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           ),
                           Expanded(
                             child: Text(
-                              '结余: ¥0.00',
+                              '结余: ${selectedLedger?.currencySymbol ?? '¥'}0.00',
                               textAlign: TextAlign.end,
                               style: TextStyle(
                                 fontSize: 14,
@@ -566,124 +581,127 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 final selectedDayTransactionsAsync =
                     ref.watch(selectedDayTransactionsProvider(_selectedDay));
 
-                return selectedDayTransactionsAsync.when(
-                  data: (transactionsWithAmount) {
-                    if (transactionsWithAmount.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.receipt_long_outlined,
-                                size: 48,
-                                color: Colors.grey,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                '该日期无交易记录',
-                                style: TextStyle(
-                                  fontSize: 16,
+                return Consumer(builder: (context, ref, child) {
+                  final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                  final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥', decimalDigits: 2);
+                  
+                  return selectedDayTransactionsAsync.when(
+                    data: (transactionsWithAmount) {
+                      if (transactionsWithAmount.isEmpty) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long_outlined,
+                                  size: 48,
                                   color: Colors.grey,
                                 ),
-                              ),
-                            ],
+                                SizedBox(height: 16),
+                                Text(
+                                  '该日期无交易记录',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    }
-
-                    // 对交易进行排序
-                    final sortedTransactions = List<TransactionWithAmount>.from(transactionsWithAmount);
-                    sortedTransactions.sort((a, b) {
-                      if (_isTransactionSortAscending) {
-                        return a.transaction.transactionDate.compareTo(b.transaction.transactionDate);
-                      } else {
-                        return b.transaction.transactionDate.compareTo(a.transaction.transactionDate);
-                      }
-                    });
-
-                    return SuperListView.builder(
-                      itemCount: sortedTransactions.length,
-                      itemBuilder: (context, index) {
-                        final item = sortedTransactions[index];
-                        final transaction = item.transaction;
-                        final amountString =
-                            NumberFormat.currency(symbol: '¥', decimalDigits: 2)
-                                .format(item.amount.abs());
-
-                        // 改进时间显示逻辑 - 参考top_expense_detail_page的实现
-                        String subtitle = '';
-                        final timeStr = DateFormat('HH:mm').format(transaction.transactionDate);
-                        
-                        // 优先显示账户信息，时间作为补充
-                        if (item.fromAccount != null && item.toAccount != null) {
-                          subtitle = '${item.fromAccount!.accountName} → ${item.toAccount!.accountName}';
-                          // 如果不是00:00，添加时间显示
-                          if (timeStr != '00:00') {
-                            subtitle += ' • $timeStr';
-                          }
-                        } else if (item.nature == TransactionNature.OUTFLOW && item.toAccount != null) {
-                          subtitle = item.toAccount!.accountName;
-                          if (timeStr != '00:00') {
-                            subtitle += ' • $timeStr';
-                          }
-                        } else if (item.nature == TransactionNature.INFLOW && item.fromAccount != null) {
-                          subtitle = item.fromAccount!.accountName;
-                          if (timeStr != '00:00') {
-                            subtitle += ' • $timeStr';
-                          }
-                        } else {
-                          // 如果没有账户信息，只显示时间（除非是00:00）
-                          subtitle = timeStr != '00:00' ? timeStr : '';
-                        }
-
-                        return TransactionListItem(
-                          title: transaction.description ?? '无描述',
-                          transactionId: transaction.transactionId.toString(),
-                          subtitle: subtitle,
-                          amount: amountString,
-                          type: _getTransactionType(item),
-                          statusColor: _getTransactionColor(item),
-                          isExpense: _isExpenseTransaction(item),
-                          transactionDate: transaction.transactionDate,
-                          createDate: transaction.createdAt,
-                          transactionAmount: item.amount,
-                          fullDescription: transaction.description,
-                          fromAccountType: item.fromAccount?.accountType,
-                          toAccountType: item.toAccount?.accountType,
-                          onDelete: () {
-                            // 刷新当月数据
-                            final monthKey = DateTime(
-                                _selectedDay.year, _selectedDay.month, 1);
-                            ref.invalidate(
-                                monthlyCalendarSummaryProvider(monthKey));
-
-                            // 刷新当天交易列表
-                            ref.invalidate(
-                                selectedDayTransactionsProvider(_selectedDay));
-
-                            // 刷新其他相关的providers
-                            if (item.fromAccount?.accountType != null &&
-                                item.toAccount?.accountType != null) {
-                              invalidateProvidersForTransaction(
-                                ref,
-                                fromAccountType: item.fromAccount?.accountType,
-                                toAccountType: item.toAccount?.accountType,
-                              );
-                            }
-                          },
                         );
-                      },
-                    );
-                  },
+                      }
+
+                      // 对交易进行排序
+                      final sortedTransactions = List<TransactionWithAmount>.from(transactionsWithAmount);
+                      sortedTransactions.sort((a, b) {
+                        if (_isTransactionSortAscending) {
+                          return a.transaction.transactionDate.compareTo(b.transaction.transactionDate);
+                        } else {
+                          return b.transaction.transactionDate.compareTo(a.transaction.transactionDate);
+                        }
+                      });
+
+                      return SuperListView.builder(
+                        itemCount: sortedTransactions.length,
+                        itemBuilder: (context, index) {
+                          final item = sortedTransactions[index];
+                          final transaction = item.transaction;
+                          final amountString = currencyFormat.format(item.amount.abs());
+
+                          // 改进时间显示逻辑 - 参考top_expense_detail_page的实现
+                          String subtitle = '';
+                          final timeStr = DateFormat('HH:mm').format(transaction.transactionDate);
+                          
+                          // 优先显示账户信息，时间作为补充
+                          if (item.fromAccount != null && item.toAccount != null) {
+                            subtitle = '${item.fromAccount!.accountName} → ${item.toAccount!.accountName}';
+                            // 如果不是00:00，添加时间显示
+                            if (timeStr != '00:00') {
+                              subtitle += ' • $timeStr';
+                            }
+                          } else if (item.nature == TransactionNature.OUTFLOW && item.toAccount != null) {
+                            subtitle = item.toAccount!.accountName;
+                            if (timeStr != '00:00') {
+                              subtitle += ' • $timeStr';
+                            }
+                          } else if (item.nature == TransactionNature.INFLOW && item.fromAccount != null) {
+                            subtitle = item.fromAccount!.accountName;
+                            if (timeStr != '00:00') {
+                              subtitle += ' • $timeStr';
+                            }
+                          } else {
+                            // 如果没有账户信息，只显示时间（除非是00:00）
+                            subtitle = timeStr != '00:00' ? timeStr : '';
+                          }
+
+                          return TransactionListItem(
+                            title: transaction.description ?? '无描述',
+                            transactionId: transaction.transactionId.toString(),
+                            subtitle: subtitle,
+                            amount: amountString,
+                            type: _getTransactionType(item),
+                            statusColor: _getTransactionColor(item),
+                            isExpense: _isExpenseTransaction(item),
+                            transactionDate: transaction.transactionDate,
+                            createDate: transaction.createdAt,
+                            transactionAmount: item.amount,
+                            fullDescription: transaction.description,
+                            fromAccountType: item.fromAccount?.accountType,
+                            toAccountType: item.toAccount?.accountType,
+                            onDelete: () {
+                              // 刷新当月数据
+                              final monthKey = DateTime(
+                                  _selectedDay.year, _selectedDay.month, 1);
+                              ref.invalidate(
+                                  monthlyCalendarSummaryProvider(monthKey));
+
+                              // 刷新当天交易列表
+                              ref.invalidate(
+                                  selectedDayTransactionsProvider(_selectedDay));
+
+                              // 刷新其他相关的providers
+                              if (item.fromAccount?.accountType != null &&
+                                  item.toAccount?.accountType != null) {
+                                invalidateProvidersForTransaction(
+                                  ref,
+                                  fromAccountType: item.fromAccount?.accountType,
+                                  toAccountType: item.toAccount?.accountType,
+                                );
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (error, stackTrace) => Center(
                     child: Text('错误: $error\n$stackTrace'),
                   ),
                 );
+                });
               },
             ),
           ),

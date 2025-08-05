@@ -74,7 +74,7 @@ class _AccountItemState extends State<AccountItem> {
           icon: child.icon,
           children:
               child.children, // Children of children are not processed here
-          currencySymbol: child.currencySymbol,
+          currencySymbol: widget.account.currencySymbol,
           percentage: childPercentage,
         );
       }).toList();

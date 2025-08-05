@@ -5,6 +5,7 @@ import 'package:flowm/components/chart/liability_trend_chart.dart';
 import 'package:flowm/components/chart/liability_treemap.dart';
 import 'package:flowm/components/account/account_item.dart'; // Import AccountItem and Account model
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart'; // 引入 GoRouter
 import 'package:el_tooltip/el_tooltip.dart';
@@ -29,6 +30,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
     super.build(context); // Important for AutomaticKeepAliveClientMixin
 
     final uiLiabilitiesAsync = ref.watch(uiLiabilityAccountsProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return uiLiabilitiesAsync.when(
       data: (allAccounts) {
@@ -71,7 +73,11 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                     _buildLiabilitiesDistributionTitle(),
                     const SizedBox(height: 12),
                     _buildTreemapContainer(
-                        context, allAccounts, displayedAccounts, isDrilledDown),
+                        context,
+                        allAccounts,
+                        displayedAccounts,
+                        isDrilledDown,
+                        selectedLedger?.currencySymbol ?? '¥'),
                   ],
                 ),
               ),
@@ -183,12 +189,13 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
               builder: (context, ref, _) {
                 final topLiabilitiesAsync =
                     ref.watch(topLiabilityAccountsProvider);
+                final selectedLedger = ref.watch(selectedLedgerProvider).value;
                 return topLiabilitiesAsync.when(
                   data: (accounts) {
                     final totalLiabilities = accounts.fold(
                         0.0, (sum, account) => sum + account.balance);
                     return Text(
-                      '¥${totalLiabilities.toStringAsFixed(2)}',
+                      '${selectedLedger?.currencySymbol ?? '¥'}${totalLiabilities.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: Colors.black,
                         fontSize: 32,
@@ -218,9 +225,13 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
           Consumer(builder: (context, ref, child) {
             final liabilityTrendAsync =
                 ref.watch(liabilityTrendProviderByDateRange(null));
+            final selectedLedger = ref.watch(selectedLedgerProvider).value;
             return liabilityTrendAsync.when(
               data: (liabilityData) {
-                return LiabilityTrendChart(liabilityData: liabilityData);
+                return LiabilityTrendChart(
+                  liabilityData: liabilityData,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
+                );
               },
               loading: () => const SizedBox(
                   height: 140,
@@ -269,8 +280,12 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
   }
 
   /// 构建包含 Treemap 的容器
-  Widget _buildTreemapContainer(BuildContext context, List<Account> allAccounts,
-      List<dynamic> displayedAccounts, bool isDrilledDown) {
+  Widget _buildTreemapContainer(
+      BuildContext context,
+      List<Account> allAccounts,
+      List<dynamic> displayedAccounts,
+      bool isDrilledDown,
+      String currencySymbol) {
     return Container(
       height:
           isDrilledDown ? 280 : 240, // Adjust height if back button is shown
@@ -279,14 +294,18 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
         borderRadius: BorderRadius.circular(6),
       ),
       clipBehavior: Clip.hardEdge,
-      child:
-          _buildTreemap(context, allAccounts, displayedAccounts, isDrilledDown),
+      child: _buildTreemap(context, allAccounts, displayedAccounts,
+          isDrilledDown, currencySymbol),
     );
   }
 
   /// 构建 Treemap 图表
-  Widget _buildTreemap(BuildContext context, List<Account> allAccounts,
-      List<dynamic> displayedAccounts, bool isDrilledDown) {
+  Widget _buildTreemap(
+      BuildContext context,
+      List<Account> allAccounts,
+      List<dynamic> displayedAccounts,
+      bool isDrilledDown,
+      String currencySymbol) {
     final double totalValueAtThisLevel = displayedAccounts
         .where((account) => account.amount > 0)
         .fold(0.0, (sum, account) => sum + account.amount);
@@ -352,7 +371,7 @@ class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
                   '${_drilledDownAccountName ?? '__treemap_root__'}_${displayedAccounts.length}_${displayedAccounts.map((a) => '${a.name}_${a.amount}').join('_')}'),
               title: isDrilledDown ? '负债分布 > $_drilledDownAccountName' : '负债分布',
               dataItems: treeMapData,
-              tooltipValueSuffix: ' ¥',
+              tooltipValueSuffix: ' $currencySymbol',
               drilledDownAccountName: _drilledDownAccountName,
               onDrillDownSelected: (accountName) {
                 final selectedAccount = displayedAccounts

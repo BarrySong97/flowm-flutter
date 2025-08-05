@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For NumberFormat
+import '../../config/app_constants.dart';
 
 class CalendarDay extends StatelessWidget {
   final DateTime day;
@@ -7,6 +8,7 @@ class CalendarDay extends StatelessWidget {
   final bool isSelected;
   final double? income;
   final double? expense;
+  final String currencySymbol;
 
   const CalendarDay({
     super.key,
@@ -15,10 +17,11 @@ class CalendarDay extends StatelessWidget {
     this.isSelected = false,
     this.income,
     this.expense,
+    this.currencySymbol = AppConstants.currencySymbol,
   });
 
   String _formatCompactCurrency(double value) {
-    if (value == 0) return '¥0';
+    if (value == 0) return '${currencySymbol}0';
     return NumberFormat.currency(
       locale: 'zh_CN',
       symbol: '',

@@ -11,6 +11,7 @@ import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 
 class TopLiabilitiesAccountDetailPage extends ConsumerStatefulWidget {
   final int accountId; // 接收 accountId 参数
@@ -42,10 +43,10 @@ class _TopAssetsAccountDetailPageState
   @override
   Widget build(BuildContext context) {
     super.build(context); // Important for AutomaticKeepAliveClientMixin
-    
+
     // 动态获取账户信息
     final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
-    
+
     return accountAsync.when(
       data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
@@ -100,7 +101,7 @@ class _TopAssetsAccountDetailPageState
                 context,
                 accountToUpdate: account,
               );
-              
+
               // 如果账户被删除，退出详情页面
               if (isDeleted == true && mounted) {
                 Navigator.of(context).pop();
@@ -161,37 +162,43 @@ class _TopAssetsAccountDetailPageState
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: liabilityTrendAsync.when(
-                          data: (liabilityData) {
-                            final amount = liabilityData.isNotEmpty
-                                ? liabilityData.last.totalLiabilities
-                                : account.amount;
-                            return Text(
-                              '¥${amount.abs().toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            final selectedLedger =
+                                ref.watch(selectedLedgerProvider).value;
+                            return liabilityTrendAsync.when(
+                              data: (liabilityData) {
+                                final amount = liabilityData.isNotEmpty
+                                    ? liabilityData.last.totalLiabilities
+                                    : account.amount;
+                                return Text(
+                                  '${selectedLedger?.currencySymbol ?? '¥'}${amount.abs().toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              },
+                              loading: () => const Text(
+                                '加载中...',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              error: (err, stack) => Text(
+                                // Fallback to account.amount on error
+                                '${selectedLedger?.currencySymbol ?? '¥'}${account.amount.abs().toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Colors.red, // Indicate error
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             );
                           },
-                          loading: () => const Text(
-                            '加载中...',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          error: (err, stack) => Text(
-                            // Fallback to account.amount on error
-                            '¥${account.amount.abs().toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Colors.red, // Indicate error
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                         ),
                       ),
                       // AssetTrendChart()
@@ -203,8 +210,13 @@ class _TopAssetsAccountDetailPageState
                                 height: 200,
                                 child: Center(child: Text('暂无该时间段负债趋势数据')));
                           }
+                          final selectedLedger =
+                              ref.watch(selectedLedgerProvider).value;
                           return LiabilityTrendChart(
-                              liabilityData: liabilityData);
+                            liabilityData: liabilityData,
+                            currencySymbol:
+                                selectedLedger?.currencySymbol ?? '¥',
+                          );
                         },
                         loading: () => const SizedBox(
                             height: 200,
@@ -235,8 +247,7 @@ class _TopAssetsAccountDetailPageState
                           ),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 48),
-                          child: Center(
-                              child: Text('${account.name} 无下级账户')));
+                          child: Center(child: Text('${account.name} 无下级账户')));
                     }
 
                     final double totalTopLevelAmount = subAccounts.fold(
@@ -332,8 +343,7 @@ class _TopAssetsAccountDetailPageState
 
                               if (treemapBaseData.isEmpty) {
                                 return Center(
-                                    child: Text(
-                                        '${account.name} 无下级账户可供分布展示'));
+                                    child: Text('${account.name} 无下级账户可供分布展示'));
                               }
 
                               List<Account> displayedAccounts;
@@ -343,8 +353,7 @@ class _TopAssetsAccountDetailPageState
 
                               if (!isDrilledDown) {
                                 displayedAccounts = treemapBaseData;
-                                currentTreemapTitle =
-                                    '${account.name} - 负债构成';
+                                currentTreemapTitle = '${account.name} - 负债构成';
                               } else {
                                 final parentAccount =
                                     treemapBaseData.firstWhereOrNull((acc) =>
@@ -453,7 +462,8 @@ class _TopAssetsAccountDetailPageState
                                             account.name), // Simpler key
                                         title: currentTreemapTitle,
                                         dataItems: treeMapData,
-                                        tooltipValueSuffix: ' ¥',
+                                        tooltipValueSuffix:
+                                            ' ${ref.watch(selectedLedgerProvider).value?.currencySymbol ?? '¥'}',
                                         drilledDownAccountName:
                                             _drilledDownAccountName,
                                         onDrillDownSelected: (accountName) {
@@ -496,14 +506,16 @@ class _TopAssetsAccountDetailPageState
                                                   'topLiabilitiesAccountDetail',
                                                   extra: {
                                                     'accountId':
-                                                        selectedAccountToNavigate.id
+                                                        selectedAccountToNavigate
+                                                            .id
                                                   });
                                             } else {
                                               GoRouter.of(context).pushNamed(
                                                   'liabilitiesDetail', // Navigate to accountDetail if no children
                                                   extra: {
                                                     'accountId':
-                                                        selectedAccountToNavigate.id
+                                                        selectedAccountToNavigate
+                                                            .id
                                                   });
                                             }
                                           } else {}

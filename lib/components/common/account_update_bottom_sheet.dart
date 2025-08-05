@@ -73,6 +73,7 @@ class _AccountUpdateBottomSheetState
     try {
       // 从数据库获取当前账户的完整信息
       final accountRepository = ref.read(accountRepositoryProvider);
+      final selectedLedger = await ref.read(selectedLedgerProvider.future);
       final dbAccount =
           await accountRepository.getAccountById(widget.accountToUpdate.id);
 
@@ -95,7 +96,7 @@ class _AccountUpdateBottomSheetState
                 name: parentAccount.accountName,
                 amount: 0.0, // 一级账户选择不需要金额信息
                 type: parentAccount.accountType,
-                currencySymbol: '¥',
+                currencySymbol: selectedLedger?.currencySymbol ?? '¥',
               );
             });
             print('已设置一级账户: ${_selectedParentAccount?.name}');

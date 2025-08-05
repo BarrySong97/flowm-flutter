@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/charts/flchart_income_expense_chart.dart';
 import 'package:flowm/components/common/period_range_selector.dart';
 import 'package:flowm/state/comparison/comparison_providers.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 
 class MonthlyDetailsPage extends ConsumerStatefulWidget {
   final String month;
@@ -155,10 +156,12 @@ class _MonthlyDetailsPageState extends ConsumerState<MonthlyDetailsPage> {
                               effectiveRange = customRange;
                             }
                             
+                            final selectedLedger = ref.watch(selectedLedgerProvider).value;
                             return FlchartIncomeExpenseChart(
                               monthlyData: comparisonData.monthlyData,
                               periodRange: comparisonData.periodRange.shortLabel,
                               dateRange: effectiveRange,
+                              currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                             );
                           },
                           loading: () => const SizedBox(
@@ -224,34 +227,49 @@ class _MonthlyDetailsPageState extends ConsumerState<MonthlyDetailsPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            _buildSummaryRow(
-                              _getSummaryExpenseLabel(
-                                  selectedPeriodRange,
-                                  comparisonData.periodRange ==
-                                          PeriodRange.range
-                                      ? ref.watch(customDateRangeProvider)
-                                      : null),
-                              '¥${_formatAmount(totalExpense)}',
-                              Colors.red[400]!,
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                                return _buildSummaryRow(
+                                  _getSummaryExpenseLabel(
+                                      selectedPeriodRange,
+                                      comparisonData.periodRange ==
+                                              PeriodRange.range
+                                          ? ref.watch(customDateRangeProvider)
+                                          : null),
+                                  '${selectedLedger?.currencySymbol ?? '¥'}${_formatAmount(totalExpense)}',
+                                  Colors.red[400]!,
+                                );
+                              },
                             ),
                             const SizedBox(height: 12),
-                            _buildSummaryRow(
-                              _getSummaryIncomeLabel(
-                                  selectedPeriodRange,
-                                  comparisonData.periodRange ==
-                                          PeriodRange.range
-                                      ? ref.watch(customDateRangeProvider)
-                                      : null),
-                              '¥${_formatAmount(totalIncome)}',
-                              Colors.green[400]!,
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                                return _buildSummaryRow(
+                                  _getSummaryIncomeLabel(
+                                      selectedPeriodRange,
+                                      comparisonData.periodRange ==
+                                              PeriodRange.range
+                                          ? ref.watch(customDateRangeProvider)
+                                          : null),
+                                  '${selectedLedger?.currencySymbol ?? '¥'}${_formatAmount(totalIncome)}',
+                                  Colors.green[400]!,
+                                );
+                              },
                             ),
                             const SizedBox(height: 12),
-                            _buildSummaryRow(
-                              '净收入',
-                              '¥${_formatAmount(netAmount)}',
-                              netAmount > 0
-                                  ? Colors.blue[400]!
-                                  : Colors.orange[400]!,
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                                return _buildSummaryRow(
+                                  '净收入',
+                                  '${selectedLedger?.currencySymbol ?? '¥'}${_formatAmount(netAmount)}',
+                                  netAmount > 0
+                                      ? Colors.blue[400]!
+                                      : Colors.orange[400]!,
+                                );
+                              },
                             ),
                           ],
                         ),

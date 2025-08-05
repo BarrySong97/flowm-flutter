@@ -7,6 +7,8 @@ import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/state/expense/expense_providers.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/db/app_database.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/components/chart/fullscreen_chart_page.dart';
 import 'package:flowm/models/account_expense_node.dart';
@@ -79,6 +81,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
   Widget _buildStatsRow(ExpensePageData data) {
     final selectedMonth = ref.watch(selectedMonthProvider);
     final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     // Current period total
     double currentTotal = data.chartData.fold(0.0, (sum, item) => sum + item.y);
@@ -107,7 +110,10 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
         periodTitle = '全年总支出';
         dailyTitle = '全年日均';
         comparisonTitle = '较去年同期';
-        final daysInYear = DateTime(selectedMonth.year, 12, 31).difference(DateTime(selectedMonth.year, 1, 1)).inDays + 1;
+        final daysInYear = DateTime(selectedMonth.year, 12, 31)
+                .difference(DateTime(selectedMonth.year, 1, 1))
+                .inDays +
+            1;
         dailyAverage = currentTotal / daysInYear;
         break;
       case 'all':
@@ -123,18 +129,22 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
         periodTitle = '当月总支出';
         dailyTitle = '当月日均';
         comparisonTitle = '较上月支出';
-        final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+        final daysInMonth =
+            DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
         dailyAverage = daysInMonth > 0 ? currentTotal / daysInMonth : 0.0;
         break;
     }
 
     // Change vs previous period
-    double previousTotal = data.previousMonthChartData.fold(0.0, (sum, item) => sum + item.y);
-    tooltipMessage = '上期支出: ¥ ${_formatCurrency(previousTotal)}';
-    
+    double previousTotal =
+        data.previousMonthChartData.fold(0.0, (sum, item) => sum + item.y);
+    tooltipMessage =
+        '上期支出: ${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(previousTotal)}';
+
     double changePercent = 0;
     if (previousTotal.abs() > 0.001) {
-      changePercent = ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
+      changePercent =
+          ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
     } else if (currentTotal.abs() > 0.001) {
       changePercent = currentTotal > 0 ? 100.0 : -100.0;
     }
@@ -145,12 +155,12 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
       children: [
         _buildStatsItem(
           periodTitle,
-          '¥ ${_formatCurrency(currentTotal)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(currentTotal)}',
         ),
         const SizedBox(width: 10),
         _buildStatsItem(
           dailyTitle,
-          '¥ ${_formatCurrency(dailyAverage)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(dailyAverage)}',
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -203,7 +213,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
   DateTime? _getStartDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
     final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
-    
+
     switch (timeRangeType) {
       case '90days':
         return DateTime.now().subtract(const Duration(days: 90));
@@ -222,7 +232,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
   DateTime? _getEndDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
     final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
-    
+
     switch (timeRangeType) {
       case '90days':
       case '60days':
@@ -255,7 +265,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
   int _getCurrentDaysInPeriod() {
     final selectedMonth = ref.read(selectedMonthProvider);
     final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
-    
+
     switch (timeRangeType) {
       case '90days':
         return 90;
@@ -276,12 +286,10 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     }
   }
 
-
-
   Widget _buildChart(List<barchart.ChartData> chartData) {
     final selectedMonth = ref.watch(selectedMonthProvider);
     final timeRangeType = ref.watch(selectedTimeRangeTypeProvider);
-    
+
     // Calculate the correct number of days based on time range type
     int daysInPeriod;
     switch (timeRangeType) {
@@ -304,9 +312,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
         break;
       case 'month':
       default:
-        daysInPeriod = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+        daysInPeriod =
+            DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
         break;
     }
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return Container(
       decoration: BoxDecoration(
@@ -340,8 +350,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                         });
                       },
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(4),
@@ -371,19 +381,21 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     GestureDetector(
                       onTap: () async {
                         if (!mounted) return;
-                        
+
                         try {
-                          final pageData = await ref.read(expensePageDataProvider.future);
-                          
+                          final pageData =
+                              await ref.read(expensePageDataProvider.future);
+
                           if (!mounted) return;
-                          
+
                           String title = _getCurrentTimeRangeTitle();
                           int daysInPeriod = _getCurrentDaysInPeriod();
-                          
+
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => FullscreenChartPage(
                                 chartData: pageData.chartData,
+                                ledger: selectedLedger,
                                 daysInPeriod: daysInPeriod,
                                 startDate: _getStartDateForChart(),
                                 endDate: _getEndDateForChart(),
@@ -397,8 +409,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                         }
                       },
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(4),
@@ -424,6 +436,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                       .toList(),
                   daysInMonth: daysInPeriod,
                   startDate: _getStartDateForChart(),
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                   endDate: _getEndDateForChart(),
                 )
               : fl_barchart.FlBarChart(
@@ -432,6 +445,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                       .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
                       .toList(),
                   daysInMonth: daysInPeriod,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                   startDate: _getStartDateForChart(),
                   endDate: _getEndDateForChart(),
                 ),
@@ -440,7 +454,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     );
   }
 
-  Widget _buildPieChartAndList(List<AccountExpenseNode> accountTreeNodes) {
+  Widget _buildPieChartAndList(
+      List<AccountExpenseNode> accountTreeNodes, Ledger? selectedLedger) {
     if (accountTreeNodes.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -475,7 +490,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     // 先为原始数据分配颜色，保持颜色映射关系
     final Map<String, Color> accountColorMap = {};
     final List<Map<String, dynamic>> pieChartExpenseData = [];
-    
+
     for (int i = 0; i < accountTreeNodes.length; i++) {
       final node = accountTreeNodes[i];
       final color = pieColors[i % pieColors.length];
@@ -503,7 +518,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
       styledAccounts.add(StyledAccount(
         name: node.accountData.accountName,
         rawAmount: node.balance,
-        currencySymbol: '¥',
+        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
         iconData: Icons.label_outline,
         leadingColor: color,
         percentageText: '${node.percentage.toStringAsFixed(0)}%',
@@ -521,7 +536,10 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
             children: [
               SizedBox(
                 height: 260,
-                child: CustomPieChart(expenseData: pieChartExpenseData),
+                child: CustomPieChart(
+                  expenseData: pieChartExpenseData,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
+                ),
               ),
               Positioned(
                 top: 8,
@@ -533,7 +551,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(4),
@@ -542,7 +561,9 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                          _isAscending
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
                           size: 14,
                           color: Colors.grey[600],
                         ),
@@ -594,6 +615,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
     ref.watch(selectedTimeRangeTypeProvider); // Watch for state changes
     final pageDataAsync = ref.watch(expensePageDataProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return SingleChildScrollView(
       child: Padding(
@@ -609,18 +631,20 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                     ref.read(selectedMonthProvider.notifier).state = newDate;
                   },
                   onLongRangeSelected: () async {
-                    final timeRangeType = ref.read(selectedTimeRangeTypeProvider);
+                    final timeRangeType =
+                        ref.read(selectedTimeRangeTypeProvider);
                     // 等待数据更新
                     await Future.delayed(const Duration(milliseconds: 100));
-                    
+
                     try {
                       // 获取最新数据
-                      final pageData = await ref.refresh(expensePageDataProvider.future);
-                      
+                      final pageData =
+                          await ref.refresh(expensePageDataProvider.future);
+
                       // 根据类型确定标题和天数
                       String title;
                       int daysInPeriod;
-                      
+
                       switch (timeRangeType) {
                         case '90days':
                           title = '最近90天';
@@ -631,20 +655,21 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
                           final now = DateTime.now();
                           final yearStart = DateTime(now.year, 1, 1);
                           final yearEnd = DateTime(now.year, 12, 31);
-                          daysInPeriod = yearEnd.difference(yearStart).inDays + 1;
+                          daysInPeriod =
+                              yearEnd.difference(yearStart).inDays + 1;
                           break;
                         case 'all':
                           title = '全部';
                           final startDate = DateTime(2020, 1, 1);
                           final endDate = DateTime.now();
-                          daysInPeriod = endDate.difference(startDate).inDays + 1;
+                          daysInPeriod =
+                              endDate.difference(startDate).inDays + 1;
                           break;
                         default:
                           title = '测试';
                           daysInPeriod = 30;
                       }
-                      
-                      
+
                       // 使用真实数据导航到全屏页面
                       if (context.mounted) {
                         Navigator.of(context).push(
@@ -709,7 +734,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage>
               ],
             ),
             pageDataAsync.when(
-              data: (data) => _buildPieChartAndList(data.accountTree),
+              data: (data) =>
+                  _buildPieChartAndList(data.accountTree, selectedLedger),
               loading: () => Container(
                 decoration: BoxDecoration(
                   color: Colors.white,

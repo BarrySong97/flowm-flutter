@@ -1,14 +1,21 @@
+import 'package:flowm/db/app_database.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
 import '../../state/account/account_repository.dart'; // Still needed for AssetHistoryData type
+import '../../config/app_constants.dart';
 
 /// 资产趋势线图组件
 ///
 /// 显示资产变化趋势，数据通过参数传入
 class AssetTrendChart extends StatelessWidget {
   final List<AssetHistoryData> assetData;
-  const AssetTrendChart({super.key, required this.assetData});
+  final Ledger? ledger;
+  const AssetTrendChart({
+    super.key,
+    required this.assetData,
+    this.ledger,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +33,12 @@ class AssetTrendChart extends StatelessWidget {
           }
 
           // 格式化货币显示
-          final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+          final formatter = NumberFormat.currency(
+              locale: 'zh_CN', symbol: ledger?.currencySymbol ?? AppConstants.currencySymbol);
 
           // 检测是否所有数据都为0
-          final bool allDataIsZero = assetData.every((data) => data.totalAssets == 0.0);
+          final bool allDataIsZero =
+              assetData.every((data) => data.totalAssets == 0.0);
 
           return SfCartesianChart(
             plotAreaBorderWidth: 0,

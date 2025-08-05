@@ -29,12 +29,12 @@ class AccountRow extends StatelessWidget {
         color: Colors.black87);
 
     // 获取用户友好的金额显示
-    final userFriendlyAmount = _getUserFriendlyAmount(account.amount, account.type);
-    
+    final userFriendlyAmount =
+        _getUserFriendlyAmount(account.amount, account.type);
+
     String displayedAmount;
     if (showCurrencySymbolInAmount) {
-      displayedAmount =
-          '${account.currencySymbol}${userFriendlyAmount.toStringAsFixed(2)}';
+      displayedAmount = userFriendlyAmount.toStringAsFixed(2);
     } else {
       // Typically for parent accounts in a list where children sum up to this amount
       displayedAmount = userFriendlyAmount.toStringAsFixed(2);
@@ -61,7 +61,7 @@ class AccountRow extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            account.name,
+                            '${account.name}',
                             style: nameStyle,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -85,7 +85,8 @@ class AccountRow extends StatelessWidget {
             ),
             Row(
               children: [
-                Text(displayedAmount, style: amountStyle),
+                Text('${account.currencySymbol}$displayedAmount',
+                    style: amountStyle),
                 // Conditional spacing to align with potential expansion arrow in AccountItem
                 // If not showing currency (parent summary) or if it's a simple item,
                 // we might not need trailing space if there's no expansion icon.

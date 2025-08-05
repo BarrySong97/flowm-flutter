@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import '../../config/app_constants.dart';
 
 class MonthlyComparisonData {
   MonthlyComparisonData(this.month, this.expense, this.income);
@@ -16,11 +17,13 @@ class FlchartIncomeExpenseChart extends StatefulWidget {
     required this.monthlyData,
     this.periodRange,
     this.dateRange,
+    this.currencySymbol = AppConstants.currencySymbol,
   });
 
   final List<MonthlyComparisonData> monthlyData;
   final String? periodRange; // 用于调整条形图宽度
   final DateTimeRange? dateRange; // 用于确定正确的时间标签
+  final String currencySymbol;
 
   @override
   State<FlchartIncomeExpenseChart> createState() =>
@@ -319,7 +322,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
         ),
         const SizedBox(height: 4),
         Text(
-          '收入: ¥${_formatTooltipAmount(income)}',
+          '收入: ${widget.currencySymbol}${_formatTooltipAmount(income)}',
           style: TextStyle(
             color: Colors.green[300],
             fontSize: 12,
@@ -327,7 +330,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
           ),
         ),
         Text(
-          '支出: ¥${_formatTooltipAmount(expense)}',
+          '支出: ${widget.currencySymbol}${_formatTooltipAmount(expense)}',
           style: TextStyle(
             color: Colors.red[300],
             fontSize: 12,
@@ -335,7 +338,7 @@ class _FlchartIncomeExpenseChartState extends State<FlchartIncomeExpenseChart> {
           ),
         ),
         Text(
-          '结余: ¥${_formatTooltipAmount(balance)}',
+          '结余: ${widget.currencySymbol}${_formatTooltipAmount(balance)}',
           style: TextStyle(
             color: balance >= 0 ? Colors.blue[300] : Colors.orange[300],
             fontSize: 12,

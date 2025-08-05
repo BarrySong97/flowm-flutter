@@ -76,12 +76,12 @@ class _FlowPageState extends ConsumerState<FlowPage> {
   }
 
   Widget buildTransactionItem(
-      TransactionWithAmount transactionWithAmount, Function(int) onDelete) {
+      TransactionWithAmount transactionWithAmount, Function(int) onDelete, String currencySymbol) {
     final transaction = transactionWithAmount.transaction;
     final totalAmount = transactionWithAmount.amount;
 
     final bool isExpense = totalAmount < 0;
-    final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+    final formatter = NumberFormat.currency(locale: 'zh_CN', symbol: currencySymbol);
     final formattedAmount = formatter.format(totalAmount.abs());
     
     // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
@@ -119,7 +119,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
     );
   }
 
-  Widget buildTransactionList(FlowTransactionsState state) {
+  Widget buildTransactionList(FlowTransactionsState state, String currencySymbol) {
     if (state.isLoading && state.transactions.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -211,6 +211,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
             final dailyIn = dayTransactions
                 .where((twa) => twa.nature == TransactionNature.INFLOW)
                 .fold(0.0, (sum, twa) => sum + twa.amount.abs());
+            final currencyFormat = NumberFormat.currency(locale: 'zh_CN', symbol: currencySymbol);
 
             return Padding(
               padding: EdgeInsets.fromLTRB(
@@ -232,7 +233,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
                   Row(
                     children: [
                       Text(
-                        '出 ¥${dailyOut.toStringAsFixed(2)}',
+                        '出 ${currencyFormat.format(dailyOut)}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -240,7 +241,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '入 ¥${dailyIn.toStringAsFixed(2)}',
+                        '入 ${currencyFormat.format(dailyIn)}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -259,7 +260,8 @@ class _FlowPageState extends ConsumerState<FlowPage> {
             if (currentIndex == index) {
               return buildTransactionItem(
                 dayTransactions[transactionIndex], 
-                _deleteTransaction
+                _deleteTransaction,
+                currencySymbol
               );
             }
             currentIndex++;
@@ -274,6 +276,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(flowTransactionsProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     // 当provider被invalidate后，如果数据为空且不在加载中，主动获取数据
     if (state.transactions.isEmpty && !state.isLoading && state.error == null) {
@@ -302,7 +305,7 @@ class _FlowPageState extends ConsumerState<FlowPage> {
             ),
           ),
           Expanded(
-            child: buildTransactionList(state),
+            child: buildTransactionList(state, selectedLedger?.currencySymbol ?? '¥'),
           ),
         ],
       ),

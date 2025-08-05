@@ -11,6 +11,7 @@ import 'package:flowm/state/icome/income_providers.dart';
 import 'package:flowm/state/expense/expense_providers.dart'
     as expense_providers;
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/db/app_database.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
 import 'package:flowm/components/chart/fullscreen_chart_page.dart';
 import 'package:flowm/models/account_expense_node.dart';
@@ -265,7 +266,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
   }
 
   Widget _buildStatsRow(List<barchart.ChartData> currentData,
-      List<barchart.ChartData> previousData) {
+      List<barchart.ChartData> previousData, Ledger? selectedLedger) {
     final selectedMonth = ref.watch(selectedMonthProvider);
     final timeRangeType =
         ref.watch(expense_providers.selectedTimeRangeTypeProvider);
@@ -324,7 +325,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
 
     // Change vs previous period
     double previousTotal = previousData.fold(0.0, (sum, item) => sum + item.y);
-    tooltipMessage = '上期收入: ¥ ${_formatCurrency(previousTotal)}';
+    tooltipMessage =
+        '上期收入: ${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(previousTotal)}';
 
     double changePercent = 0;
     if (previousTotal.abs() > 0.001) {
@@ -357,7 +359,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                   ),
                 ),
                 Text(
-                  '¥ ${_formatCurrency(currentTotal)}',
+                  '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(currentTotal)}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -387,7 +389,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                   ),
                 ),
                 Text(
-                  '¥ ${_formatCurrency(dailyAverage)}',
+                  '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(dailyAverage)}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -465,6 +467,25 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
   }
 
   Widget _buildDetailPage(BuildContext context, AccountExpenseNode account) {
+    // Get selected ledger for currency symbol
+    final selectedLedgerAsync = ref.watch(selectedLedgerProvider);
+
+    return selectedLedgerAsync.when(
+      data: (selectedLedger) =>
+          _buildDetailPageWithLedger(context, account, selectedLedger),
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('加载中...')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('错误')),
+        body: Center(child: Text('加载失败: $error')),
+      ),
+    );
+  }
+
+  Widget _buildDetailPageWithLedger(BuildContext context,
+      AccountExpenseNode account, Ledger? selectedLedger) {
     final int currentAccountId = account.accountData.accountId;
 
     final chartDataAsync =
@@ -516,13 +537,17 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
             IconButton(
               icon: const Icon(Icons.more_vert, color: Colors.black),
               onPressed: () async {
+                // Get current ledger for currency symbol
+                final currentLedger =
+                    await ref.read(selectedLedgerProvider.future);
+
                 // Convert database Account to UI Account
                 final uiAccount = ui.Account(
                   id: account.accountData.accountId,
                   name: account.accountData.accountName,
                   amount: account.balance,
                   type: account.accountData.accountType,
-                  currencySymbol: '¥',
+                  currencySymbol: currentLedger?.currencySymbol ?? '¥',
                 );
 
                 final isDeleted = await AccountUpdateBottomSheet.show(
@@ -600,8 +625,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                       chartDataAsync.when(
                         data: (currentData) {
                           return previousPeriodDataAsync.when(
-                            data: (previousData) =>
-                                _buildStatsRow(currentData, previousData),
+                            data: (previousData) => _buildStatsRow(
+                                currentData, previousData, selectedLedger),
                             loading: () => Container(
                               height: 54,
                               decoration: BoxDecoration(
@@ -739,6 +764,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                                                   builder: (context) =>
                                                       FullscreenChartPage(
                                                     chartData: chartData,
+                                                    ledger: selectedLedger,
                                                     daysInPeriod: daysInPeriod,
                                                     startDate:
                                                         _getStartDateForChart(),
@@ -782,6 +808,9 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                                 return _isLineChart
                                     ? fl_linechart.FlLineChart(
                                         lineColor: Colors.green,
+                                        currencySymbol:
+                                            selectedLedger?.currencySymbol ??
+                                                "",
                                         chartData: chartData
                                             .map((e) => fl_linechart.ChartData(
                                                 e.x, e.y, e.day))
@@ -792,6 +821,9 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                                       )
                                     : fl_barchart.FlBarChart(
                                         barColor: Colors.green,
+                                        currencySymbol:
+                                            selectedLedger?.currencySymbol ??
+                                                "",
                                         chartData: chartData
                                             .map((e) => fl_barchart.ChartData(
                                                 e.x, e.y, e.day))
@@ -884,7 +916,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                       styledAccounts.add(StyledAccount(
                         name: node.accountData.accountName,
                         rawAmount: node.balance,
-                        currencySymbol: '¥',
+                        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                         iconData: Icons.label_outline,
                         leadingColor: color,
                         percentageText:
@@ -899,7 +931,10 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                             SizedBox(
                               height: 260,
                               child: CustomPieChart(
-                                  expenseData: pieChartIncomeData),
+                                expenseData: pieChartIncomeData,
+                                currencySymbol:
+                                    selectedLedger?.currencySymbol ?? '¥',
+                              ),
                             ),
                             Positioned(
                               top: 8,

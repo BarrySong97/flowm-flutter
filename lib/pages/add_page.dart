@@ -857,13 +857,18 @@ class _AddPageState extends ConsumerState<AddPage>
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '¥$amount',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w300,
-                      color: Colors.black87,
-                    ),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                      return Text(
+                        '${selectedLedger?.currencySymbol ?? '¥'}$amount',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w300,
+                          color: Colors.black87,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -19,8 +19,9 @@ class NumberFormatUtils {
   }
 
   /// 格式化完整货币显示（带货币符号）
-  static String formatCurrencyWithSymbol(double amount) {
-    return '${AppConstants.currencySymbol} ${formatCurrency(amount)}';
+  static String formatCurrencyWithSymbol(double amount, {String? currencySymbol}) {
+    final symbol = currencySymbol ?? AppConstants.currencySymbol;
+    return '$symbol ${formatCurrency(amount)}';
   }
 
   /// 格式化百分比显示
@@ -35,7 +36,7 @@ class NumberFormatUtils {
 
   /// 格式化数字，万以上显示为k
   /// 例如：15000 -> 15k, 1500 -> ¥1,500
-  static String formatCurrencyWithK(double amount, {String symbol = '¥'}) {
+  static String formatCurrencyWithK(double amount, {String symbol = AppConstants.currencySymbol}) {
     if (amount.abs() >= 10000) {
       // 超过万的数字用k表示
       final kValue = amount / 1000;
@@ -72,7 +73,7 @@ class NumberFormatUtils {
   /// 万以上用k，十万以上可选择用w（万）
   /// [minFormatThreshold] 最小格式化阈值，低于此值不使用k或万格式化
   static String smartFormatCurrency(double amount,
-      {String symbol = '¥', bool useWan = false, double? minFormatThreshold}) {
+      {String symbol = AppConstants.currencySymbol, bool useWan = false, double? minFormatThreshold}) {
     final threshold = minFormatThreshold ?? 10000; // 默认万以上才格式化
 
     // 如果金额低于阈值，直接使用正常格式

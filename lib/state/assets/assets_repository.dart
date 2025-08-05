@@ -8,6 +8,7 @@ import '../../db/app_database.dart';
 import '../../db/tables/account_table.dart';
 import '../../components/common/time_range_selector.dart';
 import 'package:sankey_flutter/sankey_node.dart';
+import '../../config/app_constants.dart';
 import 'package:sankey_flutter/sankey_link.dart';
 
 /// 资产仓库提供者，用于封装资产相关的数据库操作和业务逻辑
@@ -69,6 +70,7 @@ class AssetsRepository {
     int limit = 100,
     DateTime? startDate,
     DateTime? endDate,
+    String currencySymbol = AppConstants.currencySymbol,
   }) async {
     // 获取目标账户信息
     final targetAccount = await _accountDao.getAccountById(accountId);
@@ -86,7 +88,7 @@ class AssetsRepository {
     );
 
     // 转换为 Sankey 图表数据
-    return await _convertToSankeyData(flows, targetAccount, flow);
+    return await _convertToSankeyData(flows, targetAccount, flow, currencySymbol);
   }
 
   /// 获取资产流转数据
@@ -220,6 +222,7 @@ class AssetsRepository {
     List<AssetFlow> flows,
     Account targetAccount,
     String flow,
+    String currencySymbol,
   ) async {
     print('\n=== AssetsRepository 金额计算调试 ===');
     print(
@@ -230,7 +233,7 @@ class AssetsRepository {
     for (int i = 0; i < flows.length; i++) {
       final assetFlow = flows[i];
       print(
-          '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: ¥${assetFlow.amount.toStringAsFixed(2)}');
+          '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: $currencySymbol${assetFlow.amount.toStringAsFixed(2)}');
     }
 
     if (flows.isEmpty) {
@@ -269,7 +272,7 @@ class AssetsRepository {
       final sourceName = accountMap[link.sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[link.targetId]?.accountName ?? 'Unknown';
       print(
-          '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): ¥${link.amount.toStringAsFixed(2)}');
+          '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): $currencySymbol${link.amount.toStringAsFixed(2)}');
     }
 
     // 聚合相同的链接和计算节点金额
@@ -296,7 +299,7 @@ class AssetsRepository {
       final targetId = int.parse(parts[1]);
       final sourceName = accountMap[sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[targetId]?.accountName ?? 'Unknown';
-      print('  $sourceName → $targetName: ¥${amount.toStringAsFixed(2)}');
+      print('  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 移除为账户设置余额的逻辑，只显示实际流转金额
@@ -304,7 +307,7 @@ class AssetsRepository {
     print('\n最终节点金额:');
     nodeAmounts.forEach((accountId, amount) {
       final accountName = accountMap[accountId]?.accountName ?? 'Unknown';
-      print('  $accountName: ¥${amount.toStringAsFixed(2)}');
+      print('  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 创建 SankeyNode 列表，只显示实际流转金额
@@ -323,14 +326,14 @@ class AssetsRepository {
         if (amount >= 1000000) {
           // 百万级，固定两位小数
           final millions = amount / 1000000;
-          formattedAmount = ' (¥${millions.toStringAsFixed(2)}M)';
+          formattedAmount = ' ($currencySymbol${millions.toStringAsFixed(2)}M)';
         } else if (amount >= 1000) {
           // 千级，固定两位小数
           final thousands = amount / 1000;
-          formattedAmount = ' (¥${thousands.toStringAsFixed(2)}K)';
+          formattedAmount = ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
         } else {
           // 小额，固定两位小数
-          formattedAmount = ' (¥${amount.toStringAsFixed(2)})';
+          formattedAmount = ' ($currencySymbol${amount.toStringAsFixed(2)})';
         }
       }
 
@@ -555,6 +558,7 @@ final assetsSankeyChartDataProvider = FutureProvider.autoDispose.family<
       String flow,
       TimeRange timeRange,
       int limit,
+      String? currencySymbol,
     })>((ref, params) {
   final assetsRepository = ref.watch(assetsRepositoryProvider);
 
@@ -589,5 +593,6 @@ final assetsSankeyChartDataProvider = FutureProvider.autoDispose.family<
     limit: params.limit,
     startDate: startDate,
     endDate: endDate,
+    currencySymbol: params.currencySymbol ?? AppConstants.currencySymbol,
   );
 });

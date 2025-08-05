@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import '../../config/app_constants.dart';
 
 // Define a model class for chart data
 class ChartData {
@@ -12,8 +13,13 @@ class ChartData {
 
 class CustomPieChart extends StatelessWidget {
   final List<Map<String, dynamic>> expenseData;
+  final String currencySymbol;
 
-  const CustomPieChart({super.key, required this.expenseData});
+  const CustomPieChart({
+    super.key, 
+    required this.expenseData, 
+    this.currencySymbol = AppConstants.currencySymbol
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -96,8 +102,8 @@ class CustomPieChart extends StatelessWidget {
         builder: (dynamic data, dynamic point, dynamic series, int pointIndex,
             int seriesIndex) {
           final chartData = data as ChartData;
-          // Assuming a currency symbol, replace '¥' with your actual symbol or logic
-          final String currencySymbol = '¥';
+          // Use the configured currency symbol from the widget
+          final String currencySymbol = this.currencySymbol;
           return Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(

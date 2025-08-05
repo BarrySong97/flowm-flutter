@@ -12,6 +12,7 @@ import 'package:flowm/components/account/account_row.dart'; // Import AccountRow
 import 'package:collection/collection.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 
 class TopAssetsAccountDetailPage extends ConsumerStatefulWidget {
   final int accountId; // 接收 accountId 参数
@@ -100,7 +101,7 @@ class _TopAssetsAccountDetailPageState
                 context,
                 accountToUpdate: account,
               );
-              
+
               // 如果账户被删除，退出详情页面
               if (isDeleted == true && mounted) {
                 Navigator.of(context).pop();
@@ -169,8 +170,10 @@ class _TopAssetsAccountDetailPageState
                               final amount = assetData.isNotEmpty
                                   ? assetData.last.totalAssets
                                   : account.amount;
+                              final selectedLedger =
+                                  ref.watch(selectedLedgerProvider).value;
                               return Text(
-                                '¥${amount.toStringAsFixed(2)}',
+                                '${selectedLedger?.currencySymbol ?? '¥'}${amount.toStringAsFixed(2)}',
                                 style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 32,
@@ -197,6 +200,9 @@ class _TopAssetsAccountDetailPageState
                           ),
                         );
 
+                        final selectedLedger =
+                            ref.watch(selectedLedgerProvider).value;
+
                         final chartWidget = assetTrendAsync.when(
                           data: (assetData) {
                             if (assetData.isEmpty) {
@@ -206,7 +212,10 @@ class _TopAssetsAccountDetailPageState
                                       child: Text(
                                           '暂无该时间段资产趋势数据'))); // Updated message
                             }
-                            return AssetTrendChart(assetData: assetData);
+                            return AssetTrendChart(
+                              assetData: assetData,
+                              ledger: selectedLedger,
+                            );
                           },
                           loading: () => const SizedBox(
                               height: 200,
@@ -325,7 +334,6 @@ class _TopAssetsAccountDetailPageState
                             ),
                           ],
                         ),
-
 
                         // 资产分布图表
                         Container(
@@ -463,7 +471,8 @@ class _TopAssetsAccountDetailPageState
                                             account.name), // Simpler key
                                         title: currentTreemapTitle,
                                         dataItems: treeMapData,
-                                        tooltipValueSuffix: ' ¥',
+                                        tooltipValueSuffix:
+                                            ' ${ref.watch(selectedLedgerProvider).value?.currencySymbol ?? '¥'}',
                                         drilledDownAccountName:
                                             _drilledDownAccountName,
                                         onDrillDownSelected: (accountName) {

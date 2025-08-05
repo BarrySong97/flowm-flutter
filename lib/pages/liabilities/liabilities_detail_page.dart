@@ -1,4 +1,5 @@
 import 'package:flowm/components/account/account_item.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/chart/liability_trend_chart.dart';
 import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
@@ -15,6 +16,7 @@ import 'package:flowm/db/tables/account_table.dart';
 import 'package:sankey_flutter/sankey_helpers.dart';
 import 'package:intl/intl.dart';
 import 'package:flowm/components/common/account_update_bottom_sheet.dart';
+import 'package:flowm/config/app_constants.dart';
 
 class LiabilitiesDetailPage extends ConsumerStatefulWidget {
   final int accountId;
@@ -179,6 +181,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                           accountId: account.id,
                                           timeRange: _selectedTimeRange
                                         )));
+                                        final selectedLedger = ref.watch(selectedLedgerProvider).value;
                                         return liabilityTrendAsync.when(
                                           data: (liabilityData) {
                                             if (liabilityData.isEmpty) {
@@ -186,7 +189,8 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                                   child: Text('暂无该时间段负债趋势数据'));
                                             }
                                             return LiabilityTrendChart(
-                                                liabilityData: liabilityData);
+                                                liabilityData: liabilityData,
+                                                currencySymbol: selectedLedger?.currencySymbol ?? '¥');
                                           },
                                           loading: () => const Center(
                                               child:
@@ -496,11 +500,13 @@ class SankeyChartWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     final sankeyChartDataAsync = ref.watch(sankeyChartDataProvider((
       accountId: account.id,
       flow: selectedFlow,
       timeRange: selectedTimeRange,
       limit: 50,
+      currencySymbol: selectedLedger?.currencySymbol ?? AppConstants.currencySymbol,
     )));
 
     return Container(
@@ -686,6 +692,7 @@ class AccountTransactionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     final transactionsAsync = ref.watch(liabilitiesAccountTransactionsProvider((
       accountId: account.id,
       timeRange: selectedTimeRange,
@@ -818,7 +825,7 @@ class AccountTransactionList extends ConsumerWidget {
                   }
 
                   final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: '¥');
+                      NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
                   final formattedDailyIn = formatter.format(dailyIn);
                   final formattedDailyOut = formatter.format(dailyOut);
 
@@ -877,7 +884,7 @@ class AccountTransactionList extends ConsumerWidget {
                               TransactionNature.OUTFLOW;
 
                           final formatter = NumberFormat.currency(
-                              locale: 'zh_CN', symbol: '¥');
+                              locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 

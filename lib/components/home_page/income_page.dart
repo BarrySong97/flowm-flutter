@@ -1,5 +1,6 @@
 import 'package:flowm/state/icome/income_providers.dart';
-import 'package:flowm/state/expense/expense_providers.dart' as expense_providers;
+import 'package:flowm/state/expense/expense_providers.dart'
+    as expense_providers;
 import 'package:flowm/components/chart/fullscreen_chart_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,8 @@ import 'package:flowm/components/chart/custom_pie_chart.dart';
 import 'package:flowm/components/account/styled_account_item.dart';
 import 'package:flowm/components/account/styled_account_list.dart';
 import 'package:flowm/components/common/month_selector_header.dart';
+import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/db/app_database.dart';
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -29,8 +32,9 @@ class _IncomePageState extends ConsumerState<IncomePage>
 
   DateTime? _getStartDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
         return DateTime.now().subtract(const Duration(days: 90));
@@ -48,8 +52,9 @@ class _IncomePageState extends ConsumerState<IncomePage>
 
   DateTime? _getEndDateForChart() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
       case '60days':
@@ -63,7 +68,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
   }
 
   String _getCurrentTimeRangeTitle() {
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
     switch (timeRangeType) {
       case '90days':
         return '最近90天';
@@ -81,8 +87,9 @@ class _IncomePageState extends ConsumerState<IncomePage>
 
   int _getCurrentDaysInPeriod() {
     final selectedMonth = ref.read(selectedMonthProvider);
-    final timeRangeType = ref.read(expense_providers.selectedTimeRangeTypeProvider);
-    
+    final timeRangeType =
+        ref.read(expense_providers.selectedTimeRangeTypeProvider);
+
     switch (timeRangeType) {
       case '90days':
         return 90;
@@ -102,6 +109,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
         return DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
     }
   }
+
   // 辅助方法格式化数字
   String _formatCurrency(double amount) {
     if (amount.abs() >= 100000) {
@@ -156,7 +164,9 @@ class _IncomePageState extends ConsumerState<IncomePage>
 
   Widget _buildStatsRow(IncomePageData data) {
     final selectedMonth = ref.watch(selectedMonthProvider);
-    final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+    final timeRangeType =
+        ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     // Current period total
     double currentTotal = data.chartData.fold(0.0, (sum, item) => sum + item.y);
@@ -185,7 +195,10 @@ class _IncomePageState extends ConsumerState<IncomePage>
         periodTitle = '全年总收入';
         dailyTitle = '全年日均';
         comparisonTitle = '较去年同期';
-        final daysInYear = DateTime(selectedMonth.year, 12, 31).difference(DateTime(selectedMonth.year, 1, 1)).inDays + 1;
+        final daysInYear = DateTime(selectedMonth.year, 12, 31)
+                .difference(DateTime(selectedMonth.year, 1, 1))
+                .inDays +
+            1;
         dailyAverage = currentTotal / daysInYear;
         break;
       case 'all':
@@ -201,18 +214,22 @@ class _IncomePageState extends ConsumerState<IncomePage>
         periodTitle = '当月总收入';
         dailyTitle = '当月日均';
         comparisonTitle = '较上月收入';
-        final daysInMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+        final daysInMonth =
+            DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
         dailyAverage = daysInMonth > 0 ? currentTotal / daysInMonth : 0.0;
         break;
     }
 
     // Change vs previous period
-    double previousTotal = data.previousMonthChartData.fold(0.0, (sum, item) => sum + item.y);
-    tooltipMessage = '上期收入: ¥ ${_formatCurrency(previousTotal)}';
-    
+    double previousTotal =
+        data.previousMonthChartData.fold(0.0, (sum, item) => sum + item.y);
+    tooltipMessage =
+        '上期收入: ${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(previousTotal)}';
+
     double changePercent = 0;
     if (previousTotal.abs() > 0.001) {
-      changePercent = ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
+      changePercent =
+          ((currentTotal - previousTotal) / previousTotal.abs()) * 100;
     } else if (currentTotal.abs() > 0.001) {
       changePercent = currentTotal > 0 ? 100.0 : -100.0;
     }
@@ -223,12 +240,12 @@ class _IncomePageState extends ConsumerState<IncomePage>
       children: [
         _buildStatsItem(
           periodTitle,
-          '¥ ${_formatCurrency(currentTotal)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(currentTotal)}',
         ),
         const SizedBox(width: 10),
         _buildStatsItem(
           dailyTitle,
-          '¥ ${_formatCurrency(dailyAverage)}',
+          '${selectedLedger?.currencySymbol ?? '¥'} ${_formatCurrency(dailyAverage)}',
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -281,7 +298,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
   Widget _buildChart(List<barchart.ChartData> chartData) {
     // Calculate the correct number of days based on time range type
     int daysInPeriod = _getCurrentDaysInPeriod();
-    
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -314,8 +332,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
                         });
                       },
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(4),
@@ -345,19 +363,21 @@ class _IncomePageState extends ConsumerState<IncomePage>
                     GestureDetector(
                       onTap: () async {
                         if (!mounted) return;
-                        
+
                         try {
-                          final pageData = await ref.refresh(incomePageDataProvider.future);
-                          
+                          final pageData =
+                              await ref.refresh(incomePageDataProvider.future);
+
                           String title = _getCurrentTimeRangeTitle();
                           int daysInPeriod = _getCurrentDaysInPeriod();
-                          
+
                           if (context.mounted) {
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) => FullscreenChartPage(
                                   chartData: pageData.chartData,
                                   daysInPeriod: daysInPeriod,
+                                  ledger: selectedLedger,
                                   startDate: _getStartDateForChart(),
                                   endDate: _getEndDateForChart(),
                                   timeRangeTitle: title,
@@ -372,8 +392,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
                         }
                       },
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(4),
@@ -394,6 +414,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
           _isLineChart
               ? fl_linechart.FlLineChart(
                   lineColor: Colors.green,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                   chartData: chartData
                       .map((e) => fl_linechart.ChartData(e.x, e.y, e.day))
                       .toList(),
@@ -403,6 +424,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
                 )
               : fl_barchart.FlBarChart(
                   barColor: Colors.green,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
                   chartData: chartData
                       .map((e) => fl_barchart.ChartData(e.x, e.y, e.day))
                       .toList(),
@@ -415,7 +437,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
     );
   }
 
-  Widget _buildPieChartAndList(List<AccountExpenseNode> accountTreeNodes) {
+  Widget _buildPieChartAndList(
+      List<AccountExpenseNode> accountTreeNodes, Ledger? selectedLedger) {
     if (accountTreeNodes.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -450,7 +473,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
     // 先为原始数据分配颜色，保持颜色映射关系
     final Map<String, Color> accountColorMap = {};
     final List<Map<String, dynamic>> pieChartExpenseData = [];
-    
+
     for (int i = 0; i < accountTreeNodes.length; i++) {
       final node = accountTreeNodes[i];
       final color = pieColors[i % pieColors.length];
@@ -478,7 +501,7 @@ class _IncomePageState extends ConsumerState<IncomePage>
       styledAccounts.add(StyledAccount(
         name: node.accountData.accountName,
         rawAmount: node.balance,
-        currencySymbol: '¥',
+        currencySymbol: selectedLedger?.currencySymbol ?? '¥',
         iconData: Icons.label_outline,
         leadingColor: color,
         percentageText: '${node.percentage.toStringAsFixed(0)}%',
@@ -496,7 +519,10 @@ class _IncomePageState extends ConsumerState<IncomePage>
             children: [
               SizedBox(
                 height: 260,
-                child: CustomPieChart(expenseData: pieChartExpenseData),
+                child: CustomPieChart(
+                  expenseData: pieChartExpenseData,
+                  currencySymbol: selectedLedger?.currencySymbol ?? '¥',
+                ),
               ),
               Positioned(
                 top: 8,
@@ -508,7 +534,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(4),
@@ -517,7 +544,9 @@ class _IncomePageState extends ConsumerState<IncomePage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _isAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                          _isAscending
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
                           size: 14,
                           color: Colors.grey[600],
                         ),
@@ -567,8 +596,10 @@ class _IncomePageState extends ConsumerState<IncomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final currentSelectedMonth = ref.watch(selectedMonthProvider);
-    ref.watch(expense_providers.selectedTimeRangeTypeProvider); // Watch for state changes
+    ref.watch(expense_providers
+        .selectedTimeRangeTypeProvider); // Watch for state changes
     final pageDataAsync = ref.watch(incomePageDataProvider);
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
 
     return SingleChildScrollView(
       child: Padding(
@@ -585,13 +616,14 @@ class _IncomePageState extends ConsumerState<IncomePage>
                   },
                   onLongRangeSelected: () async {
                     await Future.delayed(const Duration(milliseconds: 100));
-                    
+
                     try {
-                      final pageData = await ref.refresh(incomePageDataProvider.future);
-                      
+                      final pageData =
+                          await ref.refresh(incomePageDataProvider.future);
+
                       String title = _getCurrentTimeRangeTitle();
                       int daysInPeriod = _getCurrentDaysInPeriod();
-                      
+
                       if (context.mounted) {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -656,7 +688,8 @@ class _IncomePageState extends ConsumerState<IncomePage>
               ],
             ),
             pageDataAsync.when(
-              data: (data) => _buildPieChartAndList(data.accountTree),
+              data: (data) =>
+                  _buildPieChartAndList(data.accountTree, selectedLedger),
               loading: () => Container(
                 decoration: BoxDecoration(
                   color: Colors.white,

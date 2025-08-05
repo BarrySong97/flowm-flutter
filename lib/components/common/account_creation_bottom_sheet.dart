@@ -211,6 +211,7 @@ class _AccountCreationBottomSheetState
 
   @override
   Widget build(BuildContext context) {
+    final selectedLedger = ref.watch(selectedLedgerProvider).value;
     // 根据账户类型调整高度：资产和负债类型需要显示初始金额，因此高度更高
     final currentAccountType = _accountTypes[_tabController.index];
     final bool isAssetOrLiability =
@@ -348,10 +349,10 @@ class _AccountCreationBottomSheetState
                           children: [
                             TextFormField(
                               controller: _initialAmountController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: '初始金额',
-                                prefixText: '¥ ',
-                                border: OutlineInputBorder(),
+                                prefixText: '${selectedLedger?.currencySymbol ?? '¥'} ',
+                                border: const OutlineInputBorder(),
                                 // helperText: '设置此账户的当前余额',
                               ),
                               keyboardType:

@@ -9,6 +9,7 @@ import 'package:flowm/db/tables/account_table.dart';
 /// 用于替代静态传递的账户对象，确保账户信息（如余额）实时更新
 final accountInfoProvider = FutureProvider.family<Account, int>((ref, accountId) async {
   final repository = ref.watch(accountRepositoryProvider);
+  final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   
   // 获取账户基本信息
   final accounts = await repository.getAllAccounts();
@@ -28,7 +29,7 @@ final accountInfoProvider = FutureProvider.family<Account, int>((ref, accountId)
     type: account.accountType,
     icon: null, // 图标信息如果需要可以从其他地方获取
     children: null, // 子账户信息在详情页面一般不需要
-    currencySymbol: '¥',
+    currencySymbol: selectedLedger?.currencySymbol ?? '¥',
   );
 });
 
@@ -126,6 +127,6 @@ final accountTreeInfoProvider = FutureProvider.family<Account, int>((ref, accoun
     type: account.accountType,
     icon: null,
     children: children,
-    currencySymbol: '¥',
+    currencySymbol: selectedLedger.currencySymbol,
   );
 });

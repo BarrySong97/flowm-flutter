@@ -12,6 +12,7 @@ import '../../db/tables/account_table.dart';
 import '../../components/account/account_item.dart' as account_ui;
 import '../database/database_provider.dart';
 import '../ledger/ledger_repository.dart';
+import '../../config/app_constants.dart';
 
 final sankeyChartDataProvider = FutureProvider.autoDispose.family<
     SankeyChartData,
@@ -20,6 +21,7 @@ final sankeyChartDataProvider = FutureProvider.autoDispose.family<
       String flow,
       TimeRange timeRange,
       int limit,
+      String? currencySymbol,
     })>((ref, params) {
   final liabilitiesRepository = ref.watch(liabilitiesRepositoryProvider);
 
@@ -54,6 +56,7 @@ final sankeyChartDataProvider = FutureProvider.autoDispose.family<
     limit: params.limit,
     startDate: startDate,
     endDate: endDate,
+    currencySymbol: params.currencySymbol ?? AppConstants.currencySymbol,
   );
 });
 
@@ -92,7 +95,7 @@ final uiLiabilityAccountsProvider =
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   if (selectedLedger != null) {
     return repository.getLiabilityAccountTree(
-        ledgerId: selectedLedger.ledgerId);
+        ledgerId: selectedLedger.ledgerId, currencySymbol: selectedLedger.currencySymbol);
   } else {
     return [];
   }
@@ -249,7 +252,7 @@ class LiabilitiesRepository {
 
   /// 获取UI展示所需的负债账户树
   Future<List<account_ui.Account>> getLiabilityAccountTree(
-      {int? ledgerId}) async {
+      {int? ledgerId, String currencySymbol = AppConstants.currencySymbol}) async {
     try {
       // 获取账户树，先构建完整的层级关系
       final accountTree = await getAccountTree(ledgerId: ledgerId);
@@ -293,7 +296,7 @@ class LiabilitiesRepository {
 
       // 递归转换为UI需要的Account格式
       final result =
-          _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap);
+          _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap, currencySymbol: currencySymbol);
       return result;
     } catch (e) {
       print('[LiabilitiesRepository] Error in getLiabilitiesAccountTree: $e');
@@ -303,7 +306,7 @@ class LiabilitiesRepository {
 
   // 递归将AccountWithChildren转换为UI格式的Account并计算余额 (Optimized)
   List<account_ui.Account> _convertAccountsToUIFormat(
-      List<AccountWithChildren> accounts, Map<int, double> balances) {
+      List<AccountWithChildren> accounts, Map<int, double> balances, {String currencySymbol = AppConstants.currencySymbol}) {
     if (accounts.isEmpty) {
       return [];
     }
@@ -317,7 +320,7 @@ class LiabilitiesRepository {
 
       if (acc.children.isNotEmpty) {
         // 递归调用并将余额映射向下传递
-        uiChildren = _convertAccountsToUIFormat(acc.children, balances);
+        uiChildren = _convertAccountsToUIFormat(acc.children, balances, currencySymbol: currencySymbol);
         childrensTotalAmount =
             uiChildren.fold(0.0, (sum, child) => sum + child.amount);
       }
@@ -332,7 +335,7 @@ class LiabilitiesRepository {
         type: acc.account.accountType,
         amount: totalAmountForUI, // The value is already positive
         children: uiChildren,
-        currencySymbol: '¥',
+        currencySymbol: currencySymbol,
       );
     }).toList();
   }
@@ -648,6 +651,7 @@ class LiabilitiesRepository {
     int limit = 100,
     DateTime? startDate,
     DateTime? endDate,
+    String currencySymbol = AppConstants.currencySymbol,
   }) async {
     // 获取目标账户信息
     final targetAccount = await _accountDao.getAccountById(accountId);
@@ -665,7 +669,7 @@ class LiabilitiesRepository {
     );
 
     // 转换为 Sankey 图表数据
-    return await _convertToSankeyData(flows, targetAccount, flow);
+    return await _convertToSankeyData(flows, targetAccount, flow, currencySymbol);
   }
 
   /// 获取资产流转数据
@@ -910,6 +914,7 @@ class LiabilitiesRepository {
     List<AssetFlow> flows,
     Account targetAccount,
     String flow,
+    String currencySymbol,
   ) async {
     print('\n=== AssetsRepository 金额计算调试 ===');
     print(
@@ -920,7 +925,7 @@ class LiabilitiesRepository {
     for (int i = 0; i < flows.length; i++) {
       final assetFlow = flows[i];
       print(
-          '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: ¥${assetFlow.amount.toStringAsFixed(2)}');
+          '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: $currencySymbol${assetFlow.amount.toStringAsFixed(2)}');
     }
 
     if (flows.isEmpty) {
@@ -959,7 +964,7 @@ class LiabilitiesRepository {
       final sourceName = accountMap[link.sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[link.targetId]?.accountName ?? 'Unknown';
       print(
-          '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): ¥${link.amount.toStringAsFixed(2)}');
+          '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): $currencySymbol${link.amount.toStringAsFixed(2)}');
     }
 
     // 聚合相同的链接和计算节点金额
@@ -986,7 +991,7 @@ class LiabilitiesRepository {
       final targetId = int.parse(parts[1]);
       final sourceName = accountMap[sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[targetId]?.accountName ?? 'Unknown';
-      print('  $sourceName → $targetName: ¥${amount.toStringAsFixed(2)}');
+      print('  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 移除为账户设置余额的逻辑，只显示实际流转金额
@@ -994,7 +999,7 @@ class LiabilitiesRepository {
     print('\n最终节点金额:');
     nodeAmounts.forEach((accountId, amount) {
       final accountName = accountMap[accountId]?.accountName ?? 'Unknown';
-      print('  $accountName: ¥${amount.toStringAsFixed(2)}');
+      print('  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 创建 SankeyNode 列表，只显示实际流转金额
@@ -1013,14 +1018,14 @@ class LiabilitiesRepository {
         if (amount >= 1000000) {
           // 百万级，固定两位小数
           final millions = amount / 1000000;
-          formattedAmount = ' (¥${millions.toStringAsFixed(2)}M)';
+          formattedAmount = ' ($currencySymbol${millions.toStringAsFixed(2)}M)';
         } else if (amount >= 1000) {
           // 千级，固定两位小数
           final thousands = amount / 1000;
-          formattedAmount = ' (¥${thousands.toStringAsFixed(2)}K)';
+          formattedAmount = ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
         } else {
           // 小额，固定两位小数
-          formattedAmount = ' (¥${amount.toStringAsFixed(2)})';
+          formattedAmount = ' ($currencySymbol${amount.toStringAsFixed(2)})';
         }
       }
 
