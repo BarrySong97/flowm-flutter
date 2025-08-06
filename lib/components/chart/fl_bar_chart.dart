@@ -95,7 +95,7 @@ class FlBarChart extends StatelessWidget {
             ),
             children: <TextSpan>[
               TextSpan(
-                text: '$currencySymbol${rod.toY.toStringAsFixed(0)}',
+                text: '$currencySymbol${rod.toY.toStringAsFixed(2)}',
                 style: const TextStyle(
                   color: Colors.yellow,
                   fontSize: 12,
