@@ -24,7 +24,7 @@ class ExpensesPage extends ConsumerStatefulWidget {
 
 class _ExpensesPageState extends ConsumerState<ExpensesPage>
     with AutomaticKeepAliveClientMixin {
-  bool _isAscending = true; // 默认升序排列
+  bool _isAscending = false; // 默认降序排列
   bool _isLineChart = false; // false for bar chart, true for line chart
   // 辅助方法格式化数字
   String _formatCurrency(double amount) {

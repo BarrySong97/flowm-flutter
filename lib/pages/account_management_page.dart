@@ -77,7 +77,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
   final Map<int, bool> _expandedState = {};
 
   // 排序状态
-  bool _isAscending = true;
+  bool _isAscending = false;
 
   @override
   void initState() {
@@ -393,25 +393,25 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
         ),
         // 账户列表
         SliverPadding(
-          padding: const EdgeInsets.only(
-              top: 16, bottom: 16.0, left: 16, right: 16),
+          padding:
+              const EdgeInsets.only(top: 16, bottom: 16.0, left: 16, right: 16),
           sliver: _buildAccountSliverList(accounts),
         ),
       ],
     );
   }
 
-  /// 构建账户Sliver列表 
+  /// 构建账户Sliver列表
   SliverList _buildAccountSliverList(List<TreeNode> accounts) {
-    final double totalTopLevelAmount = accounts
-        .fold(0.0, (sum, node) => sum + node.account.amount.abs());
+    final double totalTopLevelAmount =
+        accounts.fold(0.0, (sum, node) => sum + node.account.amount.abs());
 
     // 直接在原有节点上更新百分比信息，避免创建新对象导致状态丢失
     for (var node in accounts) {
       double percentage = totalTopLevelAmount == 0
           ? 0.0
           : (node.account.amount.abs() / totalTopLevelAmount) * 100;
-      
+
       // 更新账户的百分比信息
       node.account = account_ui.Account(
         id: node.account.id,
@@ -495,7 +495,8 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
             width: MediaQuery.of(context).size.width - 64,
             child: Card(
               margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0)),
               child: _buildAccountRowContent(node, depth, isDragging: true),
             ),
           ),
@@ -552,7 +553,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
             borderRadius: BorderRadius.circular(8),
             border: isHovered && _insertPosition == 'inside'
                 ? Border.all(
-                    color: canAccept ? Colors.blue : Colors.red, 
+                    color: canAccept ? Colors.blue : Colors.red,
                     width: 2,
                   )
                 : null,
@@ -563,9 +564,10 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     );
   }
 
-  Widget _buildAccountRowContent(TreeNode node, int depth, {bool isDragging = false, bool isPlaceholder = false}) {
+  Widget _buildAccountRowContent(TreeNode node, int depth,
+      {bool isDragging = false, bool isPlaceholder = false}) {
     bool hasChildren = node.children.isNotEmpty;
-    
+
     return InkWell(
       onTap: () {
         if (depth == 0 && hasChildren) {
@@ -576,7 +578,9 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
           _showAccountUpdateBottomSheet(node);
         }
       },
-      onLongPress: (depth == 0 && hasChildren) ? () => _showAccountUpdateBottomSheet(node) : null,
+      onLongPress: (depth == 0 && hasChildren)
+          ? () => _showAccountUpdateBottomSheet(node)
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: Row(
@@ -608,7 +612,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                 ),
               ),
             ],
-            
+
             // 账户图标
             if (node.account.icon != null) ...[
               Container(
@@ -625,7 +629,7 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                 ),
               ),
             ],
-            
+
             // 账户名称和金额
             Expanded(
               child: Column(
@@ -635,7 +639,8 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                     node.account.name,
                     style: TextStyle(
                       fontSize: depth == 0 ? 16 : 15,
-                      fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight:
+                          depth == 0 ? FontWeight.w600 : FontWeight.w500,
                       color: isPlaceholder ? Colors.grey : Colors.black87,
                     ),
                   ),
@@ -645,14 +650,15 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                       '${node.account.percentage!.toStringAsFixed(1)}%',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isPlaceholder ? Colors.grey : Colors.grey.shade600,
+                        color:
+                            isPlaceholder ? Colors.grey : Colors.grey.shade600,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            
+
             // 金额显示
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -662,16 +668,16 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
                   style: TextStyle(
                     fontSize: depth == 0 ? 16 : 15,
                     fontWeight: FontWeight.w600,
-                    color: isPlaceholder 
-                        ? Colors.grey 
-                        : node.account.amount >= 0 
-                            ? Colors.green.shade600 
+                    color: isPlaceholder
+                        ? Colors.grey
+                        : node.account.amount >= 0
+                            ? Colors.green.shade600
                             : Colors.red.shade600,
                   ),
                 ),
               ],
             ),
-            
+
             // 拖拽指示器
             if (!isDragging && !isPlaceholder && !hasChildren) ...[
               const SizedBox(width: 12),
@@ -693,7 +699,6 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
       ),
     );
   }
-
 
   // 检查是否可以接受拖拽放置
   bool _canAcceptDrop(
@@ -732,7 +737,6 @@ class _AccountManagementPageState extends ConsumerState<AccountManagementPage>
     }
     return false;
   }
-
 
   void _updateDropPosition(DragTargetDetails details, TreeNode targetNode) {
     setState(() {

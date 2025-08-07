@@ -167,7 +167,7 @@ class TopExpensesDetailPage extends ConsumerStatefulWidget {
 }
 
 class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
-  bool _isAscending = true; // 默认升序排列
+  bool _isAscending = false; // 默认升序排列
   bool _isLineChart = false; // false for bar chart, true for line chart
 
   DateTime? _getStartDateForChart() {

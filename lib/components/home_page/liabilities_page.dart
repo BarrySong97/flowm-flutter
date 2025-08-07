@@ -20,7 +20,7 @@ class LiabilitiesPage extends ConsumerStatefulWidget {
 class _LiabilitiesPageState extends ConsumerState<LiabilitiesPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
-  bool _isAscending = true; // State for sort order
+  bool _isAscending = false; // State for sort order
 
   @override
   bool get wantKeepAlive => true;

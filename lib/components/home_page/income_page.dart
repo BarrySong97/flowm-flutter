@@ -27,7 +27,7 @@ class IncomePage extends ConsumerStatefulWidget {
 
 class _IncomePageState extends ConsumerState<IncomePage>
     with AutomaticKeepAliveClientMixin {
-  bool _isAscending = true; // 默认升序排列
+  bool _isAscending = false; // 默认降序排列
   bool _isLineChart = false; // false for bar chart, true for line chart
 
   DateTime? _getStartDateForChart() {

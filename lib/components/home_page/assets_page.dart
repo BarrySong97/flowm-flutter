@@ -24,7 +24,7 @@ class AssetsPage extends ConsumerStatefulWidget {
 class _AssetsPageState extends ConsumerState<AssetsPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
-  bool _isAscending = true; // State for sort order
+  bool _isAscending = false; // State for sort order
 
   @override
   bool get wantKeepAlive => true;

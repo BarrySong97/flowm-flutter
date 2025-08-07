@@ -29,7 +29,7 @@ class _TopAssetsAccountDetailPageState
     extends ConsumerState<TopAssetsAccountDetailPage>
     with AutomaticKeepAliveClientMixin {
   String? _drilledDownAccountName; // State for current drill-down level
-  bool _isAscending = true; // State for sort order
+  bool _isAscending = false; // State for sort order
   // dynamic _currentAccount; // _currentAccount is assigned account but account is used directly.
 
   @override
