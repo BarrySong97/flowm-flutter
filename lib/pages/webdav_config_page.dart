@@ -6,6 +6,7 @@ import '../services/auto_sync_service.dart';
 import '../utils/global_refresh_service.dart';
 import '../components/sync_status_widget.dart';
 import '../utils/file_time_utils.dart';
+import '../utils/sync_dialog_helper.dart';
 
 enum ConflictAction {
   cancel,
@@ -53,7 +54,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   Future<void> _loadWebdavConfig() async {
     final config = await WebDAVConfig.load();
     setState(() {
-      _urlController.text = config.url;
+      // 如果没有配置，默认使用坚果云WebDAV地址
+      _urlController.text = config.url.isEmpty ? 'https://dav.jianguoyun.com/dav/' : config.url;
       _usernameController.text = config.username;
       _passwordController.text = config.password;
     });
@@ -611,33 +613,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     
     if (!mounted) return; // 检查组件是否仍然挂载
     
-    String recommendation = '';
-    Color recommendationColor = Colors.blue;
-    IconData recommendationIcon = Icons.info_outline;
-    
-    // 根据检查结果给出智能建议
-    switch (syncCheckResult.direction) {
-      case SyncDirection.download:
-        recommendation = '建议：检测到服务器有新数据，推荐下载';
-        recommendationColor = Colors.orange;
-        recommendationIcon = Icons.cloud_download;
-        break;
-      case SyncDirection.upload:
-        recommendation = '建议：检测到本地有数据，推荐上传';
-        recommendationColor = Colors.green;
-        recommendationIcon = Icons.cloud_upload;
-        break;
-      case SyncDirection.conflict:
-        recommendation = '注意：本地和服务器都有数据，请谨慎选择';
-        recommendationColor = Colors.red;
-        recommendationIcon = Icons.warning;
-        break;
-      case SyncDirection.none:
-        recommendation = '提示：数据已同步，可选择跳过';
-        recommendationColor = Colors.blue;
-        recommendationIcon = Icons.check_circle;
-        break;
-    }
+    // 使用统一的推荐信息
+    final syncRecommendation = SyncDialogHelper.getSyncRecommendation(syncCheckResult.direction);
 
     final result = await showDialog<String>(
       context: context,
@@ -677,31 +654,12 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             ),
             
             // 显示智能建议
-            if (recommendation.isNotEmpty) ...[
+            if (syncRecommendation.message.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: recommendationColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: recommendationColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(recommendationIcon, color: recommendationColor, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        recommendation,
-                        style: TextStyle(
-                          color: recommendationColor.withValues(alpha: 0.8),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              SyncDialogHelper.buildRecommendationContainer(
+                message: syncRecommendation.message,
+                color: syncRecommendation.color,
+                icon: syncRecommendation.icon,
               ),
             ],
             
@@ -712,6 +670,79 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               '• 跳过：稍后手动同步',
               style: TextStyle(fontSize: 13),
             ),
+            
+            const SizedBox(height: 12),
+            // 覆盖警告
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ 重要提醒：\n'
+                      '• 下载将覆盖本地所有数据\n'
+                      '• 上传将覆盖服务器所有数据\n'
+                      '• 操作不可撤销，请谨慎选择',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            // WebDAV版本信息
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        children: const [
+                          TextSpan(
+                            text: '📝 操作说明：\n',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '• 点击“上传”将覆盖服务器数据\n'),
+                          TextSpan(text: '• 点击“下载”将覆盖本地数据\n\n'),
+                          TextSpan(
+                            text: '💾 数据备份：',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -719,23 +750,22 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             onPressed: () => Navigator.of(context).pop('skip'),
             child: const Text('跳过'),
           ),
-          TextButton(
+          // 上传按钮 - 使用统一样式
+          SyncDialogHelper.buildInitialSyncButton(
+            text: '上传',
             onPressed: () => Navigator.of(context).pop('upload'),
-            style: TextButton.styleFrom(
-              backgroundColor: syncCheckResult.direction == SyncDirection.upload 
-                  ? Colors.green.withValues(alpha: 0.1)
-                  : null,
-            ),
-            child: const Text('上传'),
+            recommendation: syncCheckResult.direction,
+            buttonType: SyncDirection.upload,
+            icon: Icons.cloud_upload,
           ),
-          ElevatedButton(
+          const SizedBox(width: 8),
+          // 下载按钮 - 使用统一样式
+          SyncDialogHelper.buildInitialSyncButton(
+            text: '下载',
             onPressed: () => Navigator.of(context).pop('download'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: syncCheckResult.direction == SyncDirection.download 
-                  ? Colors.orange 
-                  : null,
-            ),
-            child: const Text('下载'),
+            recommendation: syncCheckResult.direction,
+            buttonType: SyncDirection.download,
+            icon: Icons.cloud_download,
           ),
         ],
       ),
@@ -752,6 +782,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   }
 
   Future<ConflictAction> _showConflictDialog(SyncConflict conflict) async {
+    // 使用统一的冲突推荐逻辑
+    final recommendation = SyncDialogHelper.getConflictRecommendation(conflict);
+    
     final result = await showDialog<ConflictAction>(
       context: context,
       builder: (context) => AlertDialog(
@@ -762,11 +795,95 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           children: [
             const Text('本地和服务器的数据都有更新，请选择如何处理：'),
             const SizedBox(height: 16),
-            Text('本地文件: ${_formatDateTime(conflict.localModified)}'),
-            Text('文件大小: ${_formatFileSize(conflict.localSize)}'),
-            const SizedBox(height: 8),
-            Text('服务器文件: ${_formatDateTime(conflict.remoteModified)}'),
-            Text('文件大小: ${_formatFileSize(conflict.remoteSize)}'),
+            
+            // 文件信息对比 - 使用统一样式
+            SyncDialogHelper.buildFileInfoContainer(
+              conflict: conflict,
+              localIsNewerChecker: (c) => c.localModified.isAfter(c.remoteModified),
+              remoteIsNewerChecker: (c) => c.remoteModified.isAfter(c.localModified),
+              dateFormatter: _formatDateTime,
+              sizeFormatter: _formatFileSize,
+            ),
+            
+            // 智能建议 - 使用统一样式
+            if (recommendation.message.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SyncDialogHelper.buildRecommendationContainer(
+                message: recommendation.message,
+                color: recommendation.color,
+                icon: recommendation.icon,
+              ),
+            ],
+            
+            const SizedBox(height: 12),
+            // 覆盖警告
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ 重要提醒：选择任何版本都将完全覆盖另一版本的数据，操作不可撤销！',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            // WebDAV版本信息
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        children: const [
+                          TextSpan(
+                            text: '📝 操作说明：\n',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '• 选择“使用本地版本”将覆盖服务器数据\n'),
+                          TextSpan(text: '• 选择“使用服务器版本”将覆盖本地数据\n\n'),
+                          TextSpan(
+                            text: '💾 数据备份：',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -774,15 +891,21 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             onPressed: () => Navigator.of(context).pop(ConflictAction.cancel),
             child: const Text('取消'),
           ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(context).pop(ConflictAction.overwriteLocal),
-            child: const Text('使用服务器版本'),
+          // 服务器版本按钮 - 使用统一样式
+          SyncDialogHelper.buildConflictButton(
+            text: '使用服务器版本',
+            onPressed: () => Navigator.of(context).pop(ConflictAction.overwriteLocal),
+            isRecommended: recommendation.recommendedAction == ConflictButtonType.useRemote,
+            buttonType: ConflictButtonType.useRemote,
           ),
-          ElevatedButton(
-            onPressed: () =>
-                Navigator.of(context).pop(ConflictAction.overwriteRemote),
-            child: const Text('使用本地版本'),
+          const SizedBox(width: 8),
+          // 本地版本按钮 - 使用统一样式
+          SyncDialogHelper.buildConflictButton(
+            text: '使用本地版本',
+            onPressed: () => Navigator.of(context).pop(ConflictAction.overwriteRemote),
+            isRecommended: recommendation.recommendedAction == ConflictButtonType.useLocal,
+            buttonType: ConflictButtonType.useLocal,
+            isElevated: true,
           ),
         ],
       ),
@@ -853,7 +976,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                           controller: _urlController,
                           decoration: const InputDecoration(
                             labelText: 'WebDAV URL',
-                            hintText: 'https://example.com/webdav',
+                            hintText: 'https://dav.jianguoyun.com/dav/',
                             prefixIcon: Icon(Icons.link, size: 20),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.all(Radius.circular(6.0)),
@@ -861,15 +984,21 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             labelStyle: TextStyle(fontSize: 14),
                             hintStyle: TextStyle(fontSize: 14),
+                            helperText: '⚠️ 注意：URL末尾必须带斜杠 /',
+                            helperStyle: TextStyle(color: Colors.orange, fontSize: 12),
                           ),
                           style: const TextStyle(fontSize: 14),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return '请输入WebDAV URL';
                             }
-                            final uri = Uri.tryParse(value.trim());
+                            final trimmedValue = value.trim();
+                            final uri = Uri.tryParse(trimmedValue);
                             if (uri == null || !uri.hasAbsolutePath) {
                               return '请输入有效的URL';
+                            }
+                            if (!trimmedValue.endsWith('/')) {
+                              return 'WebDAV URL末尾必须带斜杠 / ，例如：https://dav.jianguoyun.com/dav/';
                             }
                             return null;
                           },
@@ -1095,14 +1224,29 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          '• WebDAV URL: 您的WebDAV服务器地址\n'
-                          '• 用户名: WebDAV服务器的登录用户名\n'
-                          '• 密码: WebDAV服务器的登录密码\n'
-                          '• 配置完成后可以使用测试连接验证设置是否正确',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
+                        RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                            children: const [
+                              TextSpan(text: '• WebDAV URL: 您的WebDAV服务器地址\n'),
+                              TextSpan(
+                                text: '  ⚠️ URL末尾必须带斜杠 /，如 https://dav.jianguoyun.com/dav/',
+                                style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
+                              ),
+                              TextSpan(text: '\n\n• 用户名: WebDAV服务器的登录用户名\n'),
+                              TextSpan(text: '• 密码: WebDAV服务器的登录密码\n'),
+                              TextSpan(text: '• 配置完成后可以使用测试连接验证设置是否正确\n\n'),
+                              TextSpan(
+                                text: '🌰 推荐服务商：\n',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              TextSpan(text: '• 坚果云: https://dav.jianguoyun.com/dav/\n'),
+                              TextSpan(text: '• 其他支持WebDAV的云存储服务'),
+                            ],
                           ),
                         ),
                       ],

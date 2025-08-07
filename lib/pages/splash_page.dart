@@ -6,6 +6,7 @@ import '../state/database/database_provider.dart';
 import '../utils/web_message_sender.dart';
 import '../services/auto_sync_service.dart';
 import '../services/webdav_config.dart';
+import '../utils/sync_dialog_helper.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -314,6 +315,79 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
             ],
+            
+            const SizedBox(height: 16),
+            // 覆盖警告
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ 重要提醒：\n'
+                      '• 下载云端数据将覆盖本地数据\n'
+                      '• 使用本地数据将覆盖云端数据\n'
+                      '• 操作不可撤销，请谨慎选择',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            // WebDAV版本信息
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        children: const [
+                          TextSpan(
+                            text: '📝 操作说明：\n',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '• 选择“下载云端数据”将覆盖本地数据\n'),
+                          TextSpan(text: '• 选择“使用本地数据”将覆盖云端数据\n\n'),
+                          TextSpan(
+                            text: '💾 数据备份：',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -324,17 +398,19 @@ class _SplashPageState extends ConsumerState<SplashPage>
               style: TextStyle(color: Colors.grey.shade600),
             ),
           ),
-          TextButton(
+          SyncDialogHelper.buildInitialSyncButton(
+            text: '使用本地数据\n(覆盖云端)',
             onPressed: () => Navigator.of(context).pop(SyncDirection.upload),
-            child: Text('使用本地数据\n(覆盖云端)'),
+            recommendation: SyncDirection.none, // 首次发现云端数据时不推荐上传
+            buttonType: SyncDirection.upload,
+            icon: Icons.cloud_upload,
           ),
-          ElevatedButton(
+          SyncDialogHelper.buildInitialSyncButton(
+            text: '下载云端数据\n(推荐)',
             onPressed: () => Navigator.of(context).pop(SyncDirection.download),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('下载云端数据\n(推荐)'),
+            recommendation: SyncDirection.download, // 推荐下载
+            buttonType: SyncDirection.download,
+            icon: Icons.cloud_download,
           ),
         ],
       ),
@@ -347,6 +423,14 @@ class _SplashPageState extends ConsumerState<SplashPage>
   Future<void> _showConflictDialog(SyncCheckResult checkResult) async {
     if (!mounted) return;
 
+    if (checkResult.conflict == null) {
+      await _handleSyncAction(null);
+      return;
+    }
+
+    final conflict = checkResult.conflict!;
+    final recommendation = SyncDialogHelper.getConflictRecommendation(conflict);
+
     final action = await showDialog<SyncDirection>(
       context: context,
       barrierDismissible: false,
@@ -358,16 +442,95 @@ class _SplashPageState extends ConsumerState<SplashPage>
           children: [
             const Text('本地和服务器的数据都有更新，请选择如何处理：'),
             const SizedBox(height: 16),
-            if (checkResult.conflict != null) ...[
-              Text(
-                  '本地文件: ${_formatDateTime(checkResult.conflict!.localModified)}'),
-              Text('文件大小: ${_formatFileSize(checkResult.conflict!.localSize)}'),
-              const SizedBox(height: 8),
-              Text(
-                  '服务器文件: ${_formatDateTime(checkResult.conflict!.remoteModified)}'),
-              Text(
-                  '文件大小: ${_formatFileSize(checkResult.conflict!.remoteSize)}'),
+            
+            // 文件信息对比
+            SyncDialogHelper.buildFileInfoContainer(
+              conflict: conflict,
+              localIsNewerChecker: (c) => c.localModified.isAfter(c.remoteModified),
+              remoteIsNewerChecker: (c) => c.remoteModified.isAfter(c.localModified),
+              dateFormatter: _formatDateTime,
+              sizeFormatter: _formatFileSize,
+            ),
+            
+            // 智能建议
+            if (recommendation.message.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SyncDialogHelper.buildRecommendationContainer(
+                message: recommendation.message,
+                color: recommendation.color,
+                icon: recommendation.icon,
+              ),
             ],
+            
+            const SizedBox(height: 12),
+            // 覆盖警告
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ 重要提醒：选择任何版本都将完全覆盖另一版本的数据，操作不可撤销！',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            // WebDAV版本信息
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        children: const [
+                          TextSpan(
+                            text: '📝 操作说明：\n',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '• 选择“使用本地数据”将覆盖服务器数据\n'),
+                          TextSpan(text: '• 选择“使用服务器数据”将覆盖本地数据\n\n'),
+                          TextSpan(
+                            text: '💾 数据备份：',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -375,13 +538,19 @@ class _SplashPageState extends ConsumerState<SplashPage>
             onPressed: () => Navigator.of(context).pop(SyncDirection.none),
             child: const Text('跳过同步'),
           ),
-          TextButton(
+          SyncDialogHelper.buildConflictButton(
+            text: '使用服务器数据',
             onPressed: () => Navigator.of(context).pop(SyncDirection.download),
-            child: const Text('使用服务器数据'),
+            isRecommended: recommendation.recommendedAction == ConflictButtonType.useRemote,
+            buttonType: ConflictButtonType.useRemote,
           ),
-          ElevatedButton(
+          const SizedBox(width: 8),
+          SyncDialogHelper.buildConflictButton(
+            text: '使用本地数据',
             onPressed: () => Navigator.of(context).pop(SyncDirection.upload),
-            child: const Text('使用本地数据'),
+            isRecommended: recommendation.recommendedAction == ConflictButtonType.useLocal,
+            buttonType: ConflictButtonType.useLocal,
+            isElevated: true,
           ),
         ],
       ),

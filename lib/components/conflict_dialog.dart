@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/database_sync_service.dart';
 import '../utils/file_time_utils.dart';
+import '../utils/sync_dialog_helper.dart';
 
 /// 冲突处理动作枚举
 enum ConflictAction {
-  cancel,         // 取消
-  useLocal,       // 使用本地版本
-  useRemote,      // 使用服务器版本
+  cancel, // 取消
+  useLocal, // 使用本地版本
+  useRemote, // 使用服务器版本
 }
 
 /// 全局冲突对话框服务
@@ -62,7 +63,7 @@ class ConflictDialogService {
     SyncConflict conflict,
   ) async {
     final completer = Completer<ConflictAction?>();
-    
+
     _overlayEntry = OverlayEntry(
       builder: (context) => _GlobalConflictOverlay(
         conflict: conflict,
@@ -74,7 +75,7 @@ class ConflictDialogService {
     );
 
     Overlay.of(context).insert(_overlayEntry!);
-    
+
     return completer.future;
   }
 
@@ -111,7 +112,7 @@ class _ConflictDialog extends StatelessWidget {
             size: 24,
           ),
           const SizedBox(width: 8),
-          Text(isStartup ? '启动时数据冲突' : '数据同步冲突'),
+          Text('数据同步冲突'),
         ],
       ),
       content: Column(
@@ -119,27 +120,58 @@ class _ConflictDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isStartup 
-              ? '检测到本地和服务器的数据都有更新，请选择如何处理：'
-              : '在同步过程中检测到冲突，本地和服务器的数据都有更新：',
+            isStartup
+                ? '检测到本地和服务器的数据都有更新，请选择如何处理：'
+                : '在同步过程中检测到冲突，本地和服务器的数据都有更新：',
             style: const TextStyle(fontSize: 14),
           ),
           const SizedBox(height: 16),
-          _buildFileInfo(
-            title: '📱 本地文件',
-            time: conflict.localModified,
-            size: conflict.localSize,
-            isLocal: true,
+
+          // 使用统一的文件信息容器
+          SyncDialogHelper.buildFileInfoContainer(
+            conflict: conflict,
+            localIsNewerChecker: (c) =>
+                c.localModified.isAfter(c.remoteModified),
+            remoteIsNewerChecker: (c) =>
+                c.remoteModified.isAfter(c.localModified),
+            dateFormatter: FileTimeUtils.formatDateTime,
+            sizeFormatter: FileTimeUtils.formatFileSize,
           ),
+
+          // 智能建议
           const SizedBox(height: 12),
-          _buildFileInfo(
-            title: '☁️ 服务器文件',
-            time: conflict.remoteModified,
-            size: conflict.remoteSize,
-            isLocal: false,
+          _buildRecommendationContainer(),
+
+          const SizedBox(height: 12),
+          // 覆盖警告
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning, color: Colors.red.shade600, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '⚠️ 重要提醒：选择任何版本都将完全覆盖另一版本的数据，操作不可撤销！',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+
           if (!isStartup) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -149,7 +181,8 @@ class _ConflictDialog extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade700, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -163,108 +196,113 @@ class _ConflictDialog extends StatelessWidget {
                 ],
               ),
             ),
+
+            const SizedBox(height: 12),
+            // WebDAV版本信息
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        children: const [
+                          TextSpan(
+                            text: '📝 操作说明：\n',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: '• 选择“使用本地版本”将覆盖服务器数据\n'),
+                          TextSpan(text: '• 选择“使用服务器版本”将覆盖本地数据\n\n'),
+                          TextSpan(
+                            text: '💾 数据备份：',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(
+                              text:
+                                  '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            if (onAction != null) {
-              onAction!(ConflictAction.cancel);
-            } else {
-              Navigator.of(context).pop(ConflictAction.cancel);
-            }
-          },
-          child: Text(
-            isStartup ? '跳过同步' : '取消',
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
-        ),
-        TextButton(
-          onPressed: () {
-            if (onAction != null) {
-              onAction!(ConflictAction.useRemote);
-            } else {
-              Navigator.of(context).pop(ConflictAction.useRemote);
-            }
-          },
-          child: const Text('使用服务器版本'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (onAction != null) {
-              onAction!(ConflictAction.useLocal);
-            } else {
-              Navigator.of(context).pop(ConflictAction.useLocal);
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade600,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('使用本地版本'),
-        ),
-      ],
+      actions: _buildActions(context),
     );
   }
 
-  Widget _buildFileInfo({
-    required String title,
-    required DateTime time,
-    required int size,
-    required bool isLocal,
-  }) {
-    final isNewer = isLocal 
-      ? conflict.localModified.isAfter(conflict.remoteModified)
-      : conflict.remoteModified.isAfter(conflict.localModified);
-    
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isNewer ? Colors.green.shade50 : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isNewer ? Colors.green.shade200 : Colors.orange.shade200,
+  Widget _buildRecommendationContainer() {
+    final recommendation = SyncDialogHelper.getConflictRecommendation(conflict);
+    return SyncDialogHelper.buildRecommendationContainer(
+      message: recommendation.message,
+      color: recommendation.color,
+      icon: recommendation.icon,
+    );
+  }
+
+  List<Widget> _buildActions(BuildContext context) {
+    final recommendation = SyncDialogHelper.getConflictRecommendation(conflict);
+
+    return [
+      TextButton(
+        onPressed: () {
+          if (onAction != null) {
+            onAction!(ConflictAction.cancel);
+          } else {
+            Navigator.of(context).pop(ConflictAction.cancel);
+          }
+        },
+        child: Text(
+          isStartup ? '跳过同步' : '取消',
+          style: TextStyle(color: Colors.grey.shade600),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isNewer ? Colors.green.shade700 : Colors.orange.shade700,
-                  fontSize: 13,
-                ),
-              ),
-              if (isNewer) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.fiber_new,
-                  color: Colors.green.shade700,
-                  size: 16,
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            FileTimeUtils.formatDateTime(time),
-            style: const TextStyle(fontSize: 12),
-          ),
-          Text(
-            '${FileTimeUtils.getTimeAgo(time)} • ${FileTimeUtils.formatFileSize(size)}',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
+      SyncDialogHelper.buildConflictButton(
+        text: '使用服务器版本',
+        onPressed: () {
+          if (onAction != null) {
+            onAction!(ConflictAction.useRemote);
+          } else {
+            Navigator.of(context).pop(ConflictAction.useRemote);
+          }
+        },
+        isRecommended:
+            recommendation.recommendedAction == ConflictButtonType.useRemote,
+        buttonType: ConflictButtonType.useRemote,
       ),
-    );
+      const SizedBox(width: 8),
+      SyncDialogHelper.buildConflictButton(
+        text: '使用本地版本',
+        onPressed: () {
+          if (onAction != null) {
+            onAction!(ConflictAction.useLocal);
+          } else {
+            Navigator.of(context).pop(ConflictAction.useLocal);
+          }
+        },
+        isRecommended:
+            recommendation.recommendedAction == ConflictButtonType.useLocal,
+        buttonType: ConflictButtonType.useLocal,
+        isElevated: true,
+      ),
+    ];
   }
 }
 
@@ -291,12 +329,12 @@ class _GlobalConflictOverlayState extends State<_GlobalConflictOverlay>
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
@@ -304,7 +342,7 @@ class _GlobalConflictOverlayState extends State<_GlobalConflictOverlay>
       parent: _animationController,
       curve: Curves.easeOutBack,
     ));
-    
+
     _opacityAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -312,7 +350,7 @@ class _GlobalConflictOverlayState extends State<_GlobalConflictOverlay>
       parent: _animationController,
       curve: Curves.easeOut,
     ));
-    
+
     _animationController.forward();
   }
 
