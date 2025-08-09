@@ -122,39 +122,43 @@ class _AddPageState extends ConsumerState<AddPage>
 
     try {
       final selectedLedger = await ref.read(selectedLedgerProvider.future);
-      
+
       if (selectedLedger == null) return;
-      
+
       if (widget.transactionType == 'expense') {
         // 支出：只填充默认资产账户作为从账户，让用户自己选择支出分类账户
-        final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
-        
+        final defaultAssetAccount = await ref
+            .read(accountRepositoryProvider)
+            .getDefaultAssetAccount(selectedLedger.ledgerId);
+
         if (defaultAssetAccount != null) {
           final fromAccountBalance = await ref
               .read(accountRepositoryProvider)
               .getAccountBalance(defaultAssetAccount.accountId);
-              
+
           if (mounted) {
             setState(() {
-            _fromAccount = Account(
-              id: defaultAssetAccount.accountId,
-              name: defaultAssetAccount.accountName,
-              amount: fromAccountBalance,
-              type: defaultAssetAccount.accountType,
-            );
-            _transactionFlowType = _calculateTransactionFlowType();
+              _fromAccount = Account(
+                id: defaultAssetAccount.accountId,
+                name: defaultAssetAccount.accountName,
+                amount: fromAccountBalance,
+                type: defaultAssetAccount.accountType,
+              );
+              _transactionFlowType = _calculateTransactionFlowType();
             });
           }
         }
       } else if (widget.transactionType == 'income') {
         // 收入：只填充默认资产账户作为到账户，让用户自己选择收入分类账户
-        final defaultAssetAccount = await ref.read(accountRepositoryProvider).getDefaultAssetAccount(selectedLedger.ledgerId);
-        
+        final defaultAssetAccount = await ref
+            .read(accountRepositoryProvider)
+            .getDefaultAssetAccount(selectedLedger.ledgerId);
+
         if (defaultAssetAccount != null) {
           final toAccountBalance = await ref
               .read(accountRepositoryProvider)
               .getAccountBalance(defaultAssetAccount.accountId);
-              
+
           if (mounted) {
             setState(() {
               _toAccount = Account(
@@ -198,7 +202,7 @@ class _AddPageState extends ConsumerState<AddPage>
       // 设置日期
       if (params.date != null) {
         try {
-          final dateTime = DateTime.parse(params.date!);
+          final dateTime = DateTime.now();
           setState(() {
             _currentDateTime = dateTime;
           });
@@ -290,7 +294,8 @@ class _AddPageState extends ConsumerState<AddPage>
 
   String _formatDateTime(DateTime dateTime) {
     final date = dateTime.toString().split(' ')[0];
-    final time = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final time =
+        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     return '$date $time';
   }
 
@@ -395,10 +400,10 @@ class _AddPageState extends ConsumerState<AddPage>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              validationResult.warningMessage ?? 
-                (validationResult.level == TransactionValidationLevel.uncommon 
-                  ? '这是一笔不常见的交易类型，请确认账户选择是否正确'
-                  : '这种账户组合可能不合理，请检查账户选择'),
+              validationResult.warningMessage ??
+                  (validationResult.level == TransactionValidationLevel.uncommon
+                      ? '这是一笔不常见的交易类型，请确认账户选择是否正确'
+                      : '这种账户组合可能不合理，请检查账户选择'),
               style: TextStyle(
                 color: textColor,
                 fontSize: 14,
@@ -686,7 +691,6 @@ class _AddPageState extends ConsumerState<AddPage>
       return;
     }
 
-
     final transactionAmount = double.tryParse(amount);
     if (transactionAmount == null || transactionAmount == 0.0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -859,7 +863,8 @@ class _AddPageState extends ConsumerState<AddPage>
                   const SizedBox(height: 8),
                   Consumer(
                     builder: (context, ref, child) {
-                      final selectedLedger = ref.watch(selectedLedgerProvider).value;
+                      final selectedLedger =
+                          ref.watch(selectedLedgerProvider).value;
                       return Text(
                         '${selectedLedger?.currencySymbol ?? '¥'}$amount',
                         style: const TextStyle(
@@ -929,8 +934,7 @@ class _AddPageState extends ConsumerState<AddPage>
                               ),
                             ],
                             // 显示交易验证状态
-                            if (_fromAccount != null &&
-                                _toAccount != null) ...[
+                            if (_fromAccount != null && _toAccount != null) ...[
                               const SizedBox(width: 8),
                               _buildTransactionValidationIndicator(),
                             ],
@@ -1012,7 +1016,7 @@ class _TimeInputDialogState extends State<_TimeInputDialog> {
     super.initState();
     hourController = TextEditingController();
     minuteController = TextEditingController();
-    
+
     // 设置初始值
     hourController.text = widget.initialHour.toString().padLeft(2, '0');
     minuteController.text = widget.initialMinute.toString().padLeft(2, '0');
@@ -1072,7 +1076,7 @@ class _TimeInputDialogState extends State<_TimeInputDialog> {
           onPressed: () {
             final hour = int.tryParse(hourController.text) ?? 0;
             final minute = int.tryParse(minuteController.text) ?? 0;
-            
+
             if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
               Navigator.of(context).pop(TimeOfDay(hour: hour, minute: minute));
             } else {
