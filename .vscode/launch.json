@@ -14,6 +14,15 @@
         "-t", // if your have different main file
         "lib/main.dart"
       ]
+    },
+    {
+      "name": "Flutter Noraml",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-t", // if your have different main file
+        "lib/main.dart"
+      ]
     }
   ]
 }

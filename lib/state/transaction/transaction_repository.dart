@@ -322,4 +322,19 @@ class TransactionRepository {
 
     return monthlySummary;
   }
+
+  /// 获取最常用的交易描述（备注）
+  ///
+  /// [ledgerId] - 账本ID，如果为null则查询所有账本
+  /// [limit] - 返回的最大数量，默认10个
+  /// Returns: 按使用频率降序排列的描述列表，包含描述文本和使用次数
+  Future<List<({String description, int count})>> getFrequentDescriptions({
+    int? ledgerId,
+    int limit = 10,
+  }) async {
+    return _transactionDao.getFrequentDescriptions(
+      ledgerId: ledgerId,
+      limit: limit,
+    );
+  }
 }

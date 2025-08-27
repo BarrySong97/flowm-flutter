@@ -9,6 +9,7 @@ import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/utils/account_transaction_validator.dart';
 import 'package:flowm/pages/account_transaction_guide_screen.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
+import 'package:flowm/state/transaction/frequent_descriptions_provider.dart';
 import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
 import 'package:flowm/db/tables/account_table.dart' show AccountType;
@@ -413,6 +414,76 @@ class _AddPageState extends ConsumerState<AddPage>
           ),
         ],
       ),
+    );
+  }
+
+  /// 构建高频备注快速选择列表
+  Widget _buildFrequentDescriptionsBadges() {
+    return Consumer(
+      builder: (context, ref, _) {
+        final frequentDescriptions = ref.watch(frequentDescriptionsProvider);
+
+        return frequentDescriptions.when(
+          data: (descriptions) {
+            if (descriptions.isEmpty) return const SizedBox.shrink();
+
+            return Container(
+              height: 44,
+              margin: const EdgeInsets.only(bottom: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: Row(
+                  children: descriptions.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _noteController.text = item.description;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F1F1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  item.description,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        );
+      },
     );
   }
 
@@ -975,6 +1046,9 @@ class _AddPageState extends ConsumerState<AddPage>
                 ),
               ),
             ),
+
+            // 高频备注快速选择
+            _buildFrequentDescriptionsBadges(),
 
             // 底部输入工具栏
             BottomInputToolbar(

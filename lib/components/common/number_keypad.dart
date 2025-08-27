@@ -32,7 +32,7 @@ class NumberKeypad extends StatelessWidget {
       child: InkWell(
         onTap: () => onKeyPressed(value),
         child: Container(
-          height: 60,
+          height: 48,
           alignment: Alignment.center,
           child: icon != null
               ? Icon(icon, size: 24, color: fgColor)
@@ -52,7 +52,7 @@ class NumberKeypad extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 250,
+      height: 210,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: const Color(0xFFF5F6FB),

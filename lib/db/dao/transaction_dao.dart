@@ -1410,4 +1410,61 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       );
     }).toList();
   }
+
+  /// 获取最常用的交易描述（备注）
+  ///
+  /// [ledgerId] - 账本ID，如果为null则查询所有账本
+  /// [limit] - 返回的最大数量
+  /// Returns: 按使用频率降序排列的描述列表
+  Future<List<({String description, int count})>> getFrequentDescriptions({
+    int? ledgerId,
+    int limit = 10,
+  }) async {
+    // 构建基础查询
+    String query = '''
+      SELECT description, COUNT(*) as count
+      FROM transactions t
+      WHERE description IS NOT NULL 
+        AND description != ''
+    ''';
+
+    // 如果指定了账本ID，需要通过账户关联过滤
+    if (ledgerId != null) {
+      query += '''
+        AND EXISTS (
+          SELECT 1 FROM postings p
+          INNER JOIN accounts a ON p.account_id = a.account_id
+          WHERE p.transaction_id = t.transaction_id
+            AND a.ledger_id = ?
+        )
+      ''';
+    }
+
+    query += '''
+      GROUP BY description
+      ORDER BY count DESC
+      LIMIT ?
+    ''';
+
+    // 执行查询
+    final List<Map<String, Object?>> result;
+    if (ledgerId != null) {
+      result = await db.customSelect(query, variables: [
+        Variable.withInt(ledgerId),
+        Variable.withInt(limit),
+      ]).get().then((rows) => rows.map((row) => row.data).toList());
+    } else {
+      result = await db.customSelect(query, variables: [
+        Variable.withInt(limit),
+      ]).get().then((rows) => rows.map((row) => row.data).toList());
+    }
+
+    // 转换结果
+    return result.map((row) {
+      return (
+        description: row['description'] as String,
+        count: row['count'] as int,
+      );
+    }).toList();
+  }
 }
