@@ -337,4 +337,19 @@ class TransactionRepository {
       limit: limit,
     );
   }
+
+  /// 根据备注获取最新的一笔交易及其账户信息
+  ///
+  /// [description] - 交易备注
+  /// [ledgerId] - 账本ID，如果为null则查询所有账本
+  /// Returns: 最新的交易记录，包含from和to账户信息
+  Future<TransactionWithAmount?> getLatestTransactionByDescription({
+    required String description,
+    int? ledgerId,
+  }) async {
+    return _transactionDao.getLatestTransactionByDescription(
+      description: description,
+      ledgerId: ledgerId,
+    );
+  }
 }

@@ -1411,6 +1411,63 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     }).toList();
   }
 
+  /// 根据备注获取最新的一笔交易及其账户信息
+  ///
+  /// [description] - 交易备注
+  /// [ledgerId] - 账本ID，如果为null则查询所有账本
+  /// Returns: 最新的交易记录，包含from和to账户信息
+  Future<TransactionWithAmount?> getLatestTransactionByDescription({
+    required String description,
+    int? ledgerId,
+  }) async {
+    String query = '''
+      SELECT t.transaction_id
+      FROM transactions t
+      WHERE t.description = ?
+    ''';
+
+    // 如果指定了账本ID，需要通过账户关联过滤
+    if (ledgerId != null) {
+      query += '''
+        AND EXISTS (
+          SELECT 1 FROM postings p
+          INNER JOIN accounts a ON p.account_id = a.account_id
+          WHERE p.transaction_id = t.transaction_id
+            AND a.ledger_id = ?
+        )
+      ''';
+    }
+
+    query += '''
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      LIMIT 1
+    ''';
+
+    // 执行查询
+    final List<Map<String, Object?>> result;
+    if (ledgerId != null) {
+      result = await db.customSelect(query, variables: [
+        Variable.withString(description),
+        Variable.withInt(ledgerId),
+      ]).get().then((rows) => rows.map((row) => row.data).toList());
+    } else {
+      result = await db.customSelect(query, variables: [
+        Variable.withString(description),
+      ]).get().then((rows) => rows.map((row) => row.data).toList());
+    }
+
+    // 如果没有找到交易，返回null
+    if (result.isEmpty) {
+      return null;
+    }
+
+    // 获取交易ID
+    final transactionId = result.first['transaction_id'] as int;
+
+    // 使用现有的方法获取完整的交易信息
+    return await getTransactionWithAmountById(transactionId);
+  }
+
   /// 获取最常用的交易描述（备注）
   ///
   /// [ledgerId] - 账本ID，如果为null则查询所有账本

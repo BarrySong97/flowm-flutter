@@ -293,6 +293,64 @@ class _AddPageState extends ConsumerState<AddPage>
     return '';
   }
 
+  /// 根据备注描述填充对应的账户信息
+  Future<void> _fillAccountsFromDescription(String description) async {
+    try {
+      // 获取当前选中的账本
+      final selectedLedger = await ref.read(selectedLedgerProvider.future);
+      if (selectedLedger == null) return;
+
+      // 查询该备注对应的最新交易
+      final latestTransaction = await ref
+          .read(transactionRepositoryProvider)
+          .getLatestTransactionByDescription(
+            description: description,
+            ledgerId: selectedLedger.ledgerId,
+          );
+
+      if (latestTransaction == null) return;
+      if (!mounted) return;
+
+      // 如果找到了交易，填充账户信息
+      if (latestTransaction.fromAccount != null) {
+        final fromAccountBalance = await ref
+            .read(accountRepositoryProvider)
+            .getAccountBalance(latestTransaction.fromAccount!.accountId);
+
+        if (mounted) {
+          setState(() {
+            _fromAccount = Account(
+              id: latestTransaction.fromAccount!.accountId,
+              name: latestTransaction.fromAccount!.accountName,
+              amount: fromAccountBalance,
+              type: latestTransaction.fromAccount!.accountType,
+            );
+          });
+        }
+      }
+
+      if (latestTransaction.toAccount != null) {
+        final toAccountBalance = await ref
+            .read(accountRepositoryProvider)
+            .getAccountBalance(latestTransaction.toAccount!.accountId);
+
+        if (mounted) {
+          setState(() {
+            _toAccount = Account(
+              id: latestTransaction.toAccount!.accountId,
+              name: latestTransaction.toAccount!.accountName,
+              amount: toAccountBalance,
+              type: latestTransaction.toAccount!.accountType,
+            );
+            _transactionFlowType = _calculateTransactionFlowType();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[AddPage] 填充账户信息失败: $e');
+    }
+  }
+
   String _formatDateTime(DateTime dateTime) {
     final date = dateTime.toString().split(' ')[0];
     final time =
@@ -432,6 +490,7 @@ class _AddPageState extends ConsumerState<AddPage>
               margin: const EdgeInsets.only(bottom: 8),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: Row(
@@ -441,10 +500,14 @@ class _AddPageState extends ConsumerState<AddPage>
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: () {
+                          onTap: () async {
+                            // 先填充备注文本
                             setState(() {
                               _noteController.text = item.description;
                             });
+                            
+                            // 异步查询并填充账户信息
+                            _fillAccountsFromDescription(item.description);
                           },
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
