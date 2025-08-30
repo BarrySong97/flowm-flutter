@@ -54,6 +54,7 @@ struct SimpleEntry: TimelineEntry {
 }
 
 struct FlowmWidgetEntryView: View {
+  @Environment(\.widgetFamily) var widgetFamily
   var entry: Provider.Entry
 
   private func formatCurrency(_ value: Double) -> String {
@@ -65,6 +66,50 @@ struct FlowmWidgetEntryView: View {
   }
 
   var body: some View {
+    switch widgetFamily {
+    case .systemSmall:
+      smallWidgetView
+    case .systemMedium:
+      mediumWidgetView
+    default:
+      mediumWidgetView
+    }
+  }
+
+  private var smallWidgetView: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("本月结余")
+        .font(.caption)
+        .foregroundColor(.secondary)
+
+      Text(formatCurrency(entry.balance))
+        .font(.system(.title3, design: .rounded))
+        .fontWeight(.semibold)
+        .foregroundColor(entry.balance >= 0 ? Color.primary : Color.red)
+
+      HStack {
+        Text("收入")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+        Spacer()
+        Text(formatCurrency(entry.income))
+          .font(.caption)
+          .foregroundColor(.green)
+      }
+
+      HStack {
+        Text("支出")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+        Spacer()
+        Text(formatCurrency(entry.expense))
+          .font(.caption)
+          .foregroundColor(.red)
+      }
+    }.padding(0)
+  }
+
+  private var mediumWidgetView: some View {
     VStack(alignment: .leading, spacing: 8) {
       Text("本月概览")
         .font(.headline)
@@ -114,6 +159,8 @@ struct FlowmWidget: Widget {
   }
 }
 
+
+
 extension ConfigurationAppIntent {
   fileprivate static var smiley: ConfigurationAppIntent {
     let intent = ConfigurationAppIntent()
@@ -127,3 +174,35 @@ extension ConfigurationAppIntent {
     return intent
   }
 }
+
+#Preview(
+  "small",
+  as: .systemSmall,
+  widget: {
+    FlowmWidget()
+  },
+  timeline: {
+    SimpleEntry(
+      date: .now,
+      configuration: ConfigurationAppIntent(),
+      expense: 1234.56,
+      income: 5678.90,
+      balance: 4444.34
+    )
+  })
+
+#Preview(
+  "medium",
+  as: .systemMedium,
+  widget: {
+    FlowmWidget()
+  },
+  timeline: {
+    SimpleEntry(
+      date: .now,
+      configuration: ConfigurationAppIntent(),
+      expense: 1234.56,
+      income: 5678.90,
+      balance: 4444.34
+    )
+  })

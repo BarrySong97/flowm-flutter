@@ -12,6 +12,9 @@ import SwiftUI
 struct FlowmWidgetBundle: WidgetBundle {
     var body: some Widget {
         FlowmWidget()
+        AssetsWidget()
+        CalendarWidget()
+        AssetsOverviewWidget()
         FlowmWidgetControl()
         FlowmWidgetLiveActivity()
     }
