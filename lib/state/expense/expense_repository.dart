@@ -69,14 +69,23 @@ class ExpenseRepository {
         DailyExpenses AS (
           SELECT
             date(t.transaction_date, 'unixepoch', 'localtime') as expense_date,
-            SUM(p.amount) as total_expense,
+            SUM(
+              CASE 
+                WHEN a.account_type = 'EXPENSE' THEN p.amount
+                WHEN a.account_type = 'LIABILITY' AND p.amount > 0 THEN p.amount
+                ELSE 0
+              END
+            ) as total_expense,
             COUNT(p.posting_id) as daily_count
           FROM transactions t
           JOIN postings p ON p.transaction_id = t.transaction_id
           JOIN accounts a ON p.account_id = a.account_id
           WHERE t.transaction_date BETWEEN ? AND ?
             AND a.ledger_id = ?
-            AND a.account_type = ?
+            AND (
+              (a.account_type = 'EXPENSE') OR 
+              (a.account_type = 'LIABILITY' AND p.amount > 0)
+            )
             ${accountId != null ? 'AND (a.account_id = ? OR a.parent_account_id = ?)' : ''}
           GROUP BY expense_date
         )
@@ -96,7 +105,6 @@ class ExpenseRepository {
           Variable.withDateTime(
               DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
           Variable.withInt(ledgerId),
-          Variable.withString(AccountType.EXPENSE.name),
           if (accountId != null) ...[
             Variable.withInt(accountId),
             Variable.withInt(accountId),

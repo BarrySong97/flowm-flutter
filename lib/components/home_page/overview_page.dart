@@ -66,7 +66,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     if (kIsWeb) {
       return;
     }
-    
+
     try {
       final selectedLedger = await ref.read(selectedLedgerProvider.future);
       if (selectedLedger == null) return;
@@ -78,26 +78,30 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       final monthlyData = await ref.read(monthlyOverviewDataProvider.future);
       debugPrint(
           '[HomeWidget] 🔴 Updating FlowmWidget data: expense=${monthlyData.expense}, income=${monthlyData.income}, balance=${monthlyData.balance}');
-      
-      HomeWidget.saveWidgetData<String>('expense', monthlyData.expense.toString());
-      HomeWidget.saveWidgetData<String>('income', monthlyData.income.toString());
-      HomeWidget.saveWidgetData<String>('balance', monthlyData.balance.toString());
-      
+
+      HomeWidget.saveWidgetData<String>(
+          'expense', monthlyData.expense.toString());
+      HomeWidget.saveWidgetData<String>(
+          'income', monthlyData.income.toString());
+      HomeWidget.saveWidgetData<String>(
+          'balance', monthlyData.balance.toString());
+
       // Update daily expense data for FlowmWidget chart
       await _updateDailyExpenseData(selectedLedger);
-      
+
       debugPrint('[HomeWidget] 🔴 FlowmWidget data saved to UserDefaults');
 
       // Update ExpensePieChartWidget data
       await _updateExpensePieChartData(selectedLedger);
 
-      // Update AssetsOverviewWidget data  
+      // Update AssetsOverviewWidget data
       await _updateAssetsOverviewData(selectedLedger);
 
       // Update the widget extension (all widget types within FlowmWidget target will be refreshed)
       debugPrint('[HomeWidget] 🔴 Calling HomeWidget.updateWidget...');
-      final result = await HomeWidget.updateWidget(name: 'FlowmWidget', iOSName: 'FlowmWidget');
-      
+      final result = await HomeWidget.updateWidget(
+          name: 'FlowmWidget', iOSName: 'FlowmWidget');
+
       debugPrint('[HomeWidget] 🔴 Update result: $result');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating widgets: $e');
@@ -106,29 +110,50 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
 
   Future<void> _updateDailyExpenseData(Ledger selectedLedger) async {
     try {
-      // Get current month's daily expense data
-      final expensePageData = await ref.read(expensePageDataProvider.future);
-      
+      final now = DateTime.now();
+
+      // 计算最近10天的开始日期和结束日期
+      final endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final startDateTime = now.subtract(const Duration(days: 9));
+      final startDate = DateTime(startDateTime.year, startDateTime.month,
+          startDateTime.day, 0, 0, 0); // 开始日期的00:00:00
+
+      debugPrint(
+          '[HomeWidget] 🔴 Getting daily expense data from $startDate to $endDate');
+
+      // 直接调用repository获取最近10天的数据
+      final expenseRepository = ref.read(expenseRepositoryProvider);
+      final chartData = await expenseRepository.getExpenseChartData(
+        startDate: startDate,
+        endDate: endDate,
+        ledgerId: selectedLedger.ledgerId,
+      );
+      print('chartData: ${chartData.length}');
+      // 确保只取前10天的数据
+      final limitedChartData = chartData.take(10).toList();
+
       // Format daily expense data for widget
       final List<Map<String, dynamic>> dailyExpenseData = [];
-      for (final chartItem in expensePageData.chartData) {
-        dailyExpenseData.add({
-          'day': chartItem.day,
-          'amount': chartItem.y,
-          'dateString': '${DateTime.now().month}/${chartItem.day}',
-        });
+      for (final chartItem in limitedChartData) {
+        // chartItem.x 是索引，chartItem.day 是格式化的日期字符串 "M/d"
+        final dateParts = chartItem.day.split('/');
+        if (dateParts.length == 2) {
+          final dayNumber = int.tryParse(dateParts[1]) ?? 1;
+
+          dailyExpenseData.add({
+            'day': dayNumber,
+            'amount': chartItem.y,
+            'dateString': chartItem.day, // 直接使用已经格式化好的日期字符串
+          });
+        }
       }
-      
-      // Only keep last 10 days for widget display
-      final recentDays = dailyExpenseData.length > 10 
-          ? dailyExpenseData.sublist(dailyExpenseData.length - 10)
-          : dailyExpenseData;
-      
+
       // Save as JSON string
-      final dailyExpenseJson = jsonEncode(recentDays);
+      final dailyExpenseJson = jsonEncode(dailyExpenseData);
       HomeWidget.saveWidgetData<String>('dailyExpenseData', dailyExpenseJson);
-      
-      debugPrint('[HomeWidget] 🔴 Updated daily expense data: ${recentDays.length} days');
+
+      debugPrint(
+          '[HomeWidget] 🔴 Updated daily expense data: ${dailyExpenseData.length} days');
       debugPrint('[HomeWidget] 🔴 Daily expense JSON: $dailyExpenseJson');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating daily expense data: $e');
@@ -151,7 +176,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       // Format expense data for pie chart widget
       final List<Map<String, dynamic>> expenseCategoryData = [];
       for (final node in expenseAccountTree) {
-        if (node.balance > 0) {  // Only include categories with expenses
+        if (node.balance > 0) {
+          // Only include categories with expenses
           expenseCategoryData.add({
             'category': node.accountData.accountName,
             'amount': node.balance,
@@ -163,9 +189,11 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       // Save as JSON string
       final expenseDataJson = jsonEncode(expenseCategoryData);
       HomeWidget.saveWidgetData<String>('expensePieChartData', expenseDataJson);
-      
-      debugPrint('[HomeWidget] 🔴 Updated ExpensePieChartWidget data: ${expenseCategoryData.length} categories');
-      debugPrint('[HomeWidget] 🔴 ExpensePieChartWidget JSON: $expenseDataJson');
+
+      debugPrint(
+          '[HomeWidget] 🔴 Updated ExpensePieChartWidget data: ${expenseCategoryData.length} categories');
+      debugPrint(
+          '[HomeWidget] 🔴 ExpensePieChartWidget JSON: $expenseDataJson');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating expense pie chart data: $e');
     }
@@ -215,8 +243,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       // Save as JSON string
       final assetsDataJson = jsonEncode(assetsOverviewData);
       HomeWidget.saveWidgetData<String>('assetsOverviewData', assetsDataJson);
-      
-      debugPrint('[HomeWidget] 🔴 Updated AssetsOverviewWidget data: ${assetItems.length} assets, total: $totalAssetsValue');
+
+      debugPrint(
+          '[HomeWidget] 🔴 Updated AssetsOverviewWidget data: ${assetItems.length} assets, total: $totalAssetsValue');
       debugPrint('[HomeWidget] 🔴 AssetsOverviewWidget JSON: $assetsDataJson');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating assets overview data: $e');
