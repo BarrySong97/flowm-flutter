@@ -1,25 +1,51 @@
 //
-//  FlowmWidget.swift
+//  OriginalFlowmWidget.swift
 //  FlowmWidget
 //
-//  Created by 宋天健 on 2025/6/17.
+//  Created by Claude on 2025/9/3.
 //
 
+import Charts
+import Foundation
 import SwiftUI
 import WidgetKit
+
+struct DailyExpenseItem: Identifiable {
+  let id: Int
+  let date: Date
+  let dayName: String
+  let dateString: String
+  let amount: Double
+}
+
+extension DateFormatter {
+  static let weekdayFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.dateFormat = "EEE"
+    return formatter
+  }()
+
+  static let shortDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.dateFormat = "M/d"
+    return formatter
+  }()
+}
 
 struct Provider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> SimpleEntry {
     SimpleEntry(
       date: Date(), configuration: ConfigurationAppIntent(), expense: 12345.67, income: 23456.78,
-      balance: 11111.11)
+      balance: 11111.11, dailyExpenses: mockDailyExpenses())
   }
 
   func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry
   {
     SimpleEntry(
       date: Date(), configuration: configuration, expense: 12345.67, income: 23456.78,
-      balance: 11111.11)
+      balance: 11111.11, dailyExpenses: mockDailyExpenses())
   }
 
   func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<
@@ -31,7 +57,9 @@ struct Provider: AppIntentTimelineProvider {
     let balance = Double(userDefaults?.string(forKey: "balance") ?? "") ?? 0.0
 
     let entry = SimpleEntry(
-      date: Date(), configuration: configuration, expense: expense, income: income, balance: balance
+      date: Date(), configuration: configuration, expense: expense, income: income,
+      balance: balance,
+      dailyExpenses: mockDailyExpenses()
     )
 
     // Refresh the timeline every 15 minutes
@@ -40,9 +68,30 @@ struct Provider: AppIntentTimelineProvider {
     return timeline
   }
 
-  //    func relevances() async -> WidgetRelevances<ConfigurationAppIntent> {
-  //        // Generate a list containing the contexts this widget is relevant in.
-  //    }
+  private func mockDailyExpenses() -> [DailyExpenseItem] {
+    let calendar = Calendar.current
+    let today = Date()
+    var expenses: [DailyExpenseItem] = []
+
+    // 生成过去10天的数据
+    for i in 9...0 {
+      let date = calendar.date(byAdding: .day, value: -i, to: today)!
+      let amount = Double.random(in: 200...2000)
+      let dayName = DateFormatter.weekdayFormatter.string(from: date)
+      let dateString = DateFormatter.shortDateFormatter.string(from: date)
+
+      expenses.append(
+        DailyExpenseItem(
+          id: i,
+          date: date,
+          dayName: dayName,
+          dateString: dateString,
+          amount: amount
+        ))
+    }
+
+    return expenses
+  }
 }
 
 struct SimpleEntry: TimelineEntry {
@@ -51,6 +100,7 @@ struct SimpleEntry: TimelineEntry {
   let expense: Double
   let income: Double
   let balance: Double
+  let dailyExpenses: [DailyExpenseItem]
 }
 
 struct FlowmWidgetEntryView: View {
@@ -58,11 +108,14 @@ struct FlowmWidgetEntryView: View {
   var entry: Provider.Entry
 
   private func formatCurrency(_ value: Double) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .currency
+    return NumberFormatUtils.formatCurrency(value)
+  }
+
+  private func getCurrentMonth() -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "M月"
     formatter.locale = Locale(identifier: "zh_CN")
-    formatter.currencySymbol = "¥"
-    return formatter.string(from: NSNumber(value: value)) ?? "¥0.00"
+    return formatter.string(from: Date())
   }
 
   var body: some View {
@@ -77,71 +130,133 @@ struct FlowmWidgetEntryView: View {
   }
 
   private var smallWidgetView: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("本月结余")
-        .font(.caption)
-        .foregroundColor(.secondary)
+    VStack(alignment: .leading, spacing: 8) {
+      // 月份标题
+      Text(getCurrentMonth())
+        .font(.headline)
+        .fontWeight(.medium)
+        .foregroundColor(.primary)
 
-      Text(formatCurrency(entry.balance))
-        .font(.system(.title3, design: .rounded))
-        .fontWeight(.semibold)
-        .foregroundColor(entry.balance >= 0 ? Color.primary : Color.red)
+      // 垂直布局：收入、支出、结余
+      VStack(alignment: .leading, spacing: 6) {
+        // 支出
+        HStack {
+          Text("支出")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+          Spacer()
+          Text(formatCurrency(entry.expense))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.red)
+        }
+        // 收入
+        HStack {
+          Text("收入")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+          Spacer()
+          Text(formatCurrency(entry.income))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.green)
+        }
 
-      HStack {
-        Text("收入")
-          .font(.caption2)
-          .foregroundColor(.secondary)
-        Spacer()
-        Text(formatCurrency(entry.income))
-          .font(.caption)
-          .foregroundColor(.green)
+        // 结余
+        HStack {
+          Text("结余")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+          Spacer()
+          Text(formatCurrency(entry.balance))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(entry.balance >= 0 ? .primary : .red)
+        }
       }
 
-      HStack {
-        Text("支出")
-          .font(.caption2)
-          .foregroundColor(.secondary)
-        Spacer()
-        Text(formatCurrency(entry.expense))
-          .font(.caption)
-          .foregroundColor(.red)
-      }
-    }.padding(0)
+      Spacer()
+    }
+    .padding(12)
   }
 
   private var mediumWidgetView: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("本月概览")
-        .font(.headline)
-        .foregroundColor(.secondary)
+    VStack(alignment: .leading, spacing: 12) {
+      // 上方：当月总支出、总收入、结余（横向布局）
+      monthlyOverviewSection
 
-      HStack(alignment: .top) {
-        VStack(alignment: .leading) {
-          Text("收入")
-            .font(.caption)
-          Text(formatCurrency(entry.income))
-            .font(.system(.body, design: .rounded))
-            .foregroundColor(.green)
-        }
-        Spacer()
-        VStack(alignment: .leading) {
-          Text("支出")
-            .font(.caption)
-          Text(formatCurrency(entry.expense))
-            .font(.system(.body, design: .rounded))
-            .foregroundColor(.red)
-        }
+      // 下方：每日支出柱状图
+      dailyExpenseChartSection
+    }
+    .padding(.vertical, 0)
+    .padding(.horizontal, 4)
+  }
+
+  private var monthlyOverviewSection: some View {
+    HStack(alignment: .top, spacing: 12) {
+      // 总支出
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(getCurrentMonth())总支出")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+        Text(formatCurrency(entry.expense))
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundColor(.red)
       }
 
-      VStack(alignment: .leading) {
-        Text("结余")
-          .font(.caption)
+      Spacer()
+
+      // 总收入
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(getCurrentMonth())总收入")
+          .font(.caption2)
+          .foregroundColor(.secondary)
+        Text(formatCurrency(entry.income))
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundColor(.green)
+      }
+
+      Spacer()
+
+      // 结余
+      VStack(alignment: .leading, spacing: 2) {
+        Text("\(getCurrentMonth())结余")
+          .font(.caption2)
+          .foregroundColor(.secondary)
         Text(formatCurrency(entry.balance))
-          .font(.system(.title2, design: .rounded))
-          .fontWeight(.semibold)
-          .foregroundColor(entry.balance >= 0 ? Color.primary : Color.red)
+          .font(.system(size: 14, weight: .semibold))
+          .foregroundColor(entry.balance >= 0 ? .primary : .red)
       }
-    }.padding()
+    }
+  }
+
+  private var dailyExpenseChartSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      // 柱状图
+      Chart(entry.dailyExpenses) { expense in
+        BarMark(
+          x: .value("日期", expense.dateString),
+          y: .value("金额", expense.amount)
+        )
+        .foregroundStyle(.red)
+        .cornerRadius(2, style: .continuous)
+        .annotation(position: .top) {
+          Text(NumberFormatUtils.formatNumberWithK(expense.amount))
+            .font(.system(size: 7, weight: .medium))
+            .foregroundColor(.primary)
+        }
+      }
+      .chartYAxis(.hidden)
+      .chartXAxis {
+        AxisMarks(position: .bottom) { value in
+          AxisValueLabel {
+            if let dateString = value.as(String.self) {
+              Text(dateString)
+                .font(.system(size: 7))
+                .foregroundColor(.secondary)
+            }
+          }
+        }
+      }
+      .frame(height: 70)
+    }
   }
 }
 
@@ -156,22 +271,7 @@ struct FlowmWidget: Widget {
     }
     .configurationDisplayName("月度概览")
     .description("快速查看当月收入、支出和结余。")
-  }
-}
-
-
-
-extension ConfigurationAppIntent {
-  fileprivate static var smiley: ConfigurationAppIntent {
-    let intent = ConfigurationAppIntent()
-    intent.favoriteEmoji = "😀"
-    return intent
-  }
-
-  fileprivate static var starEyes: ConfigurationAppIntent {
-    let intent = ConfigurationAppIntent()
-    intent.favoriteEmoji = "🤩"
-    return intent
+    .supportedFamilies([.systemSmall, .systemMedium])
   }
 }
 
@@ -187,7 +287,16 @@ extension ConfigurationAppIntent {
       configuration: ConfigurationAppIntent(),
       expense: 1234.56,
       income: 5678.90,
-      balance: 4444.34
+      balance: 4444.34,
+      dailyExpenses: Array(0..<10).map { i in
+        DailyExpenseItem(
+          id: i,
+          date: Calendar.current.date(byAdding: .day, value: -9 + i, to: Date()) ?? Date(),
+          dayName: "周\(i % 7 + 1)",
+          dateString: "9/\(1 + i)",
+          amount: Double.random(in: 300...1500)
+        )
+      }
     )
   })
 
@@ -203,6 +312,15 @@ extension ConfigurationAppIntent {
       configuration: ConfigurationAppIntent(),
       expense: 1234.56,
       income: 5678.90,
-      balance: 4444.34
+      balance: 4444.34,
+      dailyExpenses: Array(0..<10).map { i in
+        DailyExpenseItem(
+          id: i,
+          date: Calendar.current.date(byAdding: .day, value: -9 + i, to: Date()) ?? Date(),
+          dayName: "周\(i % 7 + 1)",
+          dateString: "9/\(1 + i)",
+          amount: Double.random(in: 300...1500)
+        )
+      }
     )
   })
