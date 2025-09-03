@@ -53,35 +53,135 @@ struct Provider: AppIntentTimelineProvider {
   > {
     print("🔵 FlowmWidget timeline() called")
 
-    let userDefaults = UserDefaults(suiteName: "group.flowm")
-    let expenseString = userDefaults?.string(forKey: "expense") ?? ""
-    let incomeString = userDefaults?.string(forKey: "income") ?? ""
-    let balanceString = userDefaults?.string(forKey: "balance") ?? ""
+    // 尝试获取UserDefaults数据
+    guard let userDefaults = UserDefaults(suiteName: "group.flowm") else {
+      print("❌ FlowmWidget Error: Cannot access UserDefaults suite 'group.flowm'")
+      return createFallbackTimeline(configuration: configuration)
+    }
+
+    let expenseString = userDefaults.string(forKey: "expense") ?? ""
+    let incomeString = userDefaults.string(forKey: "income") ?? ""
+    let balanceString = userDefaults.string(forKey: "balance") ?? ""
+    let dailyExpenseDataString = userDefaults.string(forKey: "dailyExpenseData") ?? ""
 
     print(
       "🔵 FlowmWidget raw data - expense: '\(expenseString)', income: '\(incomeString)', balance: '\(balanceString)'"
     )
+    print("🔵 FlowmWidget daily expense data: '\(dailyExpenseDataString)'")
 
-    let expense = Double(expenseString) ?? 0.0
-    let income = Double(incomeString) ?? 0.0
-    let balance = Double(balanceString) ?? 0.0
+    // 数据转换，带错误处理
+    let expense = parseDoubleWithFallback(expenseString, fallback: 0.0, key: "expense")
+    let income = parseDoubleWithFallback(incomeString, fallback: 0.0, key: "income")
+    let balance = parseDoubleWithFallback(balanceString, fallback: 0.0, key: "balance")
 
     print("🔵 FlowmWidget parsed data - expense: \(expense), income: \(income), balance: \(balance)")
 
+    // 获取真实的每日支出数据
+    let dailyExpenses = loadDailyExpenseData(from: dailyExpenseDataString)
+
     let entry = SimpleEntry(
-      date: Date(), configuration: configuration, expense: expense, income: income,
+      date: Date(),
+      configuration: configuration,
+      expense: expense,
+      income: income,
       balance: balance,
-      dailyExpenses: mockDailyExpenses()
+      dailyExpenses: dailyExpenses
     )
 
-    print("🔵 FlowmWidget entry created successfully")
+    print(
+      "🔵 FlowmWidget entry created successfully with \(dailyExpenses.count) daily expense items")
 
     // Refresh the timeline every 15 minutes
-    let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+    let nextUpdate =
+      Calendar.current.date(byAdding: .minute, value: 15, to: Date())
+      ?? Date().addingTimeInterval(900)
     let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
 
     print("🔵 FlowmWidget timeline created, next update: \(nextUpdate)")
     return timeline
+  }
+
+  // MARK: - Error Handling Helper Methods
+
+  private func parseDoubleWithFallback(_ string: String, fallback: Double, key: String) -> Double {
+    guard !string.isEmpty else {
+      print("⚠️ FlowmWidget Warning: Empty string for key '\(key)', using fallback: \(fallback)")
+      return fallback
+    }
+
+    if let value = Double(string) {
+      return value
+    } else {
+      print(
+        "⚠️ FlowmWidget Warning: Cannot parse '\(string)' to Double for key '\(key)', using fallback: \(fallback)"
+      )
+      return fallback
+    }
+  }
+
+  private func createFallbackTimeline(configuration: ConfigurationAppIntent) -> Timeline<
+    SimpleEntry
+  > {
+    print("🔶 FlowmWidget Creating fallback timeline with mock data")
+    let fallbackEntry = SimpleEntry(
+      date: Date(),
+      configuration: configuration,
+      expense: 1234.56,
+      income: 5678.90,
+      balance: 4444.34,
+      dailyExpenses: mockDailyExpenses()
+    )
+
+    let nextUpdate =
+      Calendar.current.date(byAdding: .minute, value: 15, to: Date())
+      ?? Date().addingTimeInterval(900)
+    return Timeline(entries: [fallbackEntry], policy: .after(nextUpdate))
+  }
+
+  private func loadDailyExpenseData(from jsonString: String) -> [DailyExpenseItem] {
+    guard !jsonString.isEmpty else {
+      print("⚠️ FlowmWidget: Daily expense data is empty, using mock data")
+      return mockDailyExpenses()
+    }
+
+    guard let jsonData = jsonString.data(using: .utf8),
+      let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]]
+    else {
+      print("⚠️ FlowmWidget: Cannot parse daily expense JSON, using mock data")
+      return mockDailyExpenses()
+    }
+
+    var expenses: [DailyExpenseItem] = []
+    let calendar = Calendar.current
+    let now = Date()
+    let currentMonth = calendar.component(.month, from: now)
+
+    for (index, item) in jsonArray.enumerated() {
+      let day = item["day"] as? Int ?? 1
+      let amount = item["amount"] as? Double ?? 0.0
+      let dateString = item["dateString"] as? String ?? "\(currentMonth)/\(day)"
+
+      // 创建对应日期
+      let itemDate =
+        calendar.date(byAdding: .day, value: -jsonArray.count + index + 1, to: now) ?? now
+      let dayName = DateFormatter.weekdayFormatter.string(from: itemDate)
+
+      expenses.append(
+        DailyExpenseItem(
+          id: index,
+          date: itemDate,
+          dayName: dayName,
+          dateString: dateString,
+          amount: amount
+        ))
+    }
+
+    print("🔵 FlowmWidget: Successfully loaded \(expenses.count) daily expense items from real data")
+    return expenses
+  }
+
+  private func createDailyExpenses() -> [DailyExpenseItem] {
+    return mockDailyExpenses()
   }
 
   private func mockDailyExpenses() -> [DailyExpenseItem] {
@@ -90,7 +190,7 @@ struct Provider: AppIntentTimelineProvider {
     var expenses: [DailyExpenseItem] = []
 
     // 生成过去10天的数据
-    for i in 9...0 {
+    for i in (0...9).reversed() {
       let date = calendar.date(byAdding: .day, value: -i, to: today)!
       let amount = Double.random(in: 200...2000)
       let dayName = DateFormatter.weekdayFormatter.string(from: date)
@@ -138,17 +238,16 @@ struct FlowmWidgetEntryView: View {
     print(
       "🔵 FlowmWidgetEntryView rendering - expense: \(entry.expense), income: \(entry.income), balance: \(entry.balance)"
     )
-    return Text("Hello, World!")
-    // return Group {
-    //   switch widgetFamily {
-    //   case .systemSmall:
-    //     smallWidgetView
-    //   case .systemMedium:
-    //     mediumWidgetView
-    //   default:
-    //     mediumWidgetView
-    //   }
-    // }
+    return Group {
+      switch widgetFamily {
+      case .systemSmall:
+        smallWidgetView
+      case .systemMedium:
+        mediumWidgetView
+      default:
+        mediumWidgetView
+      }
+    }
   }
 
   private var smallWidgetView: some View {
@@ -289,7 +388,7 @@ struct FlowmWidget: Widget {
     AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) {
       entry in
       FlowmWidgetEntryView(entry: entry)
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(.white, for: .widget)
     }
     .configurationDisplayName("月度概览")
     .description("快速查看当月收入、支出和结余。")

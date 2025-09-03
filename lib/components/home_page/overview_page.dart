@@ -9,6 +9,7 @@ import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/state/expense/expense_repository.dart';
+import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
@@ -82,6 +83,9 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       HomeWidget.saveWidgetData<String>('income', monthlyData.income.toString());
       HomeWidget.saveWidgetData<String>('balance', monthlyData.balance.toString());
       
+      // Update daily expense data for FlowmWidget chart
+      await _updateDailyExpenseData(selectedLedger);
+      
       debugPrint('[HomeWidget] 🔴 FlowmWidget data saved to UserDefaults');
 
       // Update ExpensePieChartWidget data
@@ -97,6 +101,37 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
       debugPrint('[HomeWidget] 🔴 Update result: $result');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating widgets: $e');
+    }
+  }
+
+  Future<void> _updateDailyExpenseData(Ledger selectedLedger) async {
+    try {
+      // Get current month's daily expense data
+      final expensePageData = await ref.read(expensePageDataProvider.future);
+      
+      // Format daily expense data for widget
+      final List<Map<String, dynamic>> dailyExpenseData = [];
+      for (final chartItem in expensePageData.chartData) {
+        dailyExpenseData.add({
+          'day': chartItem.day,
+          'amount': chartItem.y,
+          'dateString': '${DateTime.now().month}/${chartItem.day}',
+        });
+      }
+      
+      // Only keep last 10 days for widget display
+      final recentDays = dailyExpenseData.length > 10 
+          ? dailyExpenseData.sublist(dailyExpenseData.length - 10)
+          : dailyExpenseData;
+      
+      // Save as JSON string
+      final dailyExpenseJson = jsonEncode(recentDays);
+      HomeWidget.saveWidgetData<String>('dailyExpenseData', dailyExpenseJson);
+      
+      debugPrint('[HomeWidget] 🔴 Updated daily expense data: ${recentDays.length} days');
+      debugPrint('[HomeWidget] 🔴 Daily expense JSON: $dailyExpenseJson');
+    } catch (e) {
+      debugPrint('[HomeWidget] Error updating daily expense data: $e');
     }
   }
 

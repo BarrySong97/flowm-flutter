@@ -12,8 +12,8 @@ import WidgetKit
 struct FlowmWidgetBundle: WidgetBundle {
   var body: some Widget {
     FlowmWidget()
-//    AssetsOverviewWidget()
-//    ExpensePieChartWidget()
+    AssetsOverviewWidget()
+    ExpensePieChartWidget()
     FlowmWidgetControl()
     FlowmWidgetLiveActivity()
   }
