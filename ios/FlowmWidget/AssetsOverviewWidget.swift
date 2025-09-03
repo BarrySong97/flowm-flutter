@@ -38,17 +38,101 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
   func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<
     AssetsOverviewEntry
   > {
+    print("🟢 AssetsOverviewWidget timeline() called")
+    
+    let userDefaults = UserDefaults(suiteName: "group.flowm")
+    let assetsOverviewDataString = userDefaults?.string(forKey: "assetsOverviewData") ?? ""
+    
+    print("🟢 AssetsOverviewWidget raw data: '\(assetsOverviewDataString)'")
+    
+    var netAssets: Double = 150000.0
+    var totalAssets: Double = 200000.0
+    var totalLiabilities: Double = 50000.0
+    var assets: [AssetOverviewItem] = []
+    
+    // Try to parse real data from UserDefaults
+    if !assetsOverviewDataString.isEmpty {
+      print("🟢 AssetsOverviewWidget: Attempting to parse JSON data")
+      
+      if let data = assetsOverviewDataString.data(using: .utf8) {
+        do {
+          if let jsonObject = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            print("🟢 AssetsOverviewWidget: Successfully parsed JSON object")
+            
+            // Extract summary data
+            if let netAssetsValue = jsonObject["netAssets"] as? Double {
+              netAssets = netAssetsValue
+              print("🟢 AssetsOverviewWidget: netAssets = \(netAssets)")
+            }
+            
+            if let totalAssetsValue = jsonObject["totalAssets"] as? Double {
+              totalAssets = totalAssetsValue
+              print("🟢 AssetsOverviewWidget: totalAssets = \(totalAssets)")
+            }
+            
+            if let totalLiabilitiesValue = jsonObject["totalLiabilities"] as? Double {
+              totalLiabilities = totalLiabilitiesValue
+              print("🟢 AssetsOverviewWidget: totalLiabilities = \(totalLiabilities)")
+            }
+            
+            // Extract asset items
+            if let assetItems = jsonObject["assetItems"] as? [[String: Any]] {
+              print("🟢 AssetsOverviewWidget: Found \(assetItems.count) asset items")
+              
+              let backgroundColor = Color(red: 0.91, green: 0.96, blue: 0.91)
+              
+              for item in assetItems {
+                if let id = item["id"] as? Int,
+                   let name = item["name"] as? String,
+                   let amount = item["amount"] as? Double,
+                   let percentage = item["percentage"] as? Double {
+                  
+                  let assetItem = AssetOverviewItem(
+                    id: id,
+                    name: name,
+                    amount: amount,
+                    percentage: percentage,
+                    backgroundColor: backgroundColor
+                  )
+                  assets.append(assetItem)
+                  
+                  print("🟢 AssetsOverviewWidget: Added asset '\(name)' with amount \(amount)")
+                }
+              }
+            }
+          }
+        } catch {
+          print("🟢 AssetsOverviewWidget: JSON parsing failed - \(error)")
+        }
+      }
+    }
+    
+    // Use mock data if real data is not available
+    if assets.isEmpty {
+      print("🟢 AssetsOverviewWidget: Using mock data")
+      assets = mockAssets()
+      netAssets = 150000.0
+      totalAssets = 200000.0
+      totalLiabilities = 50000.0
+    } else {
+      print("🟢 AssetsOverviewWidget: Using real data with \(assets.count) assets")
+    }
+    
     let entry = AssetsOverviewEntry(
       date: Date(),
       configuration: configuration,
-      netAssets: 150000.0,
-      totalAssets: 200000.0,
-      totalLiabilities: 50000.0,
-      assets: mockAssets()
+      netAssets: netAssets,
+      totalAssets: totalAssets,
+      totalLiabilities: totalLiabilities,
+      assets: assets
     )
+
+    print("🟢 AssetsOverviewWidget: Entry created successfully")
 
     let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
     let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+    
+    print("🟢 AssetsOverviewWidget: Timeline created, next update: \(nextUpdate)")
     return timeline
   }
 
@@ -133,13 +217,17 @@ struct AssetsOverviewWidgetEntryView: View {
   }
 
   var body: some View {
-    switch widgetFamily {
-    case .systemMedium:
-      mediumAssetsOverview
-    case .systemLarge:
-      largeAssetsOverview
-    default:
-      mediumAssetsOverview
+    print("🟢 AssetsOverviewWidgetEntryView rendering - netAssets: \(entry.netAssets), assets count: \(entry.assets.count)")
+    
+    return Group {
+      switch widgetFamily {
+      case .systemMedium:
+        mediumAssetsOverview
+      case .systemLarge:
+        largeAssetsOverview
+      default:
+        mediumAssetsOverview
+      }
     }
   }
 

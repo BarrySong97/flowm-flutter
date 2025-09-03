@@ -40,15 +40,75 @@ struct ExpensePieChartProvider: AppIntentTimelineProvider {
   }
   
   func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<ExpensePieChartEntry> {
+    print("🟠 ExpensePieChartWidget timeline() called")
+    
+    let userDefaults = UserDefaults(suiteName: "group.flowm")
+    let expensePieChartDataString = userDefaults?.string(forKey: "expensePieChartData") ?? ""
+    
+    print("🟠 ExpensePieChartWidget raw data: '\(expensePieChartDataString)'")
+    
+    var categories: [ExpenseCategoryItem] = []
+    var totalExpense: Double = 0.0
+    
+    // Try to parse real data from UserDefaults
+    if !expensePieChartDataString.isEmpty {
+      print("🟠 ExpensePieChartWidget: Attempting to parse JSON data")
+      
+      if let data = expensePieChartDataString.data(using: .utf8) {
+        do {
+          if let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            print("🟠 ExpensePieChartWidget: Successfully parsed JSON array with \(jsonArray.count) items")
+            
+            let colors: [Color] = [.red, .blue, .green, .orange, .purple, .teal, .gray, .pink, .cyan, .brown]
+            
+            for (index, item) in jsonArray.enumerated() {
+              if let category = item["category"] as? String,
+                 let amount = item["amount"] as? Double,
+                 let percentage = item["percentage"] as? Double {
+                
+                let color = colors[index % colors.count]
+                let categoryItem = ExpenseCategoryItem(
+                  id: index,
+                  name: category,
+                  amount: amount,
+                  percentage: percentage,
+                  color: color
+                )
+                categories.append(categoryItem)
+                totalExpense += amount
+                
+                print("🟠 ExpensePieChartWidget: Added category '\(category)' with amount \(amount)")
+              }
+            }
+          }
+        } catch {
+          print("🟠 ExpensePieChartWidget: JSON parsing failed - \(error)")
+        }
+      }
+    }
+    
+    // Use mock data if real data is not available
+    if categories.isEmpty {
+      print("🟠 ExpensePieChartWidget: Using mock data")
+      categories = mockExpenseCategories()
+      totalExpense = 8500.0
+    } else {
+      print("🟠 ExpensePieChartWidget: Using real data with \(categories.count) categories, total: \(totalExpense)")
+    }
+    
     let entry = ExpensePieChartEntry(
       date: Date(),
       configuration: configuration,
-      totalExpense: 8500.0,
-      categories: mockExpenseCategories()
+      totalExpense: totalExpense,
+      categories: categories
     )
+    
+    print("🟠 ExpensePieChartWidget: Entry created successfully")
     
     let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
     let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+    
+    print("🟠 ExpensePieChartWidget: Timeline created, next update: \(nextUpdate)")
     return timeline
   }
   
@@ -124,7 +184,9 @@ struct ExpensePieChartWidgetEntryView: View {
   }
   
   var body: some View {
-    HStack(spacing: 16) {
+    print("🟠 ExpensePieChartWidgetEntryView rendering - totalExpense: \(entry.totalExpense), categories: \(entry.categories.count)")
+    
+    return HStack(spacing: 16) {
       // 左侧：饼图
       pieChartSection
       

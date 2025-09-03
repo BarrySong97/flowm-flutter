@@ -51,10 +51,22 @@ struct Provider: AppIntentTimelineProvider {
   func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<
     SimpleEntry
   > {
+    print("🔵 FlowmWidget timeline() called")
+
     let userDefaults = UserDefaults(suiteName: "group.flowm")
-    let expense = Double(userDefaults?.string(forKey: "expense") ?? "") ?? 0.0
-    let income = Double(userDefaults?.string(forKey: "income") ?? "") ?? 0.0
-    let balance = Double(userDefaults?.string(forKey: "balance") ?? "") ?? 0.0
+    let expenseString = userDefaults?.string(forKey: "expense") ?? ""
+    let incomeString = userDefaults?.string(forKey: "income") ?? ""
+    let balanceString = userDefaults?.string(forKey: "balance") ?? ""
+
+    print(
+      "🔵 FlowmWidget raw data - expense: '\(expenseString)', income: '\(incomeString)', balance: '\(balanceString)'"
+    )
+
+    let expense = Double(expenseString) ?? 0.0
+    let income = Double(incomeString) ?? 0.0
+    let balance = Double(balanceString) ?? 0.0
+
+    print("🔵 FlowmWidget parsed data - expense: \(expense), income: \(income), balance: \(balance)")
 
     let entry = SimpleEntry(
       date: Date(), configuration: configuration, expense: expense, income: income,
@@ -62,9 +74,13 @@ struct Provider: AppIntentTimelineProvider {
       dailyExpenses: mockDailyExpenses()
     )
 
+    print("🔵 FlowmWidget entry created successfully")
+
     // Refresh the timeline every 15 minutes
     let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
     let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+
+    print("🔵 FlowmWidget timeline created, next update: \(nextUpdate)")
     return timeline
   }
 
@@ -119,14 +135,20 @@ struct FlowmWidgetEntryView: View {
   }
 
   var body: some View {
-    switch widgetFamily {
-    case .systemSmall:
-      smallWidgetView
-    case .systemMedium:
-      mediumWidgetView
-    default:
-      mediumWidgetView
-    }
+    print(
+      "🔵 FlowmWidgetEntryView rendering - expense: \(entry.expense), income: \(entry.income), balance: \(entry.balance)"
+    )
+    return Text("Hello, World!")
+    // return Group {
+    //   switch widgetFamily {
+    //   case .systemSmall:
+    //     smallWidgetView
+    //   case .systemMedium:
+    //     mediumWidgetView
+    //   default:
+    //     mediumWidgetView
+    //   }
+    // }
   }
 
   private var smallWidgetView: some View {

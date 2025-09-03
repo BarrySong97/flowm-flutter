@@ -8,6 +8,7 @@ import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
+import 'package:flowm/state/expense/expense_repository.dart';
 import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 
 import '../../pages/main_screen.dart';
 
@@ -40,7 +42,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     // 第一次加载时主动更新
     if (!kIsWeb) {
       print('update widget');
-      _updateWidget(ref.read(monthlyOverviewDataProvider));
+      _updateAllWidgets();
       _updateAccountDataWidget();
     }
   }
@@ -59,21 +61,141 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     }
   }
 
+  Future<void> _updateAllWidgets() async {
+    if (kIsWeb) {
+      return;
+    }
+    
+    try {
+      final selectedLedger = await ref.read(selectedLedgerProvider.future);
+      if (selectedLedger == null) return;
+
+      debugPrint('[HomeWidget] 🔴 Starting _updateAllWidgets()');
+      HomeWidget.setAppGroupId('group.flowm');
+
+      // Update FlowmWidget data (existing functionality)
+      final monthlyData = await ref.read(monthlyOverviewDataProvider.future);
+      debugPrint(
+          '[HomeWidget] 🔴 Updating FlowmWidget data: expense=${monthlyData.expense}, income=${monthlyData.income}, balance=${monthlyData.balance}');
+      
+      HomeWidget.saveWidgetData<String>('expense', monthlyData.expense.toString());
+      HomeWidget.saveWidgetData<String>('income', monthlyData.income.toString());
+      HomeWidget.saveWidgetData<String>('balance', monthlyData.balance.toString());
+      
+      debugPrint('[HomeWidget] 🔴 FlowmWidget data saved to UserDefaults');
+
+      // Update ExpensePieChartWidget data
+      await _updateExpensePieChartData(selectedLedger);
+
+      // Update AssetsOverviewWidget data  
+      await _updateAssetsOverviewData(selectedLedger);
+
+      // Update the widget extension (all widget types within FlowmWidget target will be refreshed)
+      debugPrint('[HomeWidget] 🔴 Calling HomeWidget.updateWidget...');
+      final result = await HomeWidget.updateWidget(name: 'FlowmWidget', iOSName: 'FlowmWidget');
+      
+      debugPrint('[HomeWidget] 🔴 Update result: $result');
+    } catch (e) {
+      debugPrint('[HomeWidget] Error updating widgets: $e');
+    }
+  }
+
+  Future<void> _updateExpensePieChartData(Ledger selectedLedger) async {
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+      final expenseRepository = ref.read(expenseRepositoryProvider);
+      final expenseAccountTree = await expenseRepository.getExpenseAccountTree(
+        startDate: startOfMonth,
+        endDate: endOfMonth,
+        ledgerId: selectedLedger.ledgerId,
+      );
+
+      // Format expense data for pie chart widget
+      final List<Map<String, dynamic>> expenseCategoryData = [];
+      for (final node in expenseAccountTree) {
+        if (node.balance > 0) {  // Only include categories with expenses
+          expenseCategoryData.add({
+            'category': node.accountData.accountName,
+            'amount': node.balance,
+            'percentage': node.percentage,
+          });
+        }
+      }
+
+      // Save as JSON string
+      final expenseDataJson = jsonEncode(expenseCategoryData);
+      HomeWidget.saveWidgetData<String>('expensePieChartData', expenseDataJson);
+      
+      debugPrint('[HomeWidget] 🔴 Updated ExpensePieChartWidget data: ${expenseCategoryData.length} categories');
+      debugPrint('[HomeWidget] 🔴 ExpensePieChartWidget JSON: $expenseDataJson');
+    } catch (e) {
+      debugPrint('[HomeWidget] Error updating expense pie chart data: $e');
+    }
+  }
+
+  Future<void> _updateAssetsOverviewData(Ledger selectedLedger) async {
+    try {
+      final topAssets = await ref.read(topAssetAccountsProvider.future);
+      final totalLiabilities = await ref.read(totalLiabilitiesProvider.future);
+
+      // Calculate total assets
+      double totalAssetsValue = 0;
+      for (var account in topAssets) {
+        totalAssetsValue += account.balance;
+      }
+
+      // Only take top 4 accounts for widget display
+      final topAccounts = topAssets.take(4).toList();
+
+      // Format asset items
+      final List<Map<String, dynamic>> assetItems = [];
+      for (final accountWithBalance in topAccounts) {
+        final percentValue = totalAssetsValue > 0
+            ? (accountWithBalance.balance / totalAssetsValue * 100)
+            : 0.0;
+
+        assetItems.add({
+          'id': accountWithBalance.account.accountId,
+          'name': accountWithBalance.account.accountName,
+          'amount': accountWithBalance.balance,
+          'percentage': percentValue,
+        });
+      }
+
+      // Calculate net assets
+      final netAssets = totalAssetsValue + totalLiabilities;
+
+      // Create assets overview data
+      final assetsOverviewData = {
+        'assetItems': assetItems,
+        'totalAssets': totalAssetsValue,
+        'totalLiabilities': totalLiabilities.abs(),
+        'netAssets': netAssets,
+        'currencySymbol': selectedLedger.currencySymbol ?? '¥',
+      };
+
+      // Save as JSON string
+      final assetsDataJson = jsonEncode(assetsOverviewData);
+      HomeWidget.saveWidgetData<String>('assetsOverviewData', assetsDataJson);
+      
+      debugPrint('[HomeWidget] 🔴 Updated AssetsOverviewWidget data: ${assetItems.length} assets, total: $totalAssetsValue');
+      debugPrint('[HomeWidget] 🔴 AssetsOverviewWidget JSON: $assetsDataJson');
+    } catch (e) {
+      debugPrint('[HomeWidget] Error updating assets overview data: $e');
+    }
+  }
+
   void _updateWidget(
       AsyncValue<({double balance, double expense, double income})> data) {
     if (kIsWeb) {
       return;
     }
     data.whenData((value) {
-      debugPrint(
-          '[HomeWidget] Updating data: expense=${value.expense}, income=${value.income}, balance=${value.balance}');
-      HomeWidget.setAppGroupId('group.flowm');
-      HomeWidget.saveWidgetData<String>('expense', value.expense.toString());
-      HomeWidget.saveWidgetData<String>('income', value.income.toString());
-      HomeWidget.saveWidgetData<String>('balance', value.balance.toString());
-      final result =
-          HomeWidget.updateWidget(name: 'FlowmWidget', iOSName: 'FlowmWidget');
-      result.then((value) => debugPrint('[HomeWidget] Update result: $value'));
+      // Trigger comprehensive widget update
+      _updateAllWidgets();
     });
   }
 
