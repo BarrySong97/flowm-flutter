@@ -39,54 +39,55 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
     AssetsOverviewEntry
   > {
     print("🟢 AssetsOverviewWidget timeline() called")
-    
+
     let userDefaults = UserDefaults(suiteName: "group.flowm")
     let assetsOverviewDataString = userDefaults?.string(forKey: "assetsOverviewData") ?? ""
-    
+
     print("🟢 AssetsOverviewWidget raw data: '\(assetsOverviewDataString)'")
-    
+
     var netAssets: Double = 150000.0
     var totalAssets: Double = 200000.0
     var totalLiabilities: Double = 50000.0
     var assets: [AssetOverviewItem] = []
-    
+
     // Try to parse real data from UserDefaults
     if !assetsOverviewDataString.isEmpty {
       print("🟢 AssetsOverviewWidget: Attempting to parse JSON data")
-      
+
       if let data = assetsOverviewDataString.data(using: .utf8) {
         do {
           if let jsonObject = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
             print("🟢 AssetsOverviewWidget: Successfully parsed JSON object")
-            
+
             // Extract summary data
             if let netAssetsValue = jsonObject["netAssets"] as? Double {
               netAssets = netAssetsValue
               print("🟢 AssetsOverviewWidget: netAssets = \(netAssets)")
             }
-            
+
             if let totalAssetsValue = jsonObject["totalAssets"] as? Double {
               totalAssets = totalAssetsValue
               print("🟢 AssetsOverviewWidget: totalAssets = \(totalAssets)")
             }
-            
+
             if let totalLiabilitiesValue = jsonObject["totalLiabilities"] as? Double {
               totalLiabilities = totalLiabilitiesValue
               print("🟢 AssetsOverviewWidget: totalLiabilities = \(totalLiabilities)")
             }
-            
+
             // Extract asset items
             if let assetItems = jsonObject["assetItems"] as? [[String: Any]] {
               print("🟢 AssetsOverviewWidget: Found \(assetItems.count) asset items")
-              
+
               let backgroundColor = Color(red: 0.91, green: 0.96, blue: 0.91)
-              
+
               for item in assetItems {
                 if let id = item["id"] as? Int,
-                   let name = item["name"] as? String,
-                   let amount = item["amount"] as? Double,
-                   let percentage = item["percentage"] as? Double {
-                  
+                  let name = item["name"] as? String,
+                  let amount = item["amount"] as? Double,
+                  let percentage = item["percentage"] as? Double
+                {
+
                   let assetItem = AssetOverviewItem(
                     id: id,
                     name: name,
@@ -95,7 +96,7 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
                     backgroundColor: backgroundColor
                   )
                   assets.append(assetItem)
-                  
+
                   print("🟢 AssetsOverviewWidget: Added asset '\(name)' with amount \(amount)")
                 }
               }
@@ -106,7 +107,7 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
         }
       }
     }
-    
+
     // Use mock data if real data is not available
     if assets.isEmpty {
       print("🟢 AssetsOverviewWidget: Using mock data")
@@ -117,21 +118,17 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
     } else {
       print("🟢 AssetsOverviewWidget: Using real data with \(assets.count) assets")
     }
-    
+
     let entry = AssetsOverviewEntry(
-      date: Date(),
-      configuration: configuration,
-      netAssets: netAssets,
-      totalAssets: totalAssets,
-      totalLiabilities: totalLiabilities,
-      assets: assets
+      date: Date(), configuration: configuration, netAssets: netAssets, totalAssets: totalAssets,
+      totalLiabilities: totalLiabilities, assets: assets
     )
 
     print("🟢 AssetsOverviewWidget: Entry created successfully")
 
     let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
     let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-    
+
     print("🟢 AssetsOverviewWidget: Timeline created, next update: \(nextUpdate)")
     return timeline
   }
@@ -145,42 +142,42 @@ struct AssetsOverviewProvider: AppIntentTimelineProvider {
         id: 1,
         name: "现金",
         amount: 12000.0,
-        percentage: (12000.0 / totalAssets) * 100, // 4.0%
+        percentage: (12000.0 / totalAssets) * 100,  // 4.0%
         backgroundColor: backgroundColor
       ),
       AssetOverviewItem(
         id: 2,
         name: "银行卡",
         amount: 88000.0,
-        percentage: (88000.0 / totalAssets) * 100, // 29.3%
+        percentage: (88000.0 / totalAssets) * 100,  // 29.3%
         backgroundColor: backgroundColor
       ),
       AssetOverviewItem(
         id: 3,
         name: "股票",
         amount: 60000.0,
-        percentage: (60000.0 / totalAssets) * 100, // 20.0%
+        percentage: (60000.0 / totalAssets) * 100,  // 20.0%
         backgroundColor: backgroundColor
       ),
       AssetOverviewItem(
         id: 4,
         name: "基金",
         amount: 40000.0,
-        percentage: (40000.0 / totalAssets) * 100, // 13.3%
+        percentage: (40000.0 / totalAssets) * 100,  // 13.3%
         backgroundColor: backgroundColor
       ),
       AssetOverviewItem(
         id: 5,
         name: "债券",
         amount: 25000.0,
-        percentage: (25000.0 / totalAssets) * 100, // 8.3%
+        percentage: (25000.0 / totalAssets) * 100,  // 8.3%
         backgroundColor: backgroundColor
       ),
       AssetOverviewItem(
         id: 6,
         name: "定期存款",
         amount: 75000.0,
-        percentage: (75000.0 / totalAssets) * 100, // 25.0%
+        percentage: (75000.0 / totalAssets) * 100,  // 25.0%
         backgroundColor: backgroundColor
       ),
     ]
@@ -217,8 +214,10 @@ struct AssetsOverviewWidgetEntryView: View {
   }
 
   var body: some View {
-    print("🟢 AssetsOverviewWidgetEntryView rendering - netAssets: \(entry.netAssets), assets count: \(entry.assets.count)")
-    
+    print(
+      "🟢 AssetsOverviewWidgetEntryView rendering - netAssets: \(entry.netAssets), assets count: \(entry.assets.count)"
+    )
+
     return Group {
       switch widgetFamily {
       case .systemMedium:

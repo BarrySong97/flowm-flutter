@@ -99,10 +99,12 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
 
       // Update the widget extension (all widget types within FlowmWidget target will be refreshed)
       debugPrint('[HomeWidget] 🔴 Calling HomeWidget.updateWidget...');
-      final result = await HomeWidget.updateWidget(
+      await HomeWidget.updateWidget(
           name: 'FlowmWidget', iOSName: 'FlowmWidget');
-
-      debugPrint('[HomeWidget] 🔴 Update result: $result');
+      await HomeWidget.updateWidget(
+          name: 'FlowmWidget', iOSName: 'AssetsOverviewWidget');
+      await HomeWidget.updateWidget(
+          name: 'FlowmWidget', iOSName: 'ExpensePieChartWidget');
     } catch (e) {
       debugPrint('[HomeWidget] Error updating widgets: $e');
     }
