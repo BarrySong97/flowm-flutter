@@ -22,3 +22,14 @@ flutter build ios --release
 ios-deploy --bundle build/ios/iphoneos/Runner.app
 
 flutter build ios --release --flavor dev
+
+## License
+
+本项目采用 [PolyForm Noncommercial License 1.0.0](./LICENSE) 许可证。
+
+- ✅ 允许 fork、修改、个人/学习/研究使用
+- ✅ 允许免费分发（须随附 LICENSE 文件与版权声明）
+- ✅ 允许慈善、教育、公共研究、政府等非营利组织使用
+- ❌ 禁止任何形式的商业用途
+
+如需商业授权，请联系作者单独获取商用许可。
