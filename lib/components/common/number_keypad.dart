@@ -11,9 +11,9 @@ class NumberKeypad extends StatelessWidget {
   final Function(String) onKeyPressed;
 
   const NumberKeypad({
-    Key? key,
+    super.key,
     required this.onKeyPressed,
-  }) : super(key: key);
+  });
 
   Widget _buildKeypadButton(
     String value, {
@@ -64,7 +64,7 @@ class NumberKeypad extends StatelessWidget {
           1 2 3 b
           4 5 6 +
           7 8 9 -
-          0 d = s 
+          0 d = s
         ''',
         // A number of extension methods are provided for concise track sizing
         columnSizes: [1.0.fr, 1.0.fr, 1.0.fr, 1.0.fr],

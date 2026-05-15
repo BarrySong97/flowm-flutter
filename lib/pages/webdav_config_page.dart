@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/database_sync_service.dart';
@@ -30,8 +31,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   bool _isLoading = false;
   bool _isSyncing = false;
   String _syncStatus = '';
-  DateTime? _lastSyncTime;
-  
+
   // 新增：状态信息
   SyncStatusInfo _statusInfo = const SyncStatusInfo();
   bool _isLoadingStatus = false;
@@ -55,7 +55,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     final config = await WebDAVConfig.load();
     setState(() {
       // 如果没有配置，默认使用坚果云WebDAV地址
-      _urlController.text = config.url.isEmpty ? 'https://dav.jianguoyun.com/dav/' : config.url;
+      _urlController.text =
+          config.url.isEmpty ? 'https://dav.jianguoyun.com/dav/' : config.url;
       _usernameController.text = config.username;
       _passwordController.text = config.password;
     });
@@ -90,10 +91,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // 配置保存后立即更新同步状态
         await _loadSyncStatus();
-        
+
         // 如果是首次配置，弹出初始同步选择对话框
         if (isFirstTimeConfig) {
           _showInitialSyncDialog();
@@ -142,7 +143,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         if (success) {
           // 测试成功后自动保存配置
           await config.save();
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -151,10 +152,10 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               ),
             );
           }
-          
+
           // 保存成功后立即更新同步状态
           await _loadSyncStatus();
-          
+
           // 如果是首次配置，弹出初始同步选择对话框
           if (isFirstTimeConfig) {
             _showInitialSyncDialog();
@@ -204,11 +205,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
 
       // 使用 AutoSyncService 的分析逻辑
       final syncCheckResult = await AutoSyncService.checkStartupSync();
-      
+
       // 获取文件时间和大小信息用于显示
       final webdavClient = config.createClient();
       final syncService = DatabaseSyncService(webdavClient: webdavClient);
-      
+
       // 获取本地数据库文件时间和大小
       final databasePath = await syncService.getDatabaseFilePath();
       final localTime = await FileTimeUtils.getLocalDatabaseTime(databasePath);
@@ -223,13 +224,14 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       DateTime? remoteTime;
       int? remoteSize;
       try {
-        final remoteFileInfo = await webdavClient.getFileInfo(syncService.remoteDatabasePath);
+        final remoteFileInfo =
+            await webdavClient.getFileInfo(syncService.remoteDatabasePath);
         if (remoteFileInfo != null) {
           remoteTime = remoteFileInfo.lastModified;
           remoteSize = remoteFileInfo.size;
         }
       } catch (e) {
-        print('[WebdavConfig] 获取服务器文件信息失败: $e');
+        AppLogger.debug('[WebdavConfig] 获取服务器文件信息失败: $e');
       }
 
       // 获取上次同步时间
@@ -259,12 +261,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           lastSyncTime: lastSyncTime,
           localFileSize: localSize,
           remoteFileSize: remoteSize,
-          statusMessage: syncCheckResult.hasError 
+          statusMessage: syncCheckResult.hasError
               ? syncCheckResult.errorMessage ?? '检查失败'
               : syncCheckResult.message,
           statusTitle: statusTitle,
         );
-        _lastSyncTime = lastSyncTime;
         _isLoadingStatus = false;
       });
     } catch (e) {
@@ -315,23 +316,23 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           return;
         } else if (action == ConflictAction.overwriteRemote) {
           // 强制上传本地版本到服务器
-          final forceResult = await syncService.uploadDatabase(forceOverwrite: true);
+          final forceResult =
+              await syncService.uploadDatabase(forceOverwrite: true);
           setState(() {
             _syncStatus = forceResult.message;
-            if (forceResult.success) {
-              _lastSyncTime = forceResult.timestamp;
-            }
+            if (forceResult.success) {}
           });
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(forceResult.message),
-                backgroundColor: forceResult.success ? Colors.green : Colors.red,
+                backgroundColor:
+                    forceResult.success ? Colors.green : Colors.red,
               ),
             );
           }
-          
+
           if (forceResult.success) {
             await _loadSyncStatus();
           }
@@ -341,9 +342,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
 
       setState(() {
         _syncStatus = result.message;
-        if (result.success) {
-          _lastSyncTime = result.timestamp;
-        }
+        if (result.success) {}
       });
 
       if (mounted) {
@@ -391,7 +390,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     if (!confirmed) return;
 
     final startTime = DateTime.now();
-    print('[WebdavConfig] 开始下载数据库 - ${startTime.toIso8601String()}');
+    AppLogger.debug('[WebdavConfig] 开始下载数据库 - ${startTime.toIso8601String()}');
 
     setState(() {
       _isSyncing = true;
@@ -407,14 +406,15 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
 
       final webdavClient = config.createClient();
       final syncService = DatabaseSyncService(webdavClient: webdavClient);
-      
+
       setState(() {
         _syncStatus = '正在检查远程文件...';
       });
-      
+
       final downloadStartTime = DateTime.now();
-      print('[WebdavConfig] 开始调用 downloadDatabase - ${downloadStartTime.toIso8601String()}');
-      
+      AppLogger.debug(
+          '[WebdavConfig] 开始调用 downloadDatabase - ${downloadStartTime.toIso8601String()}');
+
       final result = await syncService.downloadDatabase(
         onProgress: (status) {
           setState(() {
@@ -422,10 +422,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           });
         },
       );
-      
+
       final downloadEndTime = DateTime.now();
       final downloadDuration = downloadEndTime.difference(downloadStartTime);
-      print('[WebdavConfig] downloadDatabase 完成，耗时: ${downloadDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[WebdavConfig] downloadDatabase 完成，耗时: ${downloadDuration.inMilliseconds}ms');
 
       if (result.conflict != null) {
         final action = await _showConflictDialog(result.conflict!);
@@ -437,12 +438,13 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         } else if (action == ConflictAction.overwriteLocal) {
           // 强制下载服务器版本覆盖本地
           final forceDownloadStartTime = DateTime.now();
-          print('[WebdavConfig] 开始强制下载服务器版本 - ${forceDownloadStartTime.toIso8601String()}');
-          
+          AppLogger.debug(
+              '[WebdavConfig] 开始强制下载服务器版本 - ${forceDownloadStartTime.toIso8601String()}');
+
           setState(() {
             _syncStatus = '正在强制下载服务器版本...';
           });
-          
+
           final forceResult = await syncService.downloadDatabase(
             forceOverwrite: true,
             onProgress: (status) {
@@ -451,16 +453,16 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               });
             },
           );
-          
+
           final forceDownloadEndTime = DateTime.now();
-          final forceDownloadDuration = forceDownloadEndTime.difference(forceDownloadStartTime);
-          print('[WebdavConfig] 强制下载完成，耗时: ${forceDownloadDuration.inMilliseconds}ms');
-          
+          final forceDownloadDuration =
+              forceDownloadEndTime.difference(forceDownloadStartTime);
+          AppLogger.debug(
+              '[WebdavConfig] 强制下载完成，耗时: ${forceDownloadDuration.inMilliseconds}ms');
+
           setState(() {
             _syncStatus = forceResult.message;
-            if (forceResult.success) {
-              _lastSyncTime = forceResult.timestamp;
-            }
+            if (forceResult.success) {}
           });
 
           if (forceResult.success) {
@@ -469,27 +471,32 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
             // 重新初始化数据库连接并刷新所有数据
             try {
               final refreshStartTime = DateTime.now();
-              print('[WebdavConfig] 开始刷新应用数据 - ${refreshStartTime.toIso8601String()}');
-              
+              AppLogger.debug(
+                  '[WebdavConfig] 开始刷新应用数据 - ${refreshStartTime.toIso8601String()}');
+
               setState(() {
                 _syncStatus = '正在刷新应用数据...';
               });
-              
+
               // 使用完整的数据库刷新，因为文件已被替换
               GlobalRefreshService.refreshAllData(ref);
-              
+
               final refreshEndTime = DateTime.now();
-              final refreshDuration = refreshEndTime.difference(refreshStartTime);
-              print('[WebdavConfig] 应用数据刷新完成，耗时: ${refreshDuration.inMilliseconds}ms');
+              final refreshDuration =
+                  refreshEndTime.difference(refreshStartTime);
+              AppLogger.debug(
+                  '[WebdavConfig] 应用数据刷新完成，耗时: ${refreshDuration.inMilliseconds}ms');
 
               final totalDuration = refreshEndTime.difference(startTime);
-              print('[WebdavConfig] 整个强制下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+              AppLogger.debug(
+                  '[WebdavConfig] 整个强制下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
               setState(() {
-                _syncStatus = '数据库同步完成，应用数据已刷新 (总耗时: ${totalDuration.inMilliseconds}ms)';
+                _syncStatus =
+                    '数据库同步完成，应用数据已刷新 (总耗时: ${totalDuration.inMilliseconds}ms)';
               });
             } catch (e) {
-              print('[WebdavConfig] 数据刷新失败: $e');
+              AppLogger.debug('[WebdavConfig] 数据刷新失败: $e');
               setState(() {
                 _syncStatus = '数据刷新失败: $e';
               });
@@ -499,23 +506,24 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         } else if (action == ConflictAction.overwriteRemote) {
           // 使用本地版本覆盖服务器
           final uploadStartTime = DateTime.now();
-          print('[WebdavConfig] 开始上传本地版本覆盖服务器 - ${uploadStartTime.toIso8601String()}');
-          
+          AppLogger.debug(
+              '[WebdavConfig] 开始上传本地版本覆盖服务器 - ${uploadStartTime.toIso8601String()}');
+
           setState(() {
             _syncStatus = '正在上传本地版本覆盖服务器...';
           });
-          
-          final uploadResult = await syncService.uploadDatabase(forceOverwrite: true);
-          
+
+          final uploadResult =
+              await syncService.uploadDatabase(forceOverwrite: true);
+
           final uploadEndTime = DateTime.now();
           final uploadDuration = uploadEndTime.difference(uploadStartTime);
-          print('[WebdavConfig] 上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
-          
+          AppLogger.debug(
+              '[WebdavConfig] 上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
+
           setState(() {
             _syncStatus = uploadResult.message;
-            if (uploadResult.success) {
-              _lastSyncTime = uploadResult.timestamp;
-            }
+            if (uploadResult.success) {}
           });
 
           if (uploadResult.success) {
@@ -523,16 +531,15 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           }
 
           final totalDuration = uploadEndTime.difference(startTime);
-          print('[WebdavConfig] 整个上传覆盖流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+          AppLogger.debug(
+              '[WebdavConfig] 整个上传覆盖流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
           return;
         }
       }
 
       setState(() {
         _syncStatus = result.message;
-        if (result.success) {
-          _lastSyncTime = result.timestamp;
-        }
+        if (result.success) {}
       });
 
       if (result.success) {
@@ -541,27 +548,31 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
         // 重新初始化数据库连接并刷新所有数据
         try {
           final refreshStartTime = DateTime.now();
-          print('[WebdavConfig] 开始刷新应用数据 - ${refreshStartTime.toIso8601String()}');
-          
+          AppLogger.debug(
+              '[WebdavConfig] 开始刷新应用数据 - ${refreshStartTime.toIso8601String()}');
+
           setState(() {
             _syncStatus = '正在刷新应用数据...';
           });
-          
+
           // 使用完整的数据库刷新，因为文件已被替换
           GlobalRefreshService.refreshAllData(ref);
-          
+
           final refreshEndTime = DateTime.now();
           final refreshDuration = refreshEndTime.difference(refreshStartTime);
-          print('[WebdavConfig] 应用数据刷新完成，耗时: ${refreshDuration.inMilliseconds}ms');
-          
+          AppLogger.debug(
+              '[WebdavConfig] 应用数据刷新完成，耗时: ${refreshDuration.inMilliseconds}ms');
+
           final totalDuration = refreshEndTime.difference(startTime);
-          print('[WebdavConfig] 整个下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+          AppLogger.debug(
+              '[WebdavConfig] 整个下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
           setState(() {
-            _syncStatus = '数据库同步完成，应用数据已刷新 (总耗时: ${totalDuration.inMilliseconds}ms)';
+            _syncStatus =
+                '数据库同步完成，应用数据已刷新 (总耗时: ${totalDuration.inMilliseconds}ms)';
           });
         } catch (e) {
-          print('[WebdavConfig] 数据刷新失败: $e');
+          AppLogger.debug('[WebdavConfig] 数据刷新失败: $e');
           setState(() {
             _syncStatus = '数据刷新失败: $e';
           });
@@ -570,8 +581,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
     } catch (e) {
       final errorEndTime = DateTime.now();
       final errorDuration = errorEndTime.difference(startTime);
-      print('[WebdavConfig] 下载失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
-      
+      AppLogger.debug(
+          '[WebdavConfig] 下载失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
+
       setState(() {
         _syncStatus = '下载失败: $e';
       });
@@ -579,10 +591,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
       setState(() {
         _isSyncing = false;
       });
-      
+
       final finalEndTime = DateTime.now();
       final finalDuration = finalEndTime.difference(startTime);
-      print('[WebdavConfig] 下载操作结束，总耗时: ${finalDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[WebdavConfig] 下载操作结束，总耗时: ${finalDuration.inMilliseconds}ms');
     }
   }
 
@@ -610,11 +623,12 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   Future<void> _showInitialSyncDialog() async {
     // 首先进行同步检查以获取智能建议
     final syncCheckResult = await AutoSyncService.checkStartupSync();
-    
+
     if (!mounted) return; // 检查组件是否仍然挂载
-    
+
     // 使用统一的推荐信息
-    final syncRecommendation = SyncDialogHelper.getSyncRecommendation(syncCheckResult.direction);
+    final syncRecommendation =
+        SyncDialogHelper.getSyncRecommendation(syncCheckResult.direction);
 
     final result = await showDialog<String>(
       context: context,
@@ -627,7 +641,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           children: [
             const Text('WebDAV配置已完成！请选择如何进行初始数据同步：'),
             const SizedBox(height: 16),
-            
+
             // 显示当前同步状态
             Container(
               padding: const EdgeInsets.all(12),
@@ -638,7 +652,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -652,7 +667,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 ],
               ),
             ),
-            
+
             // 显示智能建议
             if (syncRecommendation.message.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -662,7 +677,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 icon: syncRecommendation.icon,
               ),
             ],
-            
+
             const SizedBox(height: 16),
             const Text(
               '• 下载：从服务器获取数据到本地\n'
@@ -670,7 +685,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               '• 跳过：稍后手动同步',
               style: TextStyle(fontSize: 13),
             ),
-            
+
             const SizedBox(height: 12),
             // 覆盖警告
             Container(
@@ -701,7 +716,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
             // WebDAV版本信息
             Container(
@@ -714,7 +729,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -735,7 +751,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             text: '💾 数据备份：',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                          TextSpan(
+                              text:
+                                  '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
                         ],
                       ),
                     ),
@@ -784,7 +802,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
   Future<ConflictAction> _showConflictDialog(SyncConflict conflict) async {
     // 使用统一的冲突推荐逻辑
     final recommendation = SyncDialogHelper.getConflictRecommendation(conflict);
-    
+
     final result = await showDialog<ConflictAction>(
       context: context,
       builder: (context) => AlertDialog(
@@ -795,16 +813,18 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           children: [
             const Text('本地和服务器的数据都有更新，请选择如何处理：'),
             const SizedBox(height: 16),
-            
+
             // 文件信息对比 - 使用统一样式
             SyncDialogHelper.buildFileInfoContainer(
               conflict: conflict,
-              localIsNewerChecker: (c) => c.localModified.isAfter(c.remoteModified),
-              remoteIsNewerChecker: (c) => c.remoteModified.isAfter(c.localModified),
+              localIsNewerChecker: (c) =>
+                  c.localModified.isAfter(c.remoteModified),
+              remoteIsNewerChecker: (c) =>
+                  c.remoteModified.isAfter(c.localModified),
               dateFormatter: _formatDateTime,
               sizeFormatter: _formatFileSize,
             ),
-            
+
             // 智能建议 - 使用统一样式
             if (recommendation.message.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -814,7 +834,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 icon: recommendation.icon,
               ),
             ],
-            
+
             const SizedBox(height: 12),
             // 覆盖警告
             Container(
@@ -842,7 +862,7 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
             // WebDAV版本信息
             Container(
@@ -855,7 +875,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -876,7 +897,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             text: '💾 数据备份：',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                          TextSpan(
+                              text:
+                                  '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
                         ],
                       ),
                     ),
@@ -894,16 +917,20 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
           // 服务器版本按钮 - 使用统一样式
           SyncDialogHelper.buildConflictButton(
             text: '使用服务器版本',
-            onPressed: () => Navigator.of(context).pop(ConflictAction.overwriteLocal),
-            isRecommended: recommendation.recommendedAction == ConflictButtonType.useRemote,
+            onPressed: () =>
+                Navigator.of(context).pop(ConflictAction.overwriteLocal),
+            isRecommended: recommendation.recommendedAction ==
+                ConflictButtonType.useRemote,
             buttonType: ConflictButtonType.useRemote,
           ),
           const SizedBox(width: 8),
           // 本地版本按钮 - 使用统一样式
           SyncDialogHelper.buildConflictButton(
             text: '使用本地版本',
-            onPressed: () => Navigator.of(context).pop(ConflictAction.overwriteRemote),
-            isRecommended: recommendation.recommendedAction == ConflictButtonType.useLocal,
+            onPressed: () =>
+                Navigator.of(context).pop(ConflictAction.overwriteRemote),
+            isRecommended:
+                recommendation.recommendedAction == ConflictButtonType.useLocal,
             buttonType: ConflictButtonType.useLocal,
             isElevated: true,
           ),
@@ -979,13 +1006,16 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             hintText: 'https://dav.jianguoyun.com/dav/',
                             prefixIcon: Icon(Icons.link, size: 20),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(6.0)),
                             ),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
                             labelStyle: TextStyle(fontSize: 14),
                             hintStyle: TextStyle(fontSize: 14),
                             helperText: '⚠️ 注意：URL末尾必须带斜杠 /',
-                            helperStyle: TextStyle(color: Colors.orange, fontSize: 12),
+                            helperStyle:
+                                TextStyle(color: Colors.orange, fontSize: 12),
                           ),
                           style: const TextStyle(fontSize: 14),
                           validator: (value) {
@@ -1010,9 +1040,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             labelText: '用户名',
                             prefixIcon: Icon(Icons.person, size: 20),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(6.0)),
                             ),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
                             labelStyle: TextStyle(fontSize: 14),
                           ),
                           style: const TextStyle(fontSize: 14),
@@ -1044,9 +1076,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                               },
                             ),
                             border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(6.0)),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(6.0)),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
                             labelStyle: const TextStyle(fontSize: 14),
                           ),
                           style: const TextStyle(fontSize: 14),
@@ -1112,7 +1146,8 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                         const SizedBox(height: 12),
                         // 同步状态组件
                         SyncStatusWidget(
-                          statusInfo: _statusInfo.copyWith(isLoading: _isLoadingStatus),
+                          statusInfo:
+                              _statusInfo.copyWith(isLoading: _isLoadingStatus),
                         ),
                         const SizedBox(height: 20),
                         const Text(
@@ -1234,8 +1269,11 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                             children: const [
                               TextSpan(text: '• WebDAV URL: 您的WebDAV服务器地址\n'),
                               TextSpan(
-                                text: '  ⚠️ URL末尾必须带斜杠 /，如 https://dav.jianguoyun.com/dav/',
-                                style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w500),
+                                text:
+                                    '  ⚠️ URL末尾必须带斜杠 /，如 https://dav.jianguoyun.com/dav/',
+                                style: TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w500),
                               ),
                               TextSpan(text: '\n\n• 用户名: WebDAV服务器的登录用户名\n'),
                               TextSpan(text: '• 密码: WebDAV服务器的登录密码\n'),
@@ -1244,7 +1282,9 @@ class _WebdavConfigPageState extends ConsumerState<WebdavConfigPage> {
                                 text: '🌰 推荐服务商：\n',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              TextSpan(text: '• 坚果云: https://dav.jianguoyun.com/dav/\n'),
+                              TextSpan(
+                                  text:
+                                      '• 坚果云: https://dav.jianguoyun.com/dav/\n'),
                               TextSpan(text: '• 其他支持WebDAV的云存储服务'),
                             ],
                           ),

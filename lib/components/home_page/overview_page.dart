@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
 import 'package:flowm/components/overview/assets_overview_grid.dart';
 import 'package:flowm/components/overview/monthly_overview_card.dart';
@@ -9,7 +10,6 @@ import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/overview_page_providers.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/state/expense/expense_repository.dart';
-import 'package:flowm/state/expense/expense_providers.dart';
 import 'package:flowm/utils/number_format_utils.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
@@ -42,7 +42,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
     super.initState();
     // 第一次加载时主动更新
     if (!kIsWeb) {
-      print('update widget');
+      AppLogger.debug('update widget');
       _updateAllWidgets();
       _updateAccountDataWidget();
     }
@@ -130,7 +130,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
         endDate: endDate,
         ledgerId: selectedLedger.ledgerId,
       );
-      print('chartData: ${chartData.length}');
+      AppLogger.debug('chartData: ${chartData.length}');
       // 确保只取前10天的数据
       final limitedChartData = chartData.take(10).toList();
 
@@ -239,7 +239,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
         'totalAssets': totalAssetsValue,
         'totalLiabilities': totalLiabilities.abs(),
         'netAssets': netAssets,
-        'currencySymbol': selectedLedger.currencySymbol ?? '¥',
+        'currencySymbol': selectedLedger.currencySymbol,
       };
 
       // Save as JSON string
@@ -399,7 +399,7 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
               totalAssets: formattedTotalAssets,
               totalLiabilities: formattedTotalLiabilities,
               onViewMoreTap: () {
-                print('onViewMoreTap called'); // Debug log
+                AppLogger.debug('onViewMoreTap called'); // Debug log
                 widget.onPageTap?.call(1); // Navigate to assets page (index 1)
               },
             );
@@ -667,7 +667,8 @@ class _OverviewPageState extends ConsumerState<OverviewPage>
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) {
-            print('Error loading latest transactions: $error\n$stack');
+            AppLogger.debug(
+                'Error loading latest transactions: $error\n$stack');
             return const Center(child: Text('加载交易失败'));
           },
         ),

@@ -6,10 +6,10 @@ class StyledAccountList extends StatelessWidget {
   final Function(int index)? onItemTap;
 
   const StyledAccountList({
-    Key? key,
+    super.key,
     required this.accounts,
     this.onItemTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

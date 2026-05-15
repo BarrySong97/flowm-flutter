@@ -101,7 +101,7 @@ class _LiabilityTreemapWidgetState extends State<LiabilityTreemapWidget> {
                 borderRadius: BorderRadius.circular(4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -126,7 +126,7 @@ class _LiabilityTreemapWidgetState extends State<LiabilityTreemapWidget> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '占比: ${dataItem.percentageOfLevel != null ? dataItem.percentageOfLevel!.toStringAsFixed(2) + '%' : 'N/A'} (相对当前层级)',
+                    '占比: ${dataItem.percentageOfLevel != null ? '${dataItem.percentageOfLevel!.toStringAsFixed(2)}%' : 'N/A'} (相对当前层级)',
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
@@ -232,7 +232,7 @@ class _LiabilityTreemapWidgetState extends State<LiabilityTreemapWidget> {
                           '${dataItem.percentageOfLevel!.toStringAsFixed(1)}%',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: percFontSize),
                         ),
                       ],

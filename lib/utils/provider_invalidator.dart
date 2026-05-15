@@ -15,6 +15,8 @@ import 'package:flowm/state/liabilities/liabilities_repository.dart'
     as liabilities;
 import 'package:flowm/state/transaction/flow_transactions_provider.dart';
 
+typedef ProviderInvalidator = void Function(ProviderOrFamily provider);
+
 /// 根据交易中涉及的账户类型，有选择地使 providers 失效。
 ///
 /// 这通常在创建、更新或删除交易后调用，以确保UI反映最新状态。
@@ -25,70 +27,83 @@ void invalidateProvidersForTransaction(
   AccountType? toAccountType,
   AccountType? accountType, // 用于账户删除等单一账户类型操作
 }) {
+  invalidateProvidersForTransactionUsing(
+    ref.invalidate,
+    fromAccountType: fromAccountType,
+    toAccountType: toAccountType,
+    accountType: accountType,
+  );
+}
+
+void invalidateProvidersForTransactionUsing(
+  ProviderInvalidator invalidate, {
+  AccountType? fromAccountType,
+  AccountType? toAccountType,
+  AccountType? accountType,
+}) {
   final types = <AccountType>{};
   if (fromAccountType != null) types.add(fromAccountType);
   if (toAccountType != null) types.add(toAccountType);
   if (accountType != null) types.add(accountType);
-  
+
   // 总是刷新通用 providers
-  ref.invalidate(monthlyOverviewDataProvider);
-  ref.invalidate(latestTransactionsProvider);
-  ref.invalidate(flowTransactionsProvider);
-  
+  invalidate(monthlyOverviewDataProvider);
+  invalidate(latestTransactionsProvider);
+  invalidate(flowTransactionsProvider);
+
   // 失效新的动态账户信息 providers - 这些是核心的账户数据提供者
-  ref.invalidate(accountInfoProvider);
-  ref.invalidate(accountExpenseNodeProvider);
-  ref.invalidate(accountTreeInfoProvider);
+  invalidate(accountInfoProvider);
+  invalidate(accountExpenseNodeProvider);
+  invalidate(accountTreeInfoProvider);
 
   // 根据账户类型刷新特定 providers
   if (types.contains(AccountType.ASSET)) {
-    ref.invalidate(assetsPageDataProvider);
-    ref.invalidate(topAssetAccountsProvider);
-    ref.invalidate(assetsAccountTreeProvider);
-    ref.invalidate(assetSubAccountTreeProvider);
-    ref.invalidate(assetTrendProviderByDateRange);
-    ref.invalidate(assetTrendProviderByTimeRange);
-    ref.invalidate(accountTransactionsProvider);
-    ref.invalidate(assetsSankeyChartDataProvider);
+    invalidate(assetsPageDataProvider);
+    invalidate(topAssetAccountsProvider);
+    invalidate(assetsAccountTreeProvider);
+    invalidate(assetSubAccountTreeProvider);
+    invalidate(assetTrendProviderByDateRange);
+    invalidate(assetTrendProviderByTimeRange);
+    invalidate(accountTransactionsProvider);
+    invalidate(assetsSankeyChartDataProvider);
   }
 
   if (types.contains(AccountType.LIABILITY)) {
-    ref.invalidate(totalLiabilitiesProvider);
-    ref.invalidate(liabilities.uiLiabilityAccountsProvider);
-    ref.invalidate(liabilities.topLiabilityAccountsProvider);
-    ref.invalidate(liabilities.liabilityTrendProviderByDateRange);
-    ref.invalidate(liabilityAccountTreeProvider);
-    ref.invalidate(liabilities.liabilityTrendProviderByTimeRange);
-    ref.invalidate(liabilitySubAccountTreeProvider);
-    ref.invalidate(liabilities.sankeyChartDataProvider);
+    invalidate(totalLiabilitiesProvider);
+    invalidate(liabilities.uiLiabilityAccountsProvider);
+    invalidate(liabilities.topLiabilityAccountsProvider);
+    invalidate(liabilities.liabilityTrendProviderByDateRange);
+    invalidate(liabilityAccountTreeProvider);
+    invalidate(liabilities.liabilityTrendProviderByTimeRange);
+    invalidate(liabilitySubAccountTreeProvider);
+    invalidate(liabilities.sankeyChartDataProvider);
   }
 
   if (types.contains(AccountType.EXPENSE)) {
-    ref.invalidate(expensePageDataProvider);
-    ref.invalidate(expenseAccountTreeProvider);
-    ref.invalidate(expenseChartDataProvider);
-    ref.invalidate(detail_page_providers.expenseChartDataProvider);
-    ref.invalidate(previousMonthExpenseProviderFamily);
-    ref.invalidate(accountMonthlyExpenseProvider);
-    ref.invalidate(detail_page_providers.accountMonthlyExpenseProvider);
-    ref.invalidate(accountOverallExpenseProvider);
-    ref.invalidate(detail_page_providers.accountOverallExpenseProvider);
+    invalidate(expensePageDataProvider);
+    invalidate(expenseAccountTreeProvider);
+    invalidate(expenseChartDataProvider);
+    invalidate(detail_page_providers.expenseChartDataProvider);
+    invalidate(previousMonthExpenseProviderFamily);
+    invalidate(accountMonthlyExpenseProvider);
+    invalidate(detail_page_providers.accountMonthlyExpenseProvider);
+    invalidate(accountOverallExpenseProvider);
+    invalidate(detail_page_providers.accountOverallExpenseProvider);
   }
 
   if (types.contains(AccountType.INCOME)) {
-    ref.invalidate(incomePageDataProvider);
-    ref.invalidate(incomeAccountTreeProvider);
-    ref.invalidate(incomeChartDataProviderFamily);
-    ref.invalidate(income_detail_page_providers.incomeChartDataProvider);
-    ref.invalidate(previousMonthIncomeProviderFamily);
-    ref.invalidate(accountMonthlyIncomeProvider);
-    ref.invalidate(income_detail_page_providers.accountMonthlyIncomeProvider);
-    ref.invalidate(accountOverallIncomeProvider);
-    ref.invalidate(income_detail_page_providers.accountOverallIncomeProvider);
+    invalidate(incomePageDataProvider);
+    invalidate(incomeAccountTreeProvider);
+    invalidate(incomeChartDataProviderFamily);
+    invalidate(income_detail_page_providers.incomeChartDataProvider);
+    invalidate(previousMonthIncomeProviderFamily);
+    invalidate(accountMonthlyIncomeProvider);
+    invalidate(income_detail_page_providers.accountMonthlyIncomeProvider);
+    invalidate(accountOverallIncomeProvider);
+    invalidate(income_detail_page_providers.accountOverallIncomeProvider);
   }
 
   if (types.contains(AccountType.EQUITY)) {
-    ref.invalidate(equityAccountTreeProvider);
+    invalidate(equityAccountTreeProvider);
   }
 }
-

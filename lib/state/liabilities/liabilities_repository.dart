@@ -1,4 +1,6 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
+import 'package:flowm/data/accounts/account_balance_query.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,8 +40,6 @@ final sankeyChartDataProvider = FutureProvider.autoDispose.family<
         return DateTime(now.year, 1, 1);
       case TimeRange.all:
         return DateTime(now.year - 10, 1, 1);
-      default:
-        return now.subtract(const Duration(days: 30));
     }
   }
 
@@ -95,7 +95,8 @@ final uiLiabilityAccountsProvider =
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   if (selectedLedger != null) {
     return repository.getLiabilityAccountTree(
-        ledgerId: selectedLedger.ledgerId, currencySymbol: selectedLedger.currencySymbol);
+        ledgerId: selectedLedger.ledgerId,
+        currencySymbol: selectedLedger.currencySymbol);
   } else {
     return [];
   }
@@ -146,7 +147,6 @@ final liabilityTrendProviderByTimeRange = FutureProvider.family<
       startDate = endDate.subtract(const Duration(days: 89));
       break;
     case TimeRange.thisMonth:
-    default:
       startDate = DateTime(endDate.year, endDate.month, 1);
       break;
   }
@@ -211,7 +211,11 @@ final liabilitiesRepositoryProvider = Provider<LiabilitiesRepository>((ref) {
 class LiabilitiesRepository {
   final AccountDao _accountDao;
   final TransactionDao _transactionDao;
-  LiabilitiesRepository(this._accountDao, this._transactionDao);
+  late final AccountBalanceQuery _accountBalanceQuery;
+
+  LiabilitiesRepository(this._accountDao, this._transactionDao) {
+    _accountBalanceQuery = AccountBalanceQuery(_accountDao);
+  }
 
   DateTime _getEndDateFromTimeRange(TimeRange timeRange) {
     return DateTime.now();
@@ -245,14 +249,13 @@ class LiabilitiesRepository {
         return DateTime(now.year, 1, 1);
       case TimeRange.all:
         return DateTime(now.year - 10, 1, 1); // 默认返回10年前
-      default:
-        return now.subtract(Duration(days: 30));
     }
   }
 
   /// 获取UI展示所需的负债账户树
   Future<List<account_ui.Account>> getLiabilityAccountTree(
-      {int? ledgerId, String currencySymbol = AppConstants.currencySymbol}) async {
+      {int? ledgerId,
+      String currencySymbol = AppConstants.currencySymbol}) async {
     try {
       // 获取账户树，先构建完整的层级关系
       final accountTree = await getAccountTree(ledgerId: ledgerId);
@@ -295,18 +298,21 @@ class LiabilitiesRepository {
       };
 
       // 递归转换为UI需要的Account格式
-      final result =
-          _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap, currencySymbol: currencySymbol);
+      final result = _convertAccountsToUIFormat(
+          liabilityAccountsTree, balancesMap,
+          currencySymbol: currencySymbol);
       return result;
     } catch (e) {
-      print('[LiabilitiesRepository] Error in getLiabilitiesAccountTree: $e');
+      AppLogger.debug(
+          '[LiabilitiesRepository] Error in getLiabilitiesAccountTree: $e');
       return [];
     }
   }
 
   // 递归将AccountWithChildren转换为UI格式的Account并计算余额 (Optimized)
   List<account_ui.Account> _convertAccountsToUIFormat(
-      List<AccountWithChildren> accounts, Map<int, double> balances, {String currencySymbol = AppConstants.currencySymbol}) {
+      List<AccountWithChildren> accounts, Map<int, double> balances,
+      {String currencySymbol = AppConstants.currencySymbol}) {
     if (accounts.isEmpty) {
       return [];
     }
@@ -320,7 +326,8 @@ class LiabilitiesRepository {
 
       if (acc.children.isNotEmpty) {
         // 递归调用并将余额映射向下传递
-        uiChildren = _convertAccountsToUIFormat(acc.children, balances, currencySymbol: currencySymbol);
+        uiChildren = _convertAccountsToUIFormat(acc.children, balances,
+            currencySymbol: currencySymbol);
         childrensTotalAmount =
             uiChildren.fold(0.0, (sum, child) => sum + child.amount);
       }
@@ -338,63 +345,6 @@ class LiabilitiesRepository {
         currencySymbol: currencySymbol,
       );
     }).toList();
-  }
-
-  IconData _getAccountIcon(AccountType accountType) {
-    switch (accountType) {
-      case AccountType.ASSET:
-        return Icons.account_balance_wallet;
-      case AccountType.LIABILITY:
-        return Icons.credit_card;
-      case AccountType.EXPENSE:
-        return Icons.trending_down;
-      case AccountType.INCOME:
-        return Icons.trending_up;
-      case AccountType.EQUITY:
-        return Icons.pie_chart;
-      default:
-        return Icons.account_balance;
-    }
-  }
-
-  /// 获取所有叶子负债账户（按余额降序排序）
-  Future<List<AccountWithBalance>> getTopLiabilityAccounts({int? limit}) async {
-    try {
-      // 获取所有活跃的负债账户
-      final allAccounts = await _accountDao.getAllAccounts();
-      final liabilityAccounts = allAccounts
-          .where((account) =>
-              account.accountType == AccountType.LIABILITY && account.isActive)
-          .toList();
-
-      if (liabilityAccounts.isEmpty) {
-        return [];
-      }
-
-      // 计算每个负债账户的余额
-      final List<AccountWithBalance> accountsWithBalance = [];
-      for (final account in liabilityAccounts) {
-        final balance =
-            (await _accountDao.getAccountBalance(account.accountId)).abs();
-        accountsWithBalance.add(
-          AccountWithBalance(
-            account: account,
-            balance: balance,
-          ),
-        );
-      }
-
-      // 按余额降序排序
-      accountsWithBalance.sort((a, b) => b.balance.compareTo(a.balance));
-
-      // 如果指定了limit，则返回前limit个
-      return limit != null
-          ? accountsWithBalance.take(limit).toList()
-          : accountsWithBalance;
-    } catch (e) {
-      print('[LiabilitiesRepository] Error in getTopLiabilityAccounts: $e');
-      return [];
-    }
   }
 
   /// 获取指定时间段内的负债历史数据
@@ -425,13 +375,13 @@ class LiabilitiesRepository {
             (acc) => acc.accountId == accountId && acc.ledgerId == ledgerId,
           );
         } catch (e) {
-          print(
+          AppLogger.debug(
               '[LiabilitiesRepository] getLiabilityHistoryByTime: Account with ID $accountId not found in ledger $ledgerId or does not belong to it.');
           return [];
         }
 
         if (rootAccountForTree.accountType != AccountType.LIABILITY) {
-          print(
+          AppLogger.debug(
               '[LiabilitiesRepository] getLiabilityHistoryByTime: Specified account ID $accountId is not a LIABILITY account.');
           return [];
         }
@@ -453,7 +403,7 @@ class LiabilitiesRepository {
       }
 
       if (targetLiabilityAccounts.isEmpty) {
-        print(
+        AppLogger.debug(
             '[LiabilitiesRepository] getLiabilityHistoryByTime: No LIABILITY accounts found to process after filtering.');
         return [];
       }
@@ -464,7 +414,7 @@ class LiabilitiesRepository {
       // 2. 一次性获取期初总余额
       final initialBalanceResult = await _accountDao.customSelect(
         '''
-        SELECT SUM(p.amount) as balance 
+        SELECT SUM(p.amount) as balance
         FROM postings p
         JOIN transactions t ON p.transaction_id = t.transaction_id
         WHERE p.account_id IN (${targetAccountIds.map((_) => '?').join(',')})
@@ -521,8 +471,9 @@ class LiabilitiesRepository {
 
       return history;
     } catch (e, s) {
-      print('[LiabilitiesRepository] Error in getLiabilityHistoryByTime: $e');
-      print('[LiabilitiesRepository] Stacktrace: $s');
+      AppLogger.debug(
+          '[LiabilitiesRepository] Error in getLiabilityHistoryByTime: $e');
+      AppLogger.debug('[LiabilitiesRepository] Stacktrace: $s');
       return [];
     }
   }
@@ -580,60 +531,16 @@ class LiabilitiesRepository {
   Future<List<AccountWithBalance>> getTopLiabilityAccountsByLedger(
       {int? limit, required int ledgerId}) async {
     try {
-      String limitClause = limit != null ? 'LIMIT ?' : '';
-      List<Variable> variables = [
-        Variable.withInt(ledgerId),
-        Variable.withString(AccountType.LIABILITY.name),
-      ];
-      if (limit != null) {
-        variables.add(Variable.withInt(limit));
-      }
-
-      final query = '''
-        SELECT
-          a.*,
-          COALESCE(ABS(SUM(p.amount)), 0.0) as balance
-        FROM accounts a
-        LEFT JOIN postings p ON a.account_id = p.account_id
-        WHERE a.ledger_id = ?
-          AND a.account_type = ?
-          AND a.is_active = 1
-        GROUP BY a.account_id
-        ORDER BY balance DESC
-        $limitClause
-      ''';
-
-      final results =
-          await _accountDao.customSelect(query, variables: variables).get();
-
-      if (results.isEmpty) {
-        print(
-            '[LiabilitiesRepository] getTopLiabilityAccountsByLedger: No active liability accounts found in ledger $ledgerId.');
-        return [];
-      }
-
-      return results.map((row) {
-        final account = Account(
-          accountId: row.read<int>('account_id'),
-          ledgerId: row.read<int>('ledger_id'),
-          parentAccountId: row.read<int?>('parent_account_id'),
-          accountName: row.read<String>('account_name'),
-          fullPath: row.read<String>('full_path'),
-          accountType:
-              AccountType.values.byName(row.read<String>('account_type')),
-          isActive: row.read<bool>('is_active'),
-          createdAt: row.read<DateTime>('created_at'),
-        );
-        final balance = row.read<double>('balance');
-        return AccountWithBalance(
-          account: account,
-          balance: balance,
-        );
-      }).toList();
+      return _accountBalanceQuery.getTopAccountsByLedger(
+        ledgerId: ledgerId,
+        accountType: AccountType.LIABILITY,
+        limit: limit,
+        absoluteBalance: true,
+      );
     } catch (e, s) {
-      print(
+      AppLogger.debug(
           '[LiabilitiesRepository] Error in getTopLiabilityAccountsByLedger: $e');
-      print('[LiabilitiesRepository] Stacktrace: $s');
+      AppLogger.debug('[LiabilitiesRepository] Stacktrace: $s');
       return [];
     }
   }
@@ -669,7 +576,8 @@ class LiabilitiesRepository {
     );
 
     // 转换为 Sankey 图表数据
-    return await _convertToSankeyData(flows, targetAccount, flow, currencySymbol);
+    return await _convertToSankeyData(
+        flows, targetAccount, flow, currencySymbol);
   }
 
   /// 获取资产流转数据
@@ -695,7 +603,7 @@ class LiabilitiesRepository {
     if (flow == 'in') {
       // 查询流入：目标账户作为借方（正数金额）
       query = '''
-        SELECT 
+        SELECT
           p1.posting_id as source_posting_id,
           p1.account_id as source_account_id,
           a1.account_name as source_account_name,
@@ -716,8 +624,8 @@ class LiabilitiesRepository {
         JOIN postings p2 ON p1.transaction_id = p2.transaction_id
         JOIN accounts a1 ON p1.account_id = a1.account_id
         JOIN accounts a2 ON p2.account_id = a2.account_id
-        WHERE p2.account_id = ? 
-          AND p2.amount > 0 
+        WHERE p2.account_id = ?
+          AND p2.amount > 0
           AND p1.amount < 0
           AND p1.account_id != p2.account_id
           $dateFilter
@@ -727,7 +635,7 @@ class LiabilitiesRepository {
     } else {
       // 查询流出：目标账户作为贷方（负数金额）
       query = '''
-        SELECT 
+        SELECT
           p1.posting_id as source_posting_id,
           p1.account_id as source_account_id,
           a1.account_name as source_account_name,
@@ -748,8 +656,8 @@ class LiabilitiesRepository {
         JOIN postings p2 ON p1.transaction_id = p2.transaction_id
         JOIN accounts a1 ON p1.account_id = a1.account_id
         JOIN accounts a2 ON p2.account_id = a2.account_id
-        WHERE p1.account_id = ? 
-          AND p1.amount < 0 
+        WHERE p1.account_id = ?
+          AND p1.amount < 0
           AND p2.amount > 0
           AND p1.account_id != p2.account_id
           $dateFilter
@@ -916,20 +824,20 @@ class LiabilitiesRepository {
     String flow,
     String currencySymbol,
   ) async {
-    print('\n=== AssetsRepository 金额计算调试 ===');
-    print(
+    AppLogger.debug('\n=== AssetsRepository 金额计算调试 ===');
+    AppLogger.debug(
         '目标账户: ${targetAccount.accountName} (ID: ${targetAccount.accountId})');
-    print('流向: $flow');
-    print('原始流转数据 (${flows.length}条):');
+    AppLogger.debug('流向: $flow');
+    AppLogger.debug('原始流转数据 (${flows.length}条):');
 
     for (int i = 0; i < flows.length; i++) {
       final assetFlow = flows[i];
-      print(
+      AppLogger.debug(
           '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: $currencySymbol${assetFlow.amount.toStringAsFixed(2)}');
     }
 
     if (flows.isEmpty) {
-      print('无流转数据');
+      AppLogger.debug('无流转数据');
       return SankeyChartData(nodes: [], links: []);
     }
 
@@ -958,12 +866,12 @@ class LiabilitiesRepository {
     final hierarchicalLinks = _createHierarchicalLinks(
         flows, accountMap, targetAccount.accountId, flow);
 
-    print('\n层级链接 (${hierarchicalLinks.length}条):');
+    AppLogger.debug('\n层级链接 (${hierarchicalLinks.length}条):');
     for (int i = 0; i < hierarchicalLinks.length; i++) {
       final link = hierarchicalLinks[i];
       final sourceName = accountMap[link.sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[link.targetId]?.accountName ?? 'Unknown';
-      print(
+      AppLogger.debug(
           '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): $currencySymbol${link.amount.toStringAsFixed(2)}');
     }
 
@@ -984,22 +892,24 @@ class LiabilitiesRepository {
       }
     }
 
-    print('\n聚合后的链接:');
+    AppLogger.debug('\n聚合后的链接:');
     linkAmounts.forEach((linkKey, amount) {
       final parts = linkKey.split('->');
       final sourceId = int.parse(parts[0]);
       final targetId = int.parse(parts[1]);
       final sourceName = accountMap[sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[targetId]?.accountName ?? 'Unknown';
-      print('  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
+      AppLogger.debug(
+          '  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 移除为账户设置余额的逻辑，只显示实际流转金额
 
-    print('\n最终节点金额:');
+    AppLogger.debug('\n最终节点金额:');
     nodeAmounts.forEach((accountId, amount) {
       final accountName = accountMap[accountId]?.accountName ?? 'Unknown';
-      print('  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
+      AppLogger.debug(
+          '  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 创建 SankeyNode 列表，只显示实际流转金额
@@ -1022,7 +932,8 @@ class LiabilitiesRepository {
         } else if (amount >= 1000) {
           // 千级，固定两位小数
           final thousands = amount / 1000;
-          formattedAmount = ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
+          formattedAmount =
+              ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
         } else {
           // 小额，固定两位小数
           formattedAmount = ' ($currencySymbol${amount.toStringAsFixed(2)})';
@@ -1141,7 +1052,8 @@ class LiabilitiesRepository {
             _convertAccountsToUIFormat(liabilityAccountsTree, balancesMap);
         return result;
       } catch (e) {
-        print('[LiabilitiesRepository] Error in watchLiabilityAccountTree: $e');
+        AppLogger.debug(
+            '[LiabilitiesRepository] Error in watchLiabilityAccountTree: $e');
         return [];
       }
     });

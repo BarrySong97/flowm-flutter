@@ -6,7 +6,7 @@ part 'ledger_dao.g.dart';
 
 @DriftAccessor(tables: [Ledgers])
 class LedgerDao extends DatabaseAccessor<AppDatabase> with _$LedgerDaoMixin {
-  LedgerDao(AppDatabase db) : super(db);
+  LedgerDao(super.db);
 
   Future<List<Ledger>> getAllLedgers() => select(ledgers).get();
 

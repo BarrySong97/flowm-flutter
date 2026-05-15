@@ -23,9 +23,9 @@ class StyledAccount {
   String get formattedAmount {
     if (rawAmount.abs() >= 1000000) {
       // 6位数及以上才格式化
-      return '${currencySymbol}${(rawAmount / 1000000).toStringAsFixed(2)}M';
+      return '$currencySymbol${(rawAmount / 1000000).toStringAsFixed(2)}M';
     } else {
-      return '${currencySymbol}${NumberFormat('#,##0.00', 'zh_CN').format(rawAmount)}';
+      return '$currencySymbol${NumberFormat('#,##0.00', 'zh_CN').format(rawAmount)}';
     }
   }
 }
@@ -35,10 +35,10 @@ class StyledAccountItem extends StatelessWidget {
   final VoidCallback? onTap;
 
   const StyledAccountItem({
-    Key? key,
+    super.key,
     required this.account,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

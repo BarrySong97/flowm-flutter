@@ -1,7 +1,7 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:path/path.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/components/account/account_item.dart';
 
@@ -118,7 +118,7 @@ class _AssetsOverviewGridState extends ConsumerState<AssetsOverviewGrid> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    print('查看更多 clicked!'); // Debug log
+                    AppLogger.debug('查看更多 clicked!'); // Debug log
                     widget.onViewMoreTap?.call(); // Navigate to assets page
                   },
                   child: Row(
@@ -227,8 +227,8 @@ class _AssetsOverviewGridState extends ConsumerState<AssetsOverviewGrid> {
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: isPositive
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.red.withOpacity(0.2),
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.red.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(0),
                     ),
                     child: Text(

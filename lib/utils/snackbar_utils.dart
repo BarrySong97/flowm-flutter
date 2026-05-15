@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/material.dart';
 
 class SnackBarUtils {
@@ -32,8 +33,8 @@ class SnackBarUtils {
 
       overlay.insert(overlayEntry);
       _currentOverlay = overlayEntry;
-    } catch (e, stackTrace) {
-      print('Overlay显示失败，回退到标准SnackBar: $e');
+    } catch (e) {
+      AppLogger.debug('Overlay显示失败，回退到标准SnackBar: $e');
 
       // 如果overlay失败，回退到标准SnackBar
       try {
@@ -47,7 +48,7 @@ class SnackBarUtils {
           ),
         );
       } catch (fallbackError) {
-        print('SnackBar也失败了: $fallbackError');
+        AppLogger.debug('SnackBar也失败了: $fallbackError');
       }
     }
   }
@@ -158,7 +159,7 @@ class SnackBarUtils {
 
   /// 测试方法：直接显示一个简单的overlay消息
   static void testOverlay(BuildContext context) {
-    print('测试 Overlay 功能');
+    AppLogger.debug('测试 Overlay 功能');
     showOverlayMessage(
       context,
       '这是一个测试消息',
@@ -229,7 +230,7 @@ class _AnimatedSnackBarOverlayState extends State<_AnimatedSnackBarOverlay>
       await _slideController.reverse();
       widget.onComplete();
     } catch (e) {
-      print('退出动画错误: $e');
+      AppLogger.debug('退出动画错误: $e');
       widget.onComplete();
     }
   }
@@ -262,7 +263,7 @@ class _AnimatedSnackBarOverlayState extends State<_AnimatedSnackBarOverlay>
               color: widget.backgroundColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, -2),
                 ),

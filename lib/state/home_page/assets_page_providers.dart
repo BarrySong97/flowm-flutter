@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flowm/db/dao/account_dao.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../components/account/account_item.dart' as account_ui;
 import '../ledger/ledger_repository.dart';
@@ -51,8 +50,8 @@ final assetsPageDataProvider =
       break;
   }
 
-  final accountsFuture =
-      repository.getAssetsAccountTree(ledgerId: ledger.ledgerId, currencySymbol: ledger.currencySymbol);
+  final accountsFuture = repository.getAssetsAccountTree(
+      ledgerId: ledger.ledgerId, currencySymbol: ledger.currencySymbol);
   final assetTrendFuture = repository.getAssetHistoryByTimeRange(
     startDate,
     endDate,

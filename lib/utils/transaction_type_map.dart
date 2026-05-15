@@ -1,3 +1,6 @@
+// ignore_for_file: constant_identifier_names
+// These enum names are used as stable business identifiers across transaction mapping.
+
 import '../db/tables/account_table.dart';
 
 // 交易类型枚举

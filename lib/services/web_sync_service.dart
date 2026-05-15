@@ -66,7 +66,7 @@ class WebSyncService {
 
       // 添加CORS middleware
       final handler =
-          Pipeline().addMiddleware(_corsMiddleware).addHandler(router);
+          Pipeline().addMiddleware(_corsMiddleware).addHandler(router.call);
 
       _server = await serve(
         handler,
@@ -178,12 +178,12 @@ class WebSyncService {
 <body>
     <div class="container">
         <h1>🔄 Flowm 数据同步</h1>
-        
+
         <div class="info-box">
             <span class="status-indicator"></span>
             <strong>服务状态：</strong> 运行中
         </div>
-        
+
         <div class="api-section">
             <h3>📥 下载数据库文件</h3>
             <p>点击下方按钮下载完整的 SQLite 数据库文件：</p>
@@ -191,7 +191,7 @@ class WebSyncService {
                 📱 下载 SQLite 数据库文件
             </a>
         </div>
-        
+
         <div class="api-section">
             <h3>🔧 API 接口</h3>
             <p><strong>获取数据库文件：</strong> <code>GET /api/getSqlFile</code></p>
@@ -203,12 +203,12 @@ class WebSyncService {
                 <pre id="dbInfoContent" style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; font-size: 12px; overflow-x: auto;"></pre>
             </div>
         </div>
-        
+
         <script>
         async function checkDbInfo() {
             const dbInfoDiv = document.getElementById('dbInfo');
             const dbInfoContent = document.getElementById('dbInfoContent');
-            
+
             try {
                 const response = await fetch('/api/dbInfo');
                 const data = await response.json();
@@ -220,7 +220,7 @@ class WebSyncService {
             }
         }
         </script>
-        
+
         <div class="info-box">
             <p><strong>注意：</strong> 请确保设备在同一局域网内访问此服务。</p>
         </div>

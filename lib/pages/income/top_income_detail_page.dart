@@ -24,7 +24,7 @@ import 'package:flowm/components/account/account_item.dart' as ui;
 /// 上期收入数据提供者 (family)
 final previousPeriodIncomeProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
@@ -71,7 +71,7 @@ final previousPeriodIncomeProviderFamily = FutureProvider.autoDispose
 /// 修改为 .family 以接收 accountId (可以为 null)
 final incomeChartDataProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
@@ -118,7 +118,7 @@ final incomeChartDataProviderFamily = FutureProvider.autoDispose
 /// 收入账户树数据提供者
 final incomeAccountTreeDataProvider =
     FutureProvider.autoDispose<List<AccountExpenseNode>>((ref) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
@@ -538,8 +538,7 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
               icon: const Icon(Icons.more_vert, color: Colors.black),
               onPressed: () async {
                 // Get current ledger for currency symbol
-                final currentLedger =
-                    await ref.read(selectedLedgerProvider.future);
+                final currentLedger = ref.read(selectedLedgerProvider).value;
 
                 // Convert database Account to UI Account
                 final uiAccount = ui.Account(
@@ -556,7 +555,8 @@ class _TopIncomeDetailPageState extends ConsumerState<TopIncomeDetailPage> {
                 );
 
                 // 如果账户被删除，退出详情页面
-                if (isDeleted == true && mounted) {
+                if (!context.mounted) return;
+                if (isDeleted == true) {
                   Navigator.of(context).pop();
                 }
               },

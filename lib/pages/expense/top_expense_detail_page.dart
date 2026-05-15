@@ -530,8 +530,7 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
               icon: const Icon(Icons.more_vert, color: Colors.black),
               onPressed: () async {
                 // Get current ledger for currency symbol
-                final currentLedger =
-                    await ref.read(selectedLedgerProvider.future);
+                final currentLedger = ref.read(selectedLedgerProvider).value;
 
                 // Convert database Account to UI Account
                 final uiAccount = ui.Account(
@@ -548,7 +547,8 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                 );
 
                 // 如果账户被删除，退出详情页面
-                if (isDeleted == true && mounted) {
+                if (!context.mounted) return;
+                if (isDeleted == true) {
                   Navigator.of(context).pop();
                 }
               },
@@ -739,8 +739,9 @@ class _TopExpensesDetailPageState extends ConsumerState<TopExpensesDetailPage> {
                                             final chartDataValue = ref.read(
                                                 expenseChartDataProvider(
                                                     currentAccountId));
-                                            if (!chartDataValue.hasValue)
+                                            if (!chartDataValue.hasValue) {
                                               return;
+                                            }
                                             final chartData =
                                                 chartDataValue.value!;
 

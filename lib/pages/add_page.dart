@@ -7,21 +7,15 @@ import 'package:flowm/components/common/account_selector_bottom_sheet.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/utils/account_transaction_validator.dart';
+import 'package:flowm/features/transactions/application/transaction_command_controller.dart';
+import 'package:flowm/features/transactions/domain/transaction_command.dart';
 import 'package:flowm/pages/account_transaction_guide_screen.dart';
 import 'package:flowm/state/transaction/transaction_repository.dart';
 import 'package:flowm/state/transaction/frequent_descriptions_provider.dart';
-import 'package:flowm/db/dao/transaction_dao.dart' show TransactionWithAmount;
 import 'package:flowm/db/app_database.dart' as db;
-import 'package:flowm/db/tables/account_table.dart' show AccountType;
 import 'package:flowm/state/add_page_params_provider.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
-import 'package:flowm/state/home_page/overview_page_providers.dart';
-import 'package:flowm/state/expense/expense_providers.dart';
-import 'package:flowm/state/icome/income_providers.dart';
-import 'package:flowm/state/home_page/assets_page_providers.dart';
-import 'package:flowm/state/liabilities/liabilities_repository.dart';
-import 'package:flowm/utils/provider_invalidator.dart';
 
 class AddPage extends ConsumerStatefulWidget {
   final int? transactionId;
@@ -444,7 +438,7 @@ class _AddPageState extends ConsumerState<AddPage>
         color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: iconColor.withOpacity(0.3),
+          color: iconColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -505,7 +499,7 @@ class _AddPageState extends ConsumerState<AddPage>
                             setState(() {
                               _noteController.text = item.description;
                             });
-                            
+
                             // 异步查询并填充账户信息
                             _fillAccountsFromDescription(item.description);
                           },
@@ -582,32 +576,32 @@ class _AddPageState extends ConsumerState<AddPage>
               ),
               headerBackgroundColor: Colors.green[400],
               headerForegroundColor: Colors.white,
-              dayBackgroundColor: MaterialStateProperty.resolveWith((states) {
-                if (states.contains(MaterialState.selected)) {
+              dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
                   return Colors.green[200];
                 }
                 return Colors.transparent;
               }),
-              dayForegroundColor: MaterialStateProperty.resolveWith((states) {
-                if (states.contains(MaterialState.disabled)) {
+              dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
                   return Colors.grey[400];
                 }
-                if (states.contains(MaterialState.selected)) {
+                if (states.contains(WidgetState.selected)) {
                   return Colors.black87;
                 }
                 return Colors.black87;
               }),
-              dayOverlayColor: MaterialStateProperty.resolveWith((states) {
-                if (states.contains(MaterialState.selected)) {
+              dayOverlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
                   return Colors.green[200];
                 }
-                if (states.contains(MaterialState.hovered) ||
-                    states.contains(MaterialState.pressed)) {
+                if (states.contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.pressed)) {
                   return Colors.green[100];
                 }
                 return Colors.transparent;
               }),
-              dayShape: MaterialStateProperty.resolveWith((states) {
+              dayShape: WidgetStateProperty.resolveWith((states) {
                 return RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
                 );
@@ -863,18 +857,23 @@ class _AddPageState extends ConsumerState<AddPage>
     }
 
     try {
+      final transactionCommandController =
+          ref.read(transactionCommandControllerProvider);
+
       if (_isEditMode) {
-        // 更新逻辑
-        await ref
-            .read(transactionRepositoryProvider)
-            .updateTransactionWithPostings(
-              transactionId: widget.transactionId!,
-              fromAccountId: _fromAccount!.id,
-              toAccountId: _toAccount!.id,
-              amount: transactionAmount,
-              transactionDate: _currentDateTime,
-              description: _noteController.text,
-            );
+        await transactionCommandController.update(
+          UpdateTransactionCommand(
+            transactionId: widget.transactionId!,
+            fromAccountId: _fromAccount!.id,
+            toAccountId: _toAccount!.id,
+            amount: transactionAmount,
+            transactionDate: _currentDateTime,
+            description: _noteController.text,
+            fromAccountType: _fromAccount!.type,
+            toAccountType: _toAccount!.type,
+          ),
+        );
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('交易已更新'),
@@ -882,33 +881,22 @@ class _AddPageState extends ConsumerState<AddPage>
           ),
         );
         if (mounted) {
-          // revalidate providers (在清空表单前调用)
-          invalidateProvidersForTransaction(
-            ref,
-            fromAccountType: _fromAccount!.type,
-            toAccountType: _toAccount!.type,
-          );
           _clearForm();
           Navigator.of(context).pop();
         }
       } else {
-        // 创建逻辑
-        await ref
-            .read(transactionRepositoryProvider)
-            .createTransactionWithPostings(
-              fromAccountId: _fromAccount!.id,
-              toAccountId: _toAccount!.id,
-              amount: transactionAmount,
-              transactionDate: _currentDateTime,
-              description: _noteController.text,
-            );
-
-        // revalidate providers
-        invalidateProvidersForTransaction(
-          ref,
-          fromAccountType: _fromAccount!.type,
-          toAccountType: _toAccount!.type,
+        await transactionCommandController.create(
+          CreateTransactionCommand(
+            fromAccountId: _fromAccount!.id,
+            toAccountId: _toAccount!.id,
+            amount: transactionAmount,
+            transactionDate: _currentDateTime,
+            description: _noteController.text,
+            fromAccountType: _fromAccount!.type,
+            toAccountType: _toAccount!.type,
+          ),
         );
+        if (!mounted) return;
 
         // 显示成功消息并返回
         ScaffoldMessenger.of(context).showSnackBar(
@@ -920,6 +908,7 @@ class _AddPageState extends ConsumerState<AddPage>
         _clearForm();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('保存失败: $e'),

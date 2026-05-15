@@ -11,12 +11,12 @@ class AccountRow extends StatelessWidget {
   final void Function(Account account)? onTap;
 
   const AccountRow({
-    Key? key,
+    super.key,
     required this.account,
     this.percentage,
     required this.showCurrencySymbolInAmount,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class AccountRow extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            '${account.name}',
+                            account.name,
                             style: nameStyle,
                             overflow: TextOverflow.ellipsis,
                           ),

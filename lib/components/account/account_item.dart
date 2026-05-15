@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flowm/components/account/account_row.dart'; // Import the new AccountRow
 import 'package:flowm/db/tables/account_table.dart';
 
@@ -32,13 +31,13 @@ class AccountItem extends StatefulWidget {
   final void Function(Account account)? onTap; // 添加onTap回调参数
 
   const AccountItem({
-    Key? key,
+    super.key,
     required this.account,
     this.onTap, // 可选的onTap参数
-  }) : super(key: key);
+  });
 
   @override
-  _AccountItemState createState() => _AccountItemState();
+  State<AccountItem> createState() => _AccountItemState();
 }
 
 class _AccountItemState extends State<AccountItem> {

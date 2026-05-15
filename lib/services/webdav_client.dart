@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -118,7 +119,8 @@ class WebDAVClient {
   }
 
   // 上传文件
-  Future<WebDAVUploadResult> uploadFile(String remotePath, File localFile) async {
+  Future<WebDAVUploadResult> uploadFile(
+      String remotePath, File localFile) async {
     try {
       if (!await localFile.exists()) {
         throw Exception('本地文件不存在: ${localFile.path}');
@@ -131,7 +133,7 @@ class WebDAVClient {
         await ensureDirectoryExists(remotePath);
       } catch (e) {
         // 继续尝试上传，可能目录已存在
-        print(e);
+        AppLogger.debug(e.toString());
       }
 
       final fileBytes = await localFile.readAsBytes();
@@ -150,21 +152,22 @@ class WebDAVClient {
       if (response.statusCode == 201 || response.statusCode == 204) {
         // 尝试从响应头中提取 ETag
         String? etag = response.headers['etag'];
-        
+
         // 如果响应头中没有 ETag，尝试重新获取文件信息
         if (etag == null || !ETagUtils.isValidEtag(etag)) {
-          print('[WebDAVClient] 上传响应中未找到有效 ETag，尝试重新获取文件信息');
+          AppLogger.debug('[WebDAVClient] 上传响应中未找到有效 ETag，尝试重新获取文件信息');
           try {
             final fileInfo = await getFileInfo(remotePath);
             etag = fileInfo?.etag;
           } catch (e) {
-            print('[WebDAVClient] 重新获取文件信息失败: $e');
+            AppLogger.debug('[WebDAVClient] 重新获取文件信息失败: $e');
           }
         }
-        
+
         final normalizedEtag = ETagUtils.normalizeEtag(etag);
-        print('[WebDAVClient] 上传成功，获取到 ETag: "$etag" → "$normalizedEtag"');
-        
+        AppLogger.debug(
+            '[WebDAVClient] 上传成功，获取到 ETag: "$etag" → "$normalizedEtag"');
+
         return WebDAVUploadResult(
           success: true,
           etag: normalizedEtag.isNotEmpty ? normalizedEtag : null,
@@ -226,7 +229,7 @@ class WebDAVClient {
 
         final streamedResponse = await client.send(request).timeout(timeout);
         final responseBody = await streamedResponse.stream.bytesToString();
-        print(responseBody);
+        AppLogger.debug(responseBody);
 
         if (streamedResponse.statusCode == 207) {
           return _parseFileInfoFromPropfind(responseBody, remotePath);
@@ -256,11 +259,13 @@ class WebDAVClient {
           RegExp(r'<[dD]:getlastmodified[^>]*>([^<]+)</[dD]:getlastmodified>');
       final contentLengthRegex = RegExp(
           r'<[dD]:getcontentlength[^>]*>([^<]+)</[dD]:getcontentlength>');
-      
+
       // 改进的 ETag 正则表达式，支持更多格式
-      final etagRegex = RegExp(r'<[dD]:getetag[^>]*>([^<]*)</[dD]:getetag>', caseSensitive: false);
+      final etagRegex = RegExp(r'<[dD]:getetag[^>]*>([^<]*)</[dD]:getetag>',
+          caseSensitive: false);
       // 备用 ETag 正则，用于某些服务器返回的格式
-      final etagRegexAlt = RegExp(r'<etag[^>]*>([^<]*)</etag>', caseSensitive: false);
+      final etagRegexAlt =
+          RegExp(r'<etag[^>]*>([^<]*)</etag>', caseSensitive: false);
 
       final lastModifiedMatch = lastModifiedRegex.firstMatch(xmlBody);
       final contentLengthMatch = contentLengthRegex.firstMatch(xmlBody);
@@ -276,18 +281,18 @@ class WebDAVClient {
 
         final etagMatch = etagRegex.firstMatch(xmlBody);
         final etagMatchAlt = etagRegexAlt.firstMatch(xmlBody);
-        
+
         // 尝试两种 ETag 格式
         final rawEtag = etagMatch?.group(1) ?? etagMatchAlt?.group(1) ?? '';
-        
+
         // 使用 ETagUtils 进行标准化处理
         final etag = ETagUtils.normalizeEtag(rawEtag);
-        
-        print('[WebDAVClient] 解析 ETag: 原始值="$rawEtag", 标准化后="$etag"');
-        
+
+        AppLogger.debug('[WebDAVClient] 解析 ETag: 原始值="$rawEtag", 标准化后="$etag"');
+
         // 验证 ETag 有效性
         if (!ETagUtils.isValidEtag(etag)) {
-          print('[WebDAVClient] 警告：解析的 ETag 无效，将使用空值');
+          AppLogger.debug('[WebDAVClient] 警告：解析的 ETag 无效，将使用空值');
         }
         return WebDAVFileInfo(
           path: remotePath,

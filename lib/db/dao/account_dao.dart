@@ -2,13 +2,12 @@ import 'package:drift/drift.dart';
 import 'package:flowm/db/tables/ledger_table.dart';
 import '../app_database.dart';
 import '../tables/account_table.dart';
-import '../tables/posting_table.dart';
 
 part 'account_dao.g.dart';
 
 @DriftAccessor(tables: [Accounts, Ledgers])
 class AccountDao extends DatabaseAccessor<AppDatabase> with _$AccountDaoMixin {
-  AccountDao(AppDatabase db) : super(db);
+  AccountDao(super.db);
 
   // Get all accounts
   Future<List<Account>> getAllAccounts() => select(accounts).get();

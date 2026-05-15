@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -118,7 +119,7 @@ class _AccountSelectorBottomSheetState
         _tabController.animateTo(correctIndex);
       }
     } catch (e) {
-      print('切换账户类型tab失败: $e');
+      AppLogger.debug('切换账户类型tab失败: $e');
       // 失败时保持当前tab
     }
   }
@@ -148,7 +149,7 @@ class _AccountSelectorBottomSheetState
       }
     } catch (e) {
       // 如果异步查找失败，使用基于名称的推断
-      print('查找账户类型失败: $e');
+      AppLogger.debug('查找账户类型失败: $e');
     }
 
     // fallback：使用基于名称的推断
@@ -393,7 +394,7 @@ final selectedAccount = await AccountSelectorBottomSheet.show(
   context,
   title: '选择账户',
   defaultAccountType: AccountSelectorType.asset,
-  selectedAccount: currentAccount, // 可选的当前选中账户  
+  selectedAccount: currentAccount, // 可选的当前选中账户
 );
 
 // 显示账户选择器，默认选中支出类型

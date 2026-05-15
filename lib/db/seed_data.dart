@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:drift/drift.dart';
 import 'dart:math'; // Added for Random
 import 'app_database.dart';
@@ -30,7 +31,7 @@ class SeedData {
       ),
     );
 
-    print('Created default ledger with ID: $personalLedgerId');
+    AppLogger.debug('Created default ledger with ID: $personalLedgerId');
     return personalLedgerId;
   }
 
@@ -778,9 +779,10 @@ class SeedData {
   }
 
   /// 生成带随机时间的日期时间
-  DateTime _generateRandomDateTime(Random random, DateTime date, {bool isWorkingHours = false}) {
+  DateTime _generateRandomDateTime(Random random, DateTime date,
+      {bool isWorkingHours = false}) {
     int randomHour, randomMinute;
-    
+
     if (isWorkingHours) {
       // 工作时间段 9:00-18:00
       randomHour = random.nextInt(10) + 9;
@@ -788,9 +790,9 @@ class SeedData {
       // 全天时间段 7:00-23:00
       randomHour = random.nextInt(17) + 7;
     }
-    
+
     randomMinute = random.nextInt(60);
-    
+
     return DateTime(
       date.year,
       date.month,
@@ -815,7 +817,7 @@ class SeedData {
       try {
         return allAccounts.firstWhere((a) => a.fullPath == path);
       } catch (e) {
-        print(
+        AppLogger.debug(
             'Account with path "$path" not found. It might not have been created yet or the path is incorrect.');
         return null;
       }
@@ -860,7 +862,7 @@ class SeedData {
         expenseAccounts.isEmpty ||
         incomeAccounts.isEmpty ||
         liabilityAccounts.isEmpty) {
-      print(
+      AppLogger.debug(
           'Warning: Not enough asset, expense, income, or liability accounts found for generating yearly transactions. Skipping generation.');
       return;
     }
@@ -945,7 +947,8 @@ class SeedData {
 
         final salaryTransactionId = await db.transactionDao.insertTransaction(
           TransactionsCompanion.insert(
-            transactionDate: _generateRandomDateTime(random, currentDate, isWorkingHours: true),
+            transactionDate: _generateRandomDateTime(random, currentDate,
+                isWorkingHours: true),
             description: Value(description),
           ),
         );
@@ -1237,7 +1240,8 @@ class SeedData {
         }
       }
     }
-    print('Finished generating monthly transactions for the past month.');
+    AppLogger.debug(
+        'Finished generating monthly transactions for the past month.');
   }
 
   /// Create default tags for transaction categorization

@@ -1,18 +1,19 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 /// 网络状态
 enum NetworkStatus {
-  online,     // 在线
-  offline,    // 离线
-  unknown,    // 未知
+  online, // 在线
+  offline, // 离线
+  unknown, // 未知
 }
 
 /// 网络状态监听服务
 class NetworkService {
   static NetworkStatus _currentStatus = NetworkStatus.unknown;
-  static final StreamController<NetworkStatus> _statusController = 
+  static final StreamController<NetworkStatus> _statusController =
       StreamController<NetworkStatus>.broadcast();
   static Timer? _checkTimer;
   static bool _isInitialized = false;
@@ -32,17 +33,17 @@ class NetworkService {
   /// 初始化网络监听
   static Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     _isInitialized = true;
-    
+
     // 立即检查一次网络状态
     await _checkNetworkStatus();
-    
+
     // 开始定期检查网络状态
     _startPeriodicCheck();
-    
+
     if (kDebugMode) {
-      print('[NetworkService] 网络监听已初始化，当前状态: $_currentStatus');
+      AppLogger.debug('[NetworkService] 网络监听已初始化，当前状态: $_currentStatus');
     }
   }
 
@@ -57,7 +58,7 @@ class NetworkService {
   /// 检查网络状态
   static Future<void> _checkNetworkStatus() async {
     NetworkStatus newStatus;
-    
+
     try {
       // 在Web环境中使用不同的检查方式
       if (kIsWeb) {
@@ -67,7 +68,7 @@ class NetworkService {
       }
     } catch (e) {
       if (kDebugMode) {
-        print('[NetworkService] 网络状态检查失败: $e');
+        AppLogger.debug('[NetworkService] 网络状态检查失败: $e');
       }
       newStatus = NetworkStatus.unknown;
     }
@@ -76,9 +77,10 @@ class NetworkService {
       final oldStatus = _currentStatus;
       _currentStatus = newStatus;
       _statusController.add(_currentStatus);
-      
+
       if (kDebugMode) {
-        print('[NetworkService] 网络状态变化: $oldStatus -> $_currentStatus');
+        AppLogger.debug(
+            '[NetworkService] 网络状态变化: $oldStatus -> $_currentStatus');
       }
     }
   }
@@ -91,7 +93,7 @@ class NetworkService {
         'dns.google',
         type: InternetAddressType.any,
       ).timeout(const Duration(seconds: 5));
-      
+
       if (addresses.isNotEmpty && addresses[0].rawAddress.isNotEmpty) {
         return NetworkStatus.online;
       } else {
@@ -107,13 +109,14 @@ class NetworkService {
     try {
       // Web环境中使用HTTP请求检查网络
       final client = HttpClient();
-      final request = await client.getUrl(Uri.parse('https://dns.google'))
+      final request = await client
+          .getUrl(Uri.parse('https://dns.google'))
           .timeout(const Duration(seconds: 5));
-      final response = await request.close()
-          .timeout(const Duration(seconds: 5));
-      
+      final response =
+          await request.close().timeout(const Duration(seconds: 5));
+
       client.close();
-      
+
       if (response.statusCode == 200) {
         return NetworkStatus.online;
       } else {
@@ -171,8 +174,8 @@ class NetworkService {
   /// 检查特定主机是否可达
   static Future<bool> canReachHost(String host, {int port = 80}) async {
     try {
-      final socket = await Socket.connect(host, port)
-          .timeout(const Duration(seconds: 5));
+      final socket =
+          await Socket.connect(host, port).timeout(const Duration(seconds: 5));
       socket.destroy();
       return true;
     } catch (e) {
@@ -185,9 +188,9 @@ class NetworkService {
     _checkTimer?.cancel();
     _checkTimer = null;
     _isInitialized = false;
-    
+
     if (kDebugMode) {
-      print('[NetworkService] 网络监听已停止');
+      AppLogger.debug('[NetworkService] 网络监听已停止');
     }
   }
 
@@ -208,12 +211,13 @@ class NetworkService {
     try {
       final uri = Uri.parse(url);
       final host = uri.host;
-      final port = uri.port != 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
-      
+      final port =
+          uri.port != 0 ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+
       return await canReachHost(host, port: port);
     } catch (e) {
       if (kDebugMode) {
-        print('[NetworkService] WebDAV服务器连接检查失败: $e');
+        AppLogger.debug('[NetworkService] WebDAV服务器连接检查失败: $e');
       }
       return false;
     }

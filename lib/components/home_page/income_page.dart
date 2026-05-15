@@ -367,26 +367,25 @@ class _IncomePageState extends ConsumerState<IncomePage>
                         try {
                           final pageData =
                               await ref.refresh(incomePageDataProvider.future);
+                          if (!mounted) return;
 
                           String title = _getCurrentTimeRangeTitle();
                           int daysInPeriod = _getCurrentDaysInPeriod();
 
-                          if (context.mounted) {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => FullscreenChartPage(
-                                  chartData: pageData.chartData,
-                                  daysInPeriod: daysInPeriod,
-                                  ledger: selectedLedger,
-                                  startDate: _getStartDateForChart(),
-                                  endDate: _getEndDateForChart(),
-                                  timeRangeTitle: title,
-                                  isLineChart: _isLineChart,
-                                  chartType: ChartType.income,
-                                ),
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FullscreenChartPage(
+                                chartData: pageData.chartData,
+                                daysInPeriod: daysInPeriod,
+                                ledger: selectedLedger,
+                                startDate: _getStartDateForChart(),
+                                endDate: _getEndDateForChart(),
+                                timeRangeTitle: title,
+                                isLineChart: _isLineChart,
+                                chartType: ChartType.income,
                               ),
-                            );
-                          }
+                            ),
+                          );
                         } catch (error) {
                           // Silently handle error in production
                         }

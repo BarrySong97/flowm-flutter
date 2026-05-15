@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/components/common/popover_select.dart';
 import 'package:flowm/state/account/account_repository.dart';
 import 'package:flowm/state/home_page/assets_page_providers.dart';
@@ -31,15 +32,6 @@ class _TopAssetsAccountDetailPageState
   String? _drilledDownAccountName; // State for current drill-down level
   bool _isAscending = false; // State for sort order
   // dynamic _currentAccount; // _currentAccount is assigned account but account is used directly.
-
-  @override
-  void initState() {
-    super.initState();
-    // _currentAccount = account; // account is directly accessible
-    // if (account != null) { // Constructor requires account, so it should not be null.
-    //   print('TopAssetsAccountDetailPage received account: ${account.name}');
-    // }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +95,8 @@ class _TopAssetsAccountDetailPageState
               );
 
               // 如果账户被删除，退出详情页面
-              if (isDeleted == true && mounted) {
+              if (!context.mounted) return;
+              if (isDeleted == true) {
                 Navigator.of(context).pop();
               }
             },
@@ -491,7 +484,7 @@ class _TopAssetsAccountDetailPageState
                                                   accountName;
                                             });
                                           } else {
-                                            print(
+                                            AppLogger.debug(
                                                 'Cannot drill down: $accountName has no children or was not found in the current view.');
                                           }
                                         },
@@ -502,7 +495,7 @@ class _TopAssetsAccountDetailPageState
                                                       acc.name == accountName);
                                           if (selectedAccountToNavigate !=
                                               null) {
-                                            print(
+                                            AppLogger.debug(
                                                 '双击 $accountName, 准备导航到详情页 for account: ${selectedAccountToNavigate.name}');
                                             bool hasChildren =
                                                 selectedAccountToNavigate

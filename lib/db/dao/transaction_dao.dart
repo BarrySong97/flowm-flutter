@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:drift/drift.dart';
 import '../app_database.dart';
 import '../tables/transaction_table.dart';
@@ -27,7 +28,7 @@ class TransactionWithAmount {
 @DriftAccessor(tables: [Transactions, Postings, Accounts])
 class TransactionDao extends DatabaseAccessor<AppDatabase>
     with _$TransactionDaoMixin {
-  TransactionDao(AppDatabase db) : super(db);
+  TransactionDao(super.db);
 
   // Get all transactions
   Future<List<Transaction>> getAllTransactions() => select(transactions).get();
@@ -86,7 +87,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
 
   // Watch all transactions (reactive stream)
   Stream<List<Transaction>> watchAllTransactions({int? ledgerId, int? limit}) {
-    print('watchAllTransactions: $ledgerId, $limit');
+    AppLogger.debug('watchAllTransactions: $ledgerId, $limit');
     if (ledgerId == null) {
       var query = select(transactions)
         ..orderBy([
@@ -220,7 +221,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(
       {required int limit, required int offset, int? ledgerId}) {
     //日志 ledgerId
-    print(
+    AppLogger.debug(
         'watchTransactionsWithAmountPaginated: ledgerId: $ledgerId, limit: $limit, offset: $offset');
 
     if (ledgerId != null) {
@@ -409,8 +410,6 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
           transactionAmount = firstPostingAmount.abs();
 
           // Determine from/to accounts and overall nature
-          double totalPositive = 0;
-          double totalNegative = 0;
           List<Account> positiveAccounts = [];
           List<Account> negativeAccounts = [];
 
@@ -418,10 +417,8 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
             final posting = rowData.readTable(db.postings);
             final account = rowData.readTable(db.accounts);
             if (posting.amount > 0) {
-              totalPositive += posting.amount;
               positiveAccounts.add(account);
             } else if (posting.amount < 0) {
-              totalNegative += posting.amount; // amount is negative
               negativeAccounts.add(account);
             }
           }
@@ -574,7 +571,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     // 首先找出与指定账户相关的交易ID
     return customSelect(
       '''
-      SELECT DISTINCT t.transaction_id 
+      SELECT DISTINCT t.transaction_id
       FROM transactions t
       JOIN postings p ON t.transaction_id = p.transaction_id
       WHERE p.account_id IN (${List.filled(accountIds.length, '?').join(',')})
@@ -742,7 +739,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   }) {
     return customSelect(
       '''
-      SELECT DISTINCT 
+      SELECT DISTINCT
         t.transaction_id,
         t.transaction_date,
         t.description,
@@ -779,8 +776,10 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       variables: [
         Variable.withInt(accountId),
         Variable.withInt(accountId),
-        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
-        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+        Variable.withDateTime(
+            DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(
+            DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).watch().map((rows) {
@@ -877,7 +876,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
 
     final results = await customSelect(
       '''
-      SELECT DISTINCT 
+      SELECT DISTINCT
         t.transaction_id,
         t.transaction_date,
         t.description,
@@ -915,8 +914,10 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       variables: [
         Variable.withInt(accountId),
         Variable.withInt(accountId),
-        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
-        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+        Variable.withDateTime(
+            DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(
+            DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).get();
@@ -1005,7 +1006,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
   // 获取分页的交易记录 (TransactionWithAmount) - Future版本
   Future<List<TransactionWithAmount>> getTransactionsWithAmountPaginated(
       {required int limit, required int offset, int? ledgerId}) async {
-    print(
+    AppLogger.debug(
         'getTransactionsWithAmountPaginated: ledgerId: $ledgerId, limit: $limit, offset: $offset');
 
     if (ledgerId != null) {
@@ -1188,14 +1189,16 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       -- 关联to账户（金额为正）
       LEFT JOIN postings pt ON t.transaction_id = pt.transaction_id AND pt.amount > 0
       LEFT JOIN accounts at ON pt.account_id = at.account_id
-      WHERE t.transaction_date >= ? 
+      WHERE t.transaction_date >= ?
         AND t.transaction_date <= ?
       ORDER BY t.transaction_date DESC, t.transaction_id DESC
       ''',
       variables: [
         Variable.withInt(ledgerId),
-        Variable.withDateTime(DateTime(startDate.year, startDate.month, startDate.day)),
-        Variable.withDateTime(DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
+        Variable.withDateTime(
+            DateTime(startDate.year, startDate.month, startDate.day)),
+        Variable.withDateTime(
+            DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59)),
       ],
       readsFrom: {transactions, postings, accounts},
     ).get();
@@ -1324,7 +1327,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
       -- 关联to账户（金额为正）
       LEFT JOIN postings pt ON t.transaction_id = pt.transaction_id AND pt.amount > 0
       LEFT JOIN accounts at ON pt.account_id = at.account_id
-      WHERE t.transaction_date >= ? 
+      WHERE t.transaction_date >= ?
         AND t.transaction_date <= ?
       ORDER BY t.transaction_date DESC, t.transaction_id DESC
       ''',
@@ -1446,14 +1449,20 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     // 执行查询
     final List<Map<String, Object?>> result;
     if (ledgerId != null) {
-      result = await db.customSelect(query, variables: [
-        Variable.withString(description),
-        Variable.withInt(ledgerId),
-      ]).get().then((rows) => rows.map((row) => row.data).toList());
+      result = await db
+          .customSelect(query, variables: [
+            Variable.withString(description),
+            Variable.withInt(ledgerId),
+          ])
+          .get()
+          .then((rows) => rows.map((row) => row.data).toList());
     } else {
-      result = await db.customSelect(query, variables: [
-        Variable.withString(description),
-      ]).get().then((rows) => rows.map((row) => row.data).toList());
+      result = await db
+          .customSelect(query, variables: [
+            Variable.withString(description),
+          ])
+          .get()
+          .then((rows) => rows.map((row) => row.data).toList());
     }
 
     // 如果没有找到交易，返回null
@@ -1481,7 +1490,7 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     String query = '''
       SELECT description, COUNT(*) as count
       FROM transactions t
-      WHERE description IS NOT NULL 
+      WHERE description IS NOT NULL
         AND description != ''
     ''';
 
@@ -1506,14 +1515,20 @@ class TransactionDao extends DatabaseAccessor<AppDatabase>
     // 执行查询
     final List<Map<String, Object?>> result;
     if (ledgerId != null) {
-      result = await db.customSelect(query, variables: [
-        Variable.withInt(ledgerId),
-        Variable.withInt(limit),
-      ]).get().then((rows) => rows.map((row) => row.data).toList());
+      result = await db
+          .customSelect(query, variables: [
+            Variable.withInt(ledgerId),
+            Variable.withInt(limit),
+          ])
+          .get()
+          .then((rows) => rows.map((row) => row.data).toList());
     } else {
-      result = await db.customSelect(query, variables: [
-        Variable.withInt(limit),
-      ]).get().then((rows) => rows.map((row) => row.data).toList());
+      result = await db
+          .customSelect(query, variables: [
+            Variable.withInt(limit),
+          ])
+          .get()
+          .then((rows) => rows.map((row) => row.data).toList());
     }
 
     // 转换结果

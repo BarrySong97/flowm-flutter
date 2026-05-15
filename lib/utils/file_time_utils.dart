@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:io';
 
 /// 文件时间处理工具类
@@ -32,7 +33,7 @@ class FileTimeUtils {
     if (time1 == null && time2 == null) return 0;
     if (time1 == null) return -1;
     if (time2 == null) return 1;
-    
+
     return time1.compareTo(time2);
   }
 
@@ -46,7 +47,7 @@ class FileTimeUtils {
       }
       return null;
     } catch (e) {
-      print('[FileTimeUtils] 获取本地数据库时间失败: $e');
+      AppLogger.debug('[FileTimeUtils] 获取本地数据库时间失败: $e');
       return null;
     }
   }

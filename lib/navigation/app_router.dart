@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/pages/assets/assets_detail_page.dart';
 import 'package:flowm/pages/liabilities/liabilities_detail_page.dart';
 import 'package:flowm/pages/expense/expense_detail_page.dart';
@@ -23,7 +22,7 @@ import 'package:flowm/pages/account_management_page.dart';
 class AppRouter {
   // 全局导航器键
   static final navigatorKey = GlobalKey<NavigatorState>();
-  
+
   static final router = GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: '/splash',

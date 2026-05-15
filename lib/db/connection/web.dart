@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/wasm.dart';
 import 'package:flutter/foundation.dart';
@@ -11,7 +12,7 @@ QueryExecutor openConnection() {
     );
 
     if (result.missingFeatures.isNotEmpty && kDebugMode) {
-      print(
+      AppLogger.debug(
           'Using ${result.chosenImplementation} due to missing browser features: ${result.missingFeatures}');
     }
 

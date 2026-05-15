@@ -659,7 +659,7 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                   onPressed: () async {
                     // Get current ledger for currency symbol
                     final currentLedger =
-                        await ref.read(selectedLedgerProvider.future);
+                        ref.read(selectedLedgerProvider).value;
 
                     // Convert database Account to UI Account
                     final uiAccount = ui.Account(
@@ -676,7 +676,8 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                     );
 
                     // 如果账户被删除，退出详情页面
-                    if (isDeleted == true && mounted) {
+                    if (!context.mounted) return;
+                    if (isDeleted == true) {
                       Navigator.of(context).pop();
                     }
                   },
@@ -886,8 +887,10 @@ class _ExpensesIncomeDetailPageState extends ConsumerState<ExpensesDetailPage> {
                                                       expenseChartDataProvider(
                                                           account.accountData
                                                               .accountId));
-                                                  if (!chartDataValue.hasValue)
+                                                  if (!chartDataValue
+                                                      .hasValue) {
                                                     return;
+                                                  }
                                                   final chartData =
                                                       chartDataValue.value!;
 
@@ -1017,11 +1020,11 @@ class AccountTransactionList extends ConsumerWidget {
   final DateTime endDate;
 
   const AccountTransactionList({
-    Key? key,
+    super.key,
     required this.account,
     required this.startDate,
     required this.endDate,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1037,7 +1040,7 @@ class AccountTransactionList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),

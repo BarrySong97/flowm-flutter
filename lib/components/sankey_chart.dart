@@ -10,6 +10,8 @@ import 'package:sankey_flutter/sankey_node.dart';
 /// It sets the app title, theme, and uses a [Scaffold] to provide an app bar and a body
 /// that renders the Sankey diagram
 class SankeyChart extends StatelessWidget {
+  const SankeyChart({super.key});
+
   @override
   Widget build(BuildContext context) {
     return SankeyComplexDiagramWidget();
@@ -21,8 +23,10 @@ class SankeyChart extends StatelessWidget {
 /// This widget builds a Sankey diagram using data defined in the [initState] method
 /// It also handles user tap interactions to select nodes
 class SankeyComplexDiagramWidget extends StatefulWidget {
+  const SankeyComplexDiagramWidget({super.key});
+
   @override
-  _SankeyComplexDiagramWidgetState createState() =>
+  State<SankeyComplexDiagramWidget> createState() =>
       _SankeyComplexDiagramWidgetState();
 }
 

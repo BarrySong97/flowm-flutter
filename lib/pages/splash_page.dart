@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,18 +18,13 @@ class SplashPage extends ConsumerStatefulWidget {
 
 class _SplashPageState extends ConsumerState<SplashPage>
     with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _scaleController;
   late AnimationController _titleController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
   late Animation<double> _titleFadeAnimation;
   late Animation<Offset> _titleSlideAnimation;
   late Animation<double> _subtitleFadeAnimation;
   late Animation<Offset> _subtitleSlideAnimation;
   bool _isInitialized = false;
   String _displayText = '数据初始化中...';
-  String _subtitleText = '正在准备您的财务数据';
   bool _hasNavigated = false;
 
   // 新增：同步相关状态
@@ -40,41 +36,11 @@ class _SplashPageState extends ConsumerState<SplashPage>
   void initState() {
     super.initState();
 
-    // 淡入动画控制器
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-
-    // 缩放动画控制器
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
     // 标题动画控制器
     _titleController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-
-    // 淡入动画
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-
-    // 缩放动画
-    _scaleAnimation = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
-    ));
 
     // "流记"标题浮现动画
     _titleFadeAnimation = Tween<double>(
@@ -119,8 +85,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
     await Future.delayed(const Duration(milliseconds: 200));
 
     // 同时启动动画
-    _fadeController.forward();
-    _scaleController.forward();
     _titleController.forward();
   }
 
@@ -129,7 +93,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
       setState(() {
         _isInitialized = true;
         _displayText = 'FLOWM';
-        _subtitleText = '智能财务管理';
       });
 
       // 数据库初始化完成后，检查是否需要同步
@@ -155,7 +118,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
           lastLocalHash != null ||
           lastRemoteHash != null;
     } catch (e) {
-      print('[SplashPage] 检查同步历史失败: $e');
+      AppLogger.debug('[SplashPage] 检查同步历史失败: $e');
       return false;
     }
   }
@@ -166,17 +129,15 @@ class _SplashPageState extends ConsumerState<SplashPage>
       setState(() {
         _isSyncing = true;
         _syncProgress = '检查同步状态...';
-        _subtitleText = _syncProgress;
       });
 
       final checkResult = await AutoSyncService.checkStartupSync();
 
       if (!checkResult.shouldSync) {
         // 不需要同步
-        print('[SplashPage] 不需要同步: ${checkResult.message}');
+        AppLogger.debug('[SplashPage] 不需要同步: ${checkResult.message}');
         setState(() {
           _isSyncing = false;
-          _subtitleText = '智能财务管理';
         });
         return;
       }
@@ -185,7 +146,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
         // 有冲突，需要用户选择
         setState(() {
           _isSyncing = false;
-          _subtitleText = '检测到数据差异';
         });
 
         // 检查是否为首次配置情况
@@ -208,7 +168,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
           if (mounted) {
             setState(() {
               _syncProgress = progress;
-              _subtitleText = progress;
             });
           }
         },
@@ -217,9 +176,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
       setState(() {
         _isSyncing = false;
         if (success) {
-          _subtitleText = '同步完成';
         } else {
-          _subtitleText = '同步失败，使用本地数据';
           _hasSyncError = true;
         }
       });
@@ -231,10 +188,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
         });
       }
     } catch (e) {
-      print('[SplashPage] 同步检查失败: $e');
+      AppLogger.debug('[SplashPage] 同步检查失败: $e');
       setState(() {
         _isSyncing = false;
-        _subtitleText = '同步检查失败，使用本地数据';
         _hasSyncError = true;
       });
 
@@ -315,7 +271,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
             ],
-            
+
             const SizedBox(height: 16),
             // 覆盖警告
             Container(
@@ -346,7 +302,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
             // WebDAV版本信息
             Container(
@@ -359,7 +315,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -380,7 +337,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
                             text: '💾 数据备份：',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                          TextSpan(
+                              text:
+                                  '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
                         ],
                       ),
                     ),
@@ -442,16 +401,18 @@ class _SplashPageState extends ConsumerState<SplashPage>
           children: [
             const Text('本地和服务器的数据都有更新，请选择如何处理：'),
             const SizedBox(height: 16),
-            
+
             // 文件信息对比
             SyncDialogHelper.buildFileInfoContainer(
               conflict: conflict,
-              localIsNewerChecker: (c) => c.localModified.isAfter(c.remoteModified),
-              remoteIsNewerChecker: (c) => c.remoteModified.isAfter(c.localModified),
+              localIsNewerChecker: (c) =>
+                  c.localModified.isAfter(c.remoteModified),
+              remoteIsNewerChecker: (c) =>
+                  c.remoteModified.isAfter(c.localModified),
               dateFormatter: _formatDateTime,
               sizeFormatter: _formatFileSize,
             ),
-            
+
             // 智能建议
             if (recommendation.message.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -461,7 +422,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 icon: recommendation.icon,
               ),
             ],
-            
+
             const SizedBox(height: 12),
             // 覆盖警告
             Container(
@@ -489,7 +450,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 12),
             // WebDAV版本信息
             Container(
@@ -502,7 +463,8 @@ class _SplashPageState extends ConsumerState<SplashPage>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info_outline,
+                      color: Colors.blue.shade600, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -523,7 +485,9 @@ class _SplashPageState extends ConsumerState<SplashPage>
                             text: '💾 数据备份：',
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          TextSpan(text: '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
+                          TextSpan(
+                              text:
+                                  '大多WebDAV服务器具有文件历史版本功能，被覆盖的数据可能可以从服务器历史记录中恢复。'),
                         ],
                       ),
                     ),
@@ -541,14 +505,16 @@ class _SplashPageState extends ConsumerState<SplashPage>
           SyncDialogHelper.buildConflictButton(
             text: '使用服务器数据',
             onPressed: () => Navigator.of(context).pop(SyncDirection.download),
-            isRecommended: recommendation.recommendedAction == ConflictButtonType.useRemote,
+            isRecommended: recommendation.recommendedAction ==
+                ConflictButtonType.useRemote,
             buttonType: ConflictButtonType.useRemote,
           ),
           const SizedBox(width: 8),
           SyncDialogHelper.buildConflictButton(
             text: '使用本地数据',
             onPressed: () => Navigator.of(context).pop(SyncDirection.upload),
-            isRecommended: recommendation.recommendedAction == ConflictButtonType.useLocal,
+            isRecommended:
+                recommendation.recommendedAction == ConflictButtonType.useLocal,
             buttonType: ConflictButtonType.useLocal,
             isElevated: true,
           ),
@@ -584,20 +550,16 @@ class _SplashPageState extends ConsumerState<SplashPage>
         _isSyncing = true;
         _syncProgress =
             action == SyncDirection.download ? '正在下载服务器数据...' : '正在上传本地数据...';
-        _subtitleText = _syncProgress;
       });
 
       final success = await AutoSyncService.forcSync(ref, action);
 
       setState(() {
         _isSyncing = false;
-        _subtitleText = success ? '同步完成' : '同步失败';
         _hasSyncError = !success;
       });
     } else {
-      setState(() {
-        _subtitleText = '跳过同步，使用本地数据';
-      });
+      setState(() {});
     }
 
     // 冲突处理完成后跳转
@@ -638,7 +600,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
       setState(() {
         _isInitialized = true;
         _displayText = 'Flowm';
-        _subtitleText = '智能财务管理';
       });
 
       Future.delayed(const Duration(milliseconds: 1000), () {
@@ -656,8 +617,6 @@ class _SplashPageState extends ConsumerState<SplashPage>
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _scaleController.dispose();
     _titleController.dispose();
     super.dispose();
   }
@@ -677,7 +636,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
     );
 
     return Scaffold(
-      body: Container(
+      body: SizedBox(
         width: double.infinity,
         height: double.infinity,
         // decoration: const BoxDecoration(

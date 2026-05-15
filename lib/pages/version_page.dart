@@ -1,7 +1,7 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/services.dart';
 
 class VersionPage extends StatefulWidget {
@@ -34,22 +34,23 @@ class _VersionPageState extends State<VersionPage> {
     try {
       final versions = ['1.3.5', '1.3.4']; // 只使用最新版本文件
       List<Map<String, dynamic>> history = [];
-      
+
       for (String version in versions) {
         try {
-          final String response = await rootBundle.loadString('lib/version/version_$version.json');
+          final String response =
+              await rootBundle.loadString('lib/version/version_$version.json');
           final Map<String, dynamic> versionData = json.decode(response);
           history.add(versionData);
         } catch (e) {
-          print('Error loading version $version: $e');
+          AppLogger.debug('Error loading version $version: $e');
         }
       }
-      
+
       setState(() {
         versionHistory = history;
       });
     } catch (e) {
-      print('Error loading version history: $e');
+      AppLogger.debug('Error loading version history: $e');
     }
   }
 
@@ -158,8 +159,10 @@ class _VersionPageState extends State<VersionPage> {
               ),
               const SizedBox(height: 16),
               // Version history
-              ...versionHistory.asMap().entries.map((entry) => 
-                _buildVersionCard(entry.value, entry.key)).toList(),
+              ...versionHistory
+                  .asMap()
+                  .entries
+                  .map((entry) => _buildVersionCard(entry.value, entry.key)),
             ],
           ),
         ),
@@ -191,7 +194,7 @@ class _VersionPageState extends State<VersionPage> {
 
   Widget _buildVersionCard(Map<String, dynamic> version, int index) {
     final bool isExpanded = expandedVersions.contains(index);
-    
+
     return Column(
       children: [
         Container(
@@ -268,50 +271,61 @@ class _VersionPageState extends State<VersionPage> {
                   ),
                 ),
               ),
-              
+
               // Expandable content
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 height: isExpanded ? null : 0,
-                child: isExpanded ? Padding(
-                  padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      
-                      // Features section
-                      if (version['features'] != null && version['features'].isNotEmpty) ...[
-                        const Text(
-                          '✨ 新功能',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
+                child: isExpanded
+                    ? Padding(
+                        padding: const EdgeInsets.only(
+                            left: 20.0, right: 20.0, bottom: 20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+
+                            // Features section
+                            if (version['features'] != null &&
+                                version['features'].isNotEmpty) ...[
+                              const Text(
+                                '✨ 新功能',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...version['features']
+                                  .map<Widget>(
+                                      (feature) => _buildFeatureItem(feature))
+                                  .toList(),
+                              const SizedBox(height: 12),
+                            ],
+
+                            // Improvements section
+                            if (version['improvements'] != null &&
+                                version['improvements'].isNotEmpty) ...[
+                              const Text(
+                                '🔧 改进优化',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...version['improvements']
+                                  .map<Widget>((improvement) =>
+                                      _buildFeatureItem(improvement))
+                                  .toList(),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        ...version['features'].map<Widget>((feature) => _buildFeatureItem(feature)).toList(),
-                        const SizedBox(height: 12),
-                      ],
-                      
-                      // Improvements section
-                      if (version['improvements'] != null && version['improvements'].isNotEmpty) ...[
-                        const Text(
-                          '🔧 改进优化',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...version['improvements'].map<Widget>((improvement) => _buildFeatureItem(improvement)).toList(),
-                      ],
-                    ],
-                  ),
-                ) : const SizedBox.shrink(),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ],
           ),

@@ -8,7 +8,7 @@ part 'account_config_dao.g.dart';
 @DriftAccessor(tables: [AccountConfigs])
 class AccountConfigDao extends DatabaseAccessor<AppDatabase>
     with _$AccountConfigDaoMixin {
-  AccountConfigDao(AppDatabase db) : super(db);
+  AccountConfigDao(super.db);
 
   // Basic CRUD operations
 

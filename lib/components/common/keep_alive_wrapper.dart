@@ -4,9 +4,9 @@ class KeepAliveWrapper extends StatefulWidget {
   final Widget child;
 
   const KeepAliveWrapper({
-    Key? key,
+    super.key,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<KeepAliveWrapper> createState() => _KeepAliveWrapperState();
@@ -29,10 +29,10 @@ class LazyLoadPageWrapper extends StatefulWidget {
   final bool isCurrentPage;
 
   const LazyLoadPageWrapper({
-    Key? key,
+    super.key,
     required this.builder,
     required this.isCurrentPage,
-  }) : super(key: key);
+  });
 
   @override
   State<LazyLoadPageWrapper> createState() => _LazyLoadPageWrapperState();
@@ -64,11 +64,11 @@ class LazyPageWidget extends StatefulWidget {
   final PageController controller;
 
   const LazyPageWidget({
-    Key? key,
+    super.key,
     required this.builder,
     required this.index,
     required this.controller,
-  }) : super(key: key);
+  });
 
   @override
   State<LazyPageWidget> createState() => _LazyPageWidgetState();

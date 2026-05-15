@@ -5,9 +5,9 @@ class AccountList extends StatelessWidget {
   final List<Account> accounts;
 
   const AccountList({
-    Key? key,
+    super.key,
     required this.accounts,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

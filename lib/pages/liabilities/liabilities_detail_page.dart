@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
 import 'package:flowm/components/chart/liability_trend_chart.dart';
@@ -5,11 +6,9 @@ import 'package:flowm/state/account/account_info_provider.dart';
 import 'package:flowm/state/liabilities/liabilities_repository.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flowm/components/common/time_range_selector.dart';
 import 'package:flowm/components/common/transaction_list_item.dart';
-import 'package:flowm/state/assets/assets_repository.dart';
 import 'package:flowm/utils/transaction_type_map.dart';
 import 'package:flowm/db/dao/transaction_dao.dart';
 import 'package:flowm/db/tables/account_table.dart';
@@ -20,8 +19,7 @@ import 'package:flowm/config/app_constants.dart';
 
 class LiabilitiesDetailPage extends ConsumerStatefulWidget {
   final int accountId;
-  const LiabilitiesDetailPage({Key? key, required this.accountId})
-      : super(key: key);
+  const LiabilitiesDetailPage({super.key, required this.accountId});
 
   @override
   ConsumerState<LiabilitiesDetailPage> createState() =>
@@ -58,7 +56,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
 
   void _onTimeRangeChanged(TimeRange timeRange) {
     // 处理时间范围变化的逻辑
-    print('Time range changed to: ${timeRange.label}');
+    AppLogger.debug('Time range changed to: ${timeRange.label}');
     // 在这里可以添加更多逻辑，比如刷新数据、更新图表等
   }
 
@@ -74,7 +72,7 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
   Widget build(BuildContext context) {
     // 动态获取账户信息
     final accountAsync = ref.watch(accountInfoProvider(widget.accountId));
-    
+
     return accountAsync.when(
       data: (account) => _buildDetailPage(context, account),
       loading: () => Scaffold(
@@ -173,33 +171,34 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                                   child: AnimatedOpacity(
                                     opacity: _isCollapsed ? 0.0 : 1.0,
                                     duration: const Duration(milliseconds: 250),
-                                    child: Container(
-                                      child: Consumer(
-                                          builder: (context, ref, child) {
-                                        final liabilityTrendAsync = ref.watch(
-                                            liabilityTrendProviderByTimeRange((
-                                          accountId: account.id,
-                                          timeRange: _selectedTimeRange
-                                        )));
-                                        final selectedLedger = ref.watch(selectedLedgerProvider).value;
-                                        return liabilityTrendAsync.when(
-                                          data: (liabilityData) {
-                                            if (liabilityData.isEmpty) {
-                                              return const Center(
-                                                  child: Text('暂无该时间段负债趋势数据'));
-                                            }
-                                            return LiabilityTrendChart(
-                                                liabilityData: liabilityData,
-                                                currencySymbol: selectedLedger?.currencySymbol ?? '¥');
-                                          },
-                                          loading: () => const Center(
-                                              child:
-                                                  CircularProgressIndicator()),
-                                          error: (error, stack) => Center(
-                                              child: Text('加载趋势图失败: $error')),
-                                        );
-                                      }),
-                                    ),
+                                    child: Consumer(
+                                        builder: (context, ref, child) {
+                                      final liabilityTrendAsync = ref.watch(
+                                          liabilityTrendProviderByTimeRange((
+                                        accountId: account.id,
+                                        timeRange: _selectedTimeRange
+                                      )));
+                                      final selectedLedger = ref
+                                          .watch(selectedLedgerProvider)
+                                          .value;
+                                      return liabilityTrendAsync.when(
+                                        data: (liabilityData) {
+                                          if (liabilityData.isEmpty) {
+                                            return const Center(
+                                                child: Text('暂无该时间段负债趋势数据'));
+                                          }
+                                          return LiabilityTrendChart(
+                                              liabilityData: liabilityData,
+                                              currencySymbol: selectedLedger
+                                                      ?.currencySymbol ??
+                                                  '¥');
+                                        },
+                                        loading: () => const Center(
+                                            child: CircularProgressIndicator()),
+                                        error: (error, stack) => Center(
+                                            child: Text('加载趋势图失败: $error')),
+                                      );
+                                    }),
                                   ),
                                 ),
 
@@ -242,9 +241,10 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
                       context,
                       accountToUpdate: account,
                     );
-                    
+
                     // 如果账户被删除，退出详情页面
-                    if (isDeleted == true && mounted) {
+                    if (!context.mounted) return;
+                    if (isDeleted == true) {
                       Navigator.of(context).pop();
                     }
                   },
@@ -285,95 +285,6 @@ class _LiabilitiesDetailPageState extends ConsumerState<LiabilitiesDetailPage>
       ),
     );
   }
-
-  Widget _buildDetailItem(String label, String amount) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          amount,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTabSelector() {
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Stack(
-        children: [
-          // Animated selection indicator
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            left: _tabController.index *
-                (MediaQuery.of(context).size.width - 32) /
-                3,
-            top: 0,
-            bottom: 0,
-            width: (MediaQuery.of(context).size.width - 32) / 3,
-            child: Padding(
-              padding: const EdgeInsets.all(2.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-          // Tab buttons
-          Row(
-            children: [
-              Expanded(child: _buildTabButton('Profit & Loss', 0)),
-              Expanded(child: _buildTabButton('Balance', 1)),
-              Expanded(child: _buildTabButton('Token Balance', 2)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabButton(String text, int index) {
-    return GestureDetector(
-      onTap: () {
-        _tabController.animateTo(index);
-      },
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _tabController.index == index ? Colors.black87 : Colors.grey,
-            fontWeight: _tabController.index == index
-                ? FontWeight.w600
-                : FontWeight.normal,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // 独立的页面主体内容 Widget
@@ -384,12 +295,12 @@ class AssetsDetailBody extends StatelessWidget {
   final Function(String) onFlowChanged;
 
   const AssetsDetailBody({
-    Key? key,
+    super.key,
     required this.account,
     required this.selectedFlow,
     required this.selectedTimeRange,
     required this.onFlowChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +335,7 @@ class AssetsDetailBody extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -493,6 +404,7 @@ class SankeyChartWidget extends ConsumerWidget {
   final TimeRange selectedTimeRange;
 
   const SankeyChartWidget({
+    super.key,
     required this.account,
     required this.selectedFlow,
     required this.selectedTimeRange,
@@ -506,7 +418,8 @@ class SankeyChartWidget extends ConsumerWidget {
       flow: selectedFlow,
       timeRange: selectedTimeRange,
       limit: 50,
-      currencySymbol: selectedLedger?.currencySymbol ?? AppConstants.currencySymbol,
+      currencySymbol:
+          selectedLedger?.currencySymbol ?? AppConstants.currencySymbol,
     )));
 
     return Container(
@@ -515,7 +428,7 @@ class SankeyChartWidget extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -629,7 +542,7 @@ class SankeyChartWidget extends ConsumerWidget {
                       nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
                       selectedNodeId: null,
                       onNodeTap: (nodeId) {
-                        print('点击了节点: $nodeId');
+                        AppLogger.debug('点击了节点: $nodeId');
                         // 这里可以添加节点点击的处理逻辑
                       },
                       size: Size(calculatedWidth, calculatedHeight),
@@ -685,10 +598,10 @@ class AccountTransactionList extends ConsumerWidget {
   final TimeRange selectedTimeRange;
 
   const AccountTransactionList({
-    Key? key,
+    super.key,
     required this.account,
     required this.selectedTimeRange,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -704,7 +617,7 @@ class AccountTransactionList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -792,7 +705,8 @@ class AccountTransactionList extends ConsumerWidget {
 
               // 对每日内的交易按时间降序排序（最新的在前）
               groupedTransactions.forEach((date, transactions) {
-                transactions.sort((a, b) => b.transaction.transactionDate.compareTo(a.transaction.transactionDate));
+                transactions.sort((a, b) => b.transaction.transactionDate
+                    .compareTo(a.transaction.transactionDate));
               });
 
               // 按日期降序排列
@@ -824,8 +738,9 @@ class AccountTransactionList extends ConsumerWidget {
                     }
                   }
 
-                  final formatter =
-                      NumberFormat.currency(locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
+                  final formatter = NumberFormat.currency(
+                      locale: 'zh_CN',
+                      symbol: selectedLedger?.currencySymbol ?? '¥');
                   final formattedDailyIn = formatter.format(dailyIn);
                   final formattedDailyOut = formatter.format(dailyOut);
 
@@ -884,14 +799,18 @@ class AccountTransactionList extends ConsumerWidget {
                               TransactionNature.OUTFLOW;
 
                           final formatter = NumberFormat.currency(
-                              locale: 'zh_CN', symbol: selectedLedger?.currencySymbol ?? '¥');
+                              locale: 'zh_CN',
+                              symbol: selectedLedger?.currencySymbol ?? '¥');
                           final formattedAmount = formatter
                               .format(transactionWithAmount.amount.abs());
 
                           // 格式化时间为 HH:mm 格式，如果是 00:00 则不显示
                           final timeFormatter = DateFormat('HH:mm');
-                          final formattedTime = timeFormatter.format(transaction.transactionDate);
-                          final timeDisplay = formattedTime == '00:00' ? '' : ' · $formattedTime';
+                          final formattedTime =
+                              timeFormatter.format(transaction.transactionDate);
+                          final timeDisplay = formattedTime == '00:00'
+                              ? ''
+                              : ' · $formattedTime';
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(

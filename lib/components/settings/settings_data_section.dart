@@ -32,77 +32,75 @@ class SettingsDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6.0),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6.0),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              indent: 56,
+              endIndent: 0,
+              color: Colors.grey[200],
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: items.length,
-              separatorBuilder: (context, index) => Divider(
-                height: 1,
-                indent: 56,
-                endIndent: 0,
-                color: Colors.grey[200],
-              ),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Icon(
-                        item.icon,
-                        color: Colors.black87,
-                      ),
-                      title: Text(item.title),
-                      subtitle: item.subtitle != null
-                          ? Text(
-                              item.subtitle!,
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            )
-                          : null,
-                      trailing: item.trailing ??
-                          (item.showArrow
-                              ? Icon(
-                                  Icons.chevron_right,
-                                  color: Colors.grey[400],
-                                )
-                              : null),
-                      onTap: item.onTap,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Column(
+                children: [
+                  ListTile(
+                    leading: Icon(
+                      item.icon,
+                      color: Colors.black87,
                     ),
-                    if (item.customContent != null)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                            left: 16, right: 16, bottom: 8),
-                        child: item.customContent!,
-                      ),
-                  ],
-                );
-              },
-            ),
+                    title: Text(item.title),
+                    subtitle: item.subtitle != null
+                        ? Text(
+                            item.subtitle!,
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          )
+                        : null,
+                    trailing: item.trailing ??
+                        (item.showArrow
+                            ? Icon(
+                                Icons.chevron_right,
+                                color: Colors.grey[400],
+                              )
+                            : null),
+                    onTap: item.onTap,
+                  ),
+                  if (item.customContent != null)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                      child: item.customContent!,
+                    ),
+                ],
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

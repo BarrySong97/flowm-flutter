@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -107,7 +108,8 @@ class AutoSyncService {
   /// 场景A：启动时检查是否需要同步
   static Future<SyncCheckResult> checkStartupSync() async {
     final startTime = DateTime.now();
-    print('[AutoSyncService] 开始启动时同步检查 - ${startTime.toIso8601String()}');
+    AppLogger.debug(
+        '[AutoSyncService] 开始启动时同步检查 - ${startTime.toIso8601String()}');
 
     try {
       // 检查WebDAV配置
@@ -123,23 +125,22 @@ class AutoSyncService {
       // 检查是否曾经同步过
       final hasEverSynced = await _hasEverSynced();
 
-      // 如果从未同步过，进入首次配置处理流程
+      // 如果从未同步过，记录状态后继续使用现有智能判断流程
       if (!hasEverSynced) {
-        print('[AutoSyncService] 检测到从未同步过，进入首次配置处理');
-        // return await _handleFirstTimeSync(localTime, remoteTime, syncService);
+        AppLogger.debug('[AutoSyncService] 检测到从未同步过，进入首次配置处理');
       }
 
       // 分析同步需求
       final result = await _analyzeSyncNeed(syncService);
 
       final duration = DateTime.now().difference(startTime);
-      print(
+      AppLogger.debug(
           '[AutoSyncService] 启动时同步检查完成，耗时: ${duration.inMilliseconds}ms，结果: ${result.message}');
 
       return result;
     } catch (e) {
       final duration = DateTime.now().difference(startTime);
-      print(
+      AppLogger.debug(
           '[AutoSyncService] 启动时同步检查失败，耗时: ${duration.inMilliseconds}ms，错误: $e');
 
       return SyncCheckResult.error('同步检查失败: $e');
@@ -151,22 +152,22 @@ class AutoSyncService {
     DatabaseSyncService syncService,
   ) async {
     try {
-      print('[AutoSyncService] 开始基于 ETag/Hash 的同步分析');
-      
+      AppLogger.debug('[AutoSyncService] 开始基于 ETag/Hash 的同步分析');
+
       // 1. 获取本地文件哈希
       String? currentLocalHash;
       try {
         final dbFile = await syncService.getDatabaseFile();
         if (await dbFile.exists()) {
           currentLocalHash = await syncService.calculateFileHash(dbFile);
-          print('[AutoSyncService] 本地文件哈希: $currentLocalHash');
+          AppLogger.debug('[AutoSyncService] 本地文件哈希: $currentLocalHash');
         } else {
-          print('[AutoSyncService] 本地文件不存在');
+          AppLogger.debug('[AutoSyncService] 本地文件不存在');
         }
       } catch (e) {
-        print('[AutoSyncService] 获取本地文件哈希失败: $e');
+        AppLogger.debug('[AutoSyncService] 获取本地文件哈希失败: $e');
       }
-      
+
       // 2. 获取远程文件信息
       RemoteSyncInfo? currentRemoteInfo;
       try {
@@ -174,18 +175,18 @@ class AutoSyncService {
             .getFileInfo(syncService.remoteDatabasePath);
         if (remoteFileInfo != null) {
           currentRemoteInfo = RemoteSyncInfo.fromWebDAVFileInfo(remoteFileInfo);
-          print('[AutoSyncService] 远程文件信息: $currentRemoteInfo');
+          AppLogger.debug('[AutoSyncService] 远程文件信息: $currentRemoteInfo');
         } else {
-          print('[AutoSyncService] 远程文件不存在');
+          AppLogger.debug('[AutoSyncService] 远程文件不存在');
         }
       } catch (e) {
-        print('[AutoSyncService] 获取远程文件信息失败: $e');
+        AppLogger.debug('[AutoSyncService] 获取远程文件信息失败: $e');
       }
-      
+
       // 3. 获取上次同步记录
       final lastSyncRecord = await WebDAVConfig.getSyncRecord();
-      print('[AutoSyncService] 上次同步记录: $lastSyncRecord');
-      
+      AppLogger.debug('[AutoSyncService] 上次同步记录: $lastSyncRecord');
+
       // 4. 使用同步分析器进行分析
       final decision = await SyncAnalyzer.analyzeSyncNeed(
         currentLocalHash: currentLocalHash,
@@ -193,7 +194,7 @@ class AutoSyncService {
         lastSyncRecord: lastSyncRecord,
         syncService: syncService,
       );
-      
+
       // 5. 转换为 SyncCheckResult
       switch (decision) {
         case SyncDecision.noSync:
@@ -205,18 +206,15 @@ class AutoSyncService {
         case SyncDecision.conflict:
           // 构建冲突信息
           final conflict = await _buildConflictInfo(
-            currentLocalHash, 
-            currentRemoteInfo, 
-            syncService
-          );
+              currentLocalHash, currentRemoteInfo, syncService);
           return SyncCheckResult.conflict(conflict);
       }
     } catch (e) {
-      print('[AutoSyncService] 同步分析过程发生错误: $e');
+      AppLogger.debug('[AutoSyncService] 同步分析过程发生错误: $e');
       return SyncCheckResult.error('同步分析失败: $e');
     }
   }
-  
+
   /// 构建冲突信息
   static Future<SyncConflict> _buildConflictInfo(
     String? localHash,
@@ -227,7 +225,7 @@ class AutoSyncService {
       // 获取本地文件信息
       final dbFile = await syncService.getDatabaseFile();
       final localStat = await dbFile.stat();
-      
+
       // 获取远程哈希（如果是 ETag，需要下载文件计算）
       String remoteHash = 'unknown';
       if (remoteInfo?.anchor.type == SyncAnchorType.hash) {
@@ -238,10 +236,10 @@ class AutoSyncService {
               .downloadFile(syncService.remoteDatabasePath);
           remoteHash = md5.convert(remoteData).toString();
         } catch (e) {
-          print('[AutoSyncService] 获取远程文件哈希失败: $e');
+          AppLogger.debug('[AutoSyncService] 获取远程文件哈希失败: $e');
         }
       }
-      
+
       return SyncConflict(
         localModified: localStat.modified,
         remoteModified: remoteInfo?.lastModified ?? DateTime.now(),
@@ -251,7 +249,7 @@ class AutoSyncService {
         remoteHash: remoteHash,
       );
     } catch (e) {
-      print('[AutoSyncService] 构建冲突信息失败: $e');
+      AppLogger.debug('[AutoSyncService] 构建冲突信息失败: $e');
       // 返回基本冲突信息
       return SyncConflict(
         localModified: DateTime.now(),
@@ -278,7 +276,8 @@ class AutoSyncService {
     final startTime = DateTime.now();
 
     try {
-      print('[AutoSyncService] 开始执行启动时同步 - ${startTime.toIso8601String()}');
+      AppLogger.debug(
+          '[AutoSyncService] 开始执行启动时同步 - ${startTime.toIso8601String()}');
 
       final config = await WebDAVConfig.load();
       final webdavClient = config.createClient();
@@ -323,13 +322,13 @@ class AutoSyncService {
       }
 
       final duration = DateTime.now().difference(startTime);
-      print(
+      AppLogger.debug(
           '[AutoSyncService] 启动时同步完成，耗时: ${duration.inMilliseconds}ms，成功: $success');
 
       return success;
     } catch (e) {
       final duration = DateTime.now().difference(startTime);
-      print(
+      AppLogger.debug(
           '[AutoSyncService] 启动时同步失败，耗时: ${duration.inMilliseconds}ms，错误: $e');
       return false;
     } finally {
@@ -343,7 +342,7 @@ class AutoSyncService {
       return; // 已经在监听
     }
 
-    print('[AutoSyncService] 开始监听数据库文件变化');
+    AppLogger.debug('[AutoSyncService] 开始监听数据库文件变化');
 
     // 开始网络状态监控
     NetworkService.initialize();
@@ -358,34 +357,33 @@ class AutoSyncService {
       // 获取WebDAV配置来创建同步服务
       final config = await WebDAVConfig.load();
       if (!config.isValid) {
-        print('[AutoSyncService] WebDAV未配置，跳过文件监听');
+        AppLogger.debug('[AutoSyncService] WebDAV未配置，跳过文件监听');
         return;
       }
-      
+
       final webdavClient = config.createClient();
       final syncService = DatabaseSyncService(webdavClient: webdavClient);
       final databasePath = await syncService.getDatabaseFilePath();
       final dbFile = File(databasePath);
       final dbDirectory = dbFile.parent;
-      
-      print('[AutoSyncService] 启动文件系统监听: ${dbDirectory.path}');
-      
+
+      AppLogger.debug('[AutoSyncService] 启动文件系统监听: ${dbDirectory.path}');
+
       _fileWatcher = DirectoryWatcher(dbDirectory.path);
       _watcherSubscription = _fileWatcher!.events
-          .where((event) => 
-              event.path.endsWith('.sqlite') && 
-              event.type == ChangeType.MODIFY)
+          .where((event) =>
+              event.path.endsWith('.sqlite') && event.type == ChangeType.MODIFY)
           .listen((event) {
-            print('[AutoSyncService] 检测到数据库文件变化: ${event.path}');
-            scheduleUpload(ref);
-          }, onError: (error) {
-            print('[AutoSyncService] 文件监听器错误: $error，切换到定时检查');
-            _fallbackToPeriodicCheck(ref);
-          });
-          
-      print('[AutoSyncService] 文件系统监听已启动');
+        AppLogger.debug('[AutoSyncService] 检测到数据库文件变化: ${event.path}');
+        scheduleUpload(ref);
+      }, onError: (error) {
+        AppLogger.debug('[AutoSyncService] 文件监听器错误: $error，切换到定时检查');
+        _fallbackToPeriodicCheck(ref);
+      });
+
+      AppLogger.debug('[AutoSyncService] 文件系统监听已启动');
     } catch (e) {
-      print('[AutoSyncService] 文件系统监听启动失败: $e，使用定时检查作为回退');
+      AppLogger.debug('[AutoSyncService] 文件系统监听启动失败: $e，使用定时检查作为回退');
       _fallbackToPeriodicCheck(ref);
     }
   }
@@ -396,10 +394,10 @@ class AutoSyncService {
     _watcherSubscription?.cancel();
     _watcherSubscription = null;
     _fileWatcher = null;
-    
+
     // 启动定时检查作为回退机制
     if (_dbWatcher == null) {
-      print('[AutoSyncService] 启动定时检查回退机制（30秒轮询）');
+      AppLogger.debug('[AutoSyncService] 启动定时检查回退机制（30秒轮询）');
       _dbWatcher = Timer.periodic(const Duration(seconds: 30), (timer) {
         _checkDatabaseChanges(ref);
       });
@@ -416,7 +414,7 @@ class AutoSyncService {
 
       // 检查网络状态
       if (!NetworkService.isOnline) {
-        print('[AutoSyncService] 网络离线，跳过数据库变化检查');
+        AppLogger.debug('[AutoSyncService] 网络离线，跳过数据库变化检查');
         return;
       }
 
@@ -428,14 +426,14 @@ class AutoSyncService {
 
       if (currentTime != null && _lastSyncCheck != null) {
         if (currentTime.isAfter(_lastSyncCheck!)) {
-          print('[AutoSyncService] 检测到数据库变化，准备上传');
+          AppLogger.debug('[AutoSyncService] 检测到数据库变化，准备上传');
           scheduleUpload(ref);
         }
       }
 
       _lastSyncCheck = currentTime;
     } catch (e) {
-      print('[AutoSyncService] 检查数据库变化失败: $e');
+      AppLogger.debug('[AutoSyncService] 检查数据库变化失败: $e');
     }
   }
 
@@ -444,7 +442,7 @@ class AutoSyncService {
     // 取消之前的定时器
     _uploadTimer?.cancel();
 
-    print('[AutoSyncService] 安排防抖上传，延迟 $_debounceDelaySeconds 秒');
+    AppLogger.debug('[AutoSyncService] 安排防抖上传，延迟 $_debounceDelaySeconds 秒');
 
     // 设置新的定时器
     _uploadTimer = Timer(Duration(seconds: _debounceDelaySeconds), () {
@@ -460,14 +458,14 @@ class AutoSyncService {
 
     // 检查网络状态
     if (!NetworkService.isOnline) {
-      print('[AutoSyncService] 网络离线，跳过后台上传');
+      AppLogger.debug('[AutoSyncService] 网络离线，跳过后台上传');
       return;
     }
 
     _isSyncing = true;
 
     try {
-      print('[AutoSyncService] 开始执行后台上传');
+      AppLogger.debug('[AutoSyncService] 开始执行后台上传');
 
       final config = await WebDAVConfig.load();
       final webdavClient = config.createClient();
@@ -476,30 +474,30 @@ class AutoSyncService {
       final result = await syncService.uploadDatabase(forceOverwrite: false);
 
       if (result.conflict != null) {
-        print('[AutoSyncService] 后台上传检测到冲突，显示对话框让用户选择');
-        
+        AppLogger.debug('[AutoSyncService] 后台上传检测到冲突，显示对话框让用户选择');
+
         // 使用全局上下文显示冲突对话框（使用启动模式避免Overlay问题）
         final context = AppRouter.navigatorKey.currentContext;
         if (context != null && context.mounted) {
           final action = await ConflictDialogService.showConflictDialog(
-            context, 
+            context,
             result.conflict!,
             isStartup: true, // 使用启动模式，避免Overlay依赖
           );
-          
+
           if (context.mounted) {
             await _handleConflictAction(action, syncService, ref);
           }
         } else {
-          print('[AutoSyncService] 无法获取有效上下文，跳过冲突处理');
+          AppLogger.debug('[AutoSyncService] 无法获取有效上下文，跳过冲突处理');
         }
       } else if (result.success) {
-        print('[AutoSyncService] 后台上传成功');
+        AppLogger.debug('[AutoSyncService] 后台上传成功');
       } else {
-        print('[AutoSyncService] 后台上传失败: ${result.message}');
+        AppLogger.debug('[AutoSyncService] 后台上传失败: ${result.message}');
       }
     } catch (e) {
-      print('[AutoSyncService] 后台上传异常: $e');
+      AppLogger.debug('[AutoSyncService] 后台上传异常: $e');
     } finally {
       _isSyncing = false;
     }
@@ -507,44 +505,47 @@ class AutoSyncService {
 
   /// 处理冲突用户选择
   static Future<void> _handleConflictAction(
-    ConflictAction? action, 
-    DatabaseSyncService syncService, 
+    ConflictAction? action,
+    DatabaseSyncService syncService,
     WidgetRef ref,
   ) async {
     if (action == null || action == ConflictAction.cancel) {
-      print('[AutoSyncService] 用户取消冲突处理');
+      AppLogger.debug('[AutoSyncService] 用户取消冲突处理');
       return;
     }
-    
+
     try {
       if (action == ConflictAction.useLocal) {
-        print('[AutoSyncService] 用户选择使用本地版本，强制上传');
-        final uploadResult = await syncService.uploadDatabase(forceOverwrite: true);
+        AppLogger.debug('[AutoSyncService] 用户选择使用本地版本，强制上传');
+        final uploadResult =
+            await syncService.uploadDatabase(forceOverwrite: true);
         if (uploadResult.success) {
-          print('[AutoSyncService] 强制上传成功');
+          AppLogger.debug('[AutoSyncService] 强制上传成功');
         } else {
-          print('[AutoSyncService] 强制上传失败: ${uploadResult.message}');
+          AppLogger.debug('[AutoSyncService] 强制上传失败: ${uploadResult.message}');
         }
       } else if (action == ConflictAction.useRemote) {
-        print('[AutoSyncService] 用户选择使用服务器版本，下载覆盖本地');
-        final downloadResult = await syncService.downloadDatabase(forceOverwrite: true);
+        AppLogger.debug('[AutoSyncService] 用户选择使用服务器版本，下载覆盖本地');
+        final downloadResult =
+            await syncService.downloadDatabase(forceOverwrite: true);
         if (downloadResult.success) {
-          print('[AutoSyncService] 下载覆盖成功，刷新应用数据');
+          AppLogger.debug('[AutoSyncService] 下载覆盖成功，刷新应用数据');
           // 刷新应用数据，因为本地数据库文件被替换了
           GlobalRefreshService.refreshAllData(ref);
         } else {
-          print('[AutoSyncService] 下载覆盖失败: ${downloadResult.message}');
+          AppLogger.debug(
+              '[AutoSyncService] 下载覆盖失败: ${downloadResult.message}');
         }
       }
     } catch (e) {
-      print('[AutoSyncService] 处理冲突选择时发生异常: $e');
+      AppLogger.debug('[AutoSyncService] 处理冲突选择时发生异常: $e');
     }
   }
 
   /// 停止监听
   static void stopWatcher() {
-    print('[AutoSyncService] 停止数据库文件监听');
-    
+    AppLogger.debug('[AutoSyncService] 停止数据库文件监听');
+
     // 停止文件系统监听
     _watcherSubscription?.cancel();
     _watcherSubscription = null;
@@ -575,89 +576,10 @@ class AutoSyncService {
           lastLocalHash != null ||
           lastRemoteHash != null;
     } catch (e) {
-      print('[AutoSyncService] 检查同步历史失败: $e');
+      AppLogger.debug('[AutoSyncService] 检查同步历史失败: $e');
       // 如果检查失败，保守地认为从未同步过
       return false;
     }
-  }
-
-  /// 处理首次同步的情况
-  static Future<SyncCheckResult> _handleFirstTimeSync(
-    DateTime? localTime,
-    DateTime? remoteTime,
-    DatabaseSyncService syncService,
-  ) async {
-    // 情况1: 无本地无远程 - 全新安装
-    if (localTime == null && remoteTime == null) {
-      return SyncCheckResult.noSync('全新安装，无需同步');
-    }
-
-    // 情况2: 无本地有远程 - 跨设备安装
-    if (localTime == null && remoteTime != null) {
-      return SyncCheckResult.download('检测到云端数据，建议下载');
-    }
-
-    // 情况3: 有本地无远程 - 首次使用或网络问题
-    if (localTime != null && remoteTime == null) {
-      // 检查是否为默认数据库（通过文件创建时间判断）
-      final isRecentlyCreated = await _isRecentlyCreated(syncService);
-      if (isRecentlyCreated) {
-        return SyncCheckResult.noSync('首次安装，无需同步');
-      } else {
-        return SyncCheckResult.upload('检测到本地数据，建议上传');
-      }
-    }
-
-    // 情况4: 有本地有远程 - 需要用户选择或智能判断
-    if (localTime != null && remoteTime != null) {
-      // 检查是否为最近创建的默认数据库
-      final isRecentlyCreated = await _isRecentlyCreated(syncService);
-      if (isRecentlyCreated) {
-        // 本地是默认数据，云端有数据，很可能是跨设备安装
-        return SyncCheckResult.download('检测到云端数据，建议下载');
-      } else {
-        // 本地有用户数据，云端也有数据，需要用户选择
-        // 构建冲突信息让用户决定
-        final dbFile = await syncService.getDatabaseFile();
-        final localStat = await dbFile.stat();
-
-        return SyncCheckResult.conflict(SyncConflict(
-          localModified: localTime,
-          remoteModified: remoteTime,
-          localSize: localStat.size,
-          remoteSize: 0, // 暂时设为0，实际使用时会获取真实大小
-          localHash: 'unknown',
-          remoteHash: 'unknown',
-        ));
-      }
-    }
-
-    // 默认情况，不应该到达这里
-    return SyncCheckResult.noSync('无法确定同步需求');
-  }
-
-  /// 检查数据库文件是否为最近创建的默认文件
-  static Future<bool> _isRecentlyCreated(
-      DatabaseSyncService syncService) async {
-    try {
-      final dbFile = await syncService.getDatabaseFile();
-      if (!await dbFile.exists()) return true;
-
-      final stat = await dbFile.stat();
-      final fileAge = DateTime.now().difference(stat.changed);
-
-      // 如果文件创建时间在10分钟内，认为是最近创建的默认文件
-      return fileAge.inMinutes < 10;
-    } catch (e) {
-      print('[AutoSyncService] 检查文件创建时间失败: $e');
-      // 检查失败时保守地认为不是最近创建的
-      return false;
-    }
-  }
-
-  /// 检查是否从未同步过（保留兼容性）
-  static Future<bool> _hasNeverSynced(DatabaseSyncService syncService) async {
-    return !(await _hasEverSynced());
   }
 
   /// 强制同步（用户手动触发）
@@ -694,10 +616,10 @@ class AutoSyncService {
           return false;
       }
 
-      print('[AutoSyncService] 强制同步完成，方向: $direction，成功: $success');
+      AppLogger.debug('[AutoSyncService] 强制同步完成，方向: $direction，成功: $success');
       return success;
     } catch (e) {
-      print('[AutoSyncService] 强制同步失败: $e');
+      AppLogger.debug('[AutoSyncService] 强制同步失败: $e');
       return false;
     } finally {
       _isSyncing = false;

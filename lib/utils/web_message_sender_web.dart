@@ -1,8 +1,9 @@
-import 'dart:html' as html;
+import 'dart:js_interop';
 
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 
 void sendWebMessage(dynamic message, String targetOrigin) {
   debugPrint('sendWebMessage: $message');
-  html.window.parent?.postMessage(message, targetOrigin);
+  web.window.parent?.postMessage(message.jsify(), targetOrigin.toJS);
 }

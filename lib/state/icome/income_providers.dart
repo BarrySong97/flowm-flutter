@@ -2,7 +2,8 @@ import 'package:flowm/components/chart/barchart.dart' as barchart;
 import 'package:flowm/models/account_expense_node.dart';
 import 'package:flowm/state/icome/income_repository.dart';
 import 'package:flowm/state/ledger/ledger_repository.dart';
-import 'package:flowm/state/expense/expense_providers.dart' as expense_providers;
+import 'package:flowm/state/expense/expense_providers.dart'
+    as expense_providers;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// 当前选中的月份提供者
@@ -21,10 +22,11 @@ class IncomePageData {
 }
 
 final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
-  final timeRangeType = ref.watch(expense_providers.selectedTimeRangeTypeProvider);
+  final timeRangeType =
+      ref.watch(expense_providers.selectedTimeRangeTypeProvider);
 
   if (selectedLedger == null) {
     return IncomePageData(
@@ -38,7 +40,7 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
 
   // Current period date range
   DateTime startDate, endDate;
-  
+
   switch (timeRangeType) {
     case '90days':
       startDate = DateTime.now().subtract(const Duration(days: 90));
@@ -65,7 +67,7 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
 
   // Previous period date range
   DateTime prevStartDate, prevEndDate;
-  
+
   switch (timeRangeType) {
     case '90days':
       prevEndDate = DateTime.now().subtract(const Duration(days: 90));
@@ -121,7 +123,7 @@ final incomePageDataProvider = FutureProvider<IncomePageData>((ref) async {
 final previousMonthIncomeProviderFamily =
     FutureProvider.family<List<barchart.ChartData>, int?>(
         (ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
 
@@ -148,7 +150,7 @@ final previousMonthIncomeProviderFamily =
 final incomeChartDataProviderFamily =
     FutureProvider.family<List<barchart.ChartData>, int?>(
         (ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
 
@@ -159,7 +161,6 @@ final incomeChartDataProviderFamily =
   final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
   final DateTime endDate =
       DateTime(selectedDate.year, selectedDate.month + 1, 0);
-
 
   return repository.getIncomeChartData(
     startDate: startDate,
@@ -172,7 +173,7 @@ final incomeChartDataProviderFamily =
 /// 指定账户当月总收入提供者
 final accountMonthlyIncomeProvider =
     FutureProvider.family<double, int>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedDate = ref.watch(selectedMonthProvider);
   final DateTime startDate = DateTime(selectedDate.year, selectedDate.month, 1);
   final DateTime endDate =
@@ -188,6 +189,6 @@ final accountMonthlyIncomeProvider =
 /// 指定账户累计总收入提供者 (不区分时间)
 final accountOverallIncomeProvider =
     FutureProvider.family<double, int>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   return repository.getAccountIncomeTotalBalance(accountId: accountId);
 });

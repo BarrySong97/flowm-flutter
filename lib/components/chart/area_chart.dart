@@ -63,8 +63,8 @@ class AreaChartWidget extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  primaryColor.withOpacity(0.3),
-                  primaryColor.withOpacity(0.05),
+                  primaryColor.withValues(alpha: 0.3),
+                  primaryColor.withValues(alpha: 0.05),
                 ],
               ),
               borderColor: const Color(0xFF20AC65),

@@ -24,7 +24,7 @@ import 'package:flowm/components/account/account_item.dart' as ui;
 /// 上期收入数据提供者 (family)
 final previousPeriodIncomeProviderFamily = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
@@ -71,7 +71,7 @@ final previousPeriodIncomeProviderFamily = FutureProvider.autoDispose
 /// 修改为 .family 以接收 accountId (可以为 null)
 final incomeChartDataProvider = FutureProvider.autoDispose
     .family<List<barchart.ChartData>, int?>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedLedger = await ref.watch(selectedLedgerProvider.future);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
@@ -118,7 +118,7 @@ final incomeChartDataProvider = FutureProvider.autoDispose
 /// 指定账户当期总收入提供者
 final accountMonthlyIncomeProvider =
     FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   final selectedDate = ref.watch(selectedMonthProvider);
   final timeRangeType =
       ref.watch(expense_providers.selectedTimeRangeTypeProvider);
@@ -159,7 +159,7 @@ final accountMonthlyIncomeProvider =
 /// 指定账户累计总收入提供者 (不区分时间)
 final accountOverallIncomeProvider =
     FutureProvider.autoDispose.family<double, int>((ref, accountId) async {
-  final repository = ref.watch(IncomeRepositoryProvider);
+  final repository = ref.watch(incomeRepositoryProvider);
   return repository.getAccountIncomeTotalBalance(accountId: accountId);
 });
 
@@ -670,7 +670,7 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                   onPressed: () async {
                     // Get current ledger for currency symbol
                     final currentLedger =
-                        await ref.read(selectedLedgerProvider.future);
+                        ref.read(selectedLedgerProvider).value;
 
                     // Convert database Account to UI Account
                     final uiAccount = ui.Account(
@@ -687,7 +687,8 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                     );
 
                     // 如果账户被删除，退出详情页面
-                    if (isDeleted == true && mounted) {
+                    if (!context.mounted) return;
+                    if (isDeleted == true) {
                       Navigator.of(context).pop();
                     }
                   },
@@ -897,8 +898,10 @@ class _IncomeDetailPageState extends ConsumerState<IncomeDetailPage> {
                                                       incomeChartDataProvider(
                                                           account.accountData
                                                               .accountId));
-                                                  if (!chartDataValue.hasValue)
+                                                  if (!chartDataValue
+                                                      .hasValue) {
                                                     return;
+                                                  }
                                                   final chartData =
                                                       chartDataValue.value!;
 
@@ -1030,11 +1033,11 @@ class AccountTransactionList extends ConsumerWidget {
   final DateTime endDate;
 
   const AccountTransactionList({
-    Key? key,
+    super.key,
     required this.account,
     required this.startDate,
     required this.endDate,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1050,7 +1053,7 @@ class AccountTransactionList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),

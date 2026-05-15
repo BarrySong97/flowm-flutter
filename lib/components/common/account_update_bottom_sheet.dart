@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/db/tables/account_table.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
@@ -99,14 +100,14 @@ class _AccountUpdateBottomSheetState
                 currencySymbol: selectedLedger?.currencySymbol ?? '¥',
               );
             });
-            print('已设置一级账户: ${_selectedParentAccount?.name}');
+            AppLogger.debug('已设置一级账户: ${_selectedParentAccount?.name}');
           }
         }
 
-        print('已设置默认资产账户状态: $_isDefaultAssetAccount');
+        AppLogger.debug('已设置默认资产账户状态: $_isDefaultAssetAccount');
       }
     } catch (e) {
-      print('获取账户信息失败: $e');
+      AppLogger.debug('获取账户信息失败: $e');
       // 如果获取失败，继续使用默认值
     }
   }
@@ -190,7 +191,7 @@ class _AccountUpdateBottomSheetState
       }
 
       try {
-        print(
+        AppLogger.debug(
             '开始更新账户: ID=${widget.accountToUpdate.id}, 名称=${_nameController.text.trim()}');
 
         await ref.read(accountRepositoryProvider).editAccount(
@@ -203,7 +204,7 @@ class _AccountUpdateBottomSheetState
                   _hasChildAccounts ? false : _isDefaultAssetAccount,
             );
 
-        print('账户更新成功');
+        AppLogger.debug('账户更新成功');
 
         // 刷新所有账户相关的provider
         invalidateProvidersForTransaction(ref,
@@ -220,8 +221,8 @@ class _AccountUpdateBottomSheetState
           });
         }
       } catch (e, stackTrace) {
-        print('更新账户失败: $e');
-        print('堆栈跟踪: $stackTrace');
+        AppLogger.debug('更新账户失败: $e');
+        AppLogger.debug('堆栈跟踪: $stackTrace');
 
         if (mounted) {
           Navigator.of(context).pop(false);
@@ -259,7 +260,7 @@ class _AccountUpdateBottomSheetState
 
     if (confirmed == true) {
       try {
-        print(
+        AppLogger.debug(
             '开始删除账户: ID=${widget.accountToUpdate.id}, 名称=${widget.accountToUpdate.name}');
 
         final result = await ref
@@ -267,15 +268,13 @@ class _AccountUpdateBottomSheetState
             .deleteAccount(widget.accountToUpdate.id);
 
         String message;
-        Color backgroundColor;
         bool success = false;
 
         switch (result) {
           case DeleteAccountResult.success:
             message = '账户删除成功';
-            backgroundColor = Colors.green;
             success = true;
-            print('账户删除成功');
+            AppLogger.debug('账户删除成功');
 
             // 刷新所有账户相关的provider
             invalidateProvidersForTransaction(ref,
@@ -284,32 +283,27 @@ class _AccountUpdateBottomSheetState
 
           case DeleteAccountResult.hasChildAccounts:
             message = '删除失败：该账户有子账户，请先删除子账户';
-            backgroundColor = Colors.orange;
-            print('删除失败：该账户可能有子账户');
+            AppLogger.debug('删除失败：该账户可能有子账户');
             break;
 
           case DeleteAccountResult.hasRelatedTransactions:
             message = '删除失败：该账户有相关交易记录，请先删除相关的交易记录再删除账户';
-            backgroundColor = Colors.orange;
-            print('删除失败：该账户有相关的交易记录');
+            AppLogger.debug('删除失败：该账户有相关的交易记录');
             break;
 
           case DeleteAccountResult.isSystemAccount:
             message = '无法删除系统账户"期初余额"，该账户用于维护复式记账平衡';
-            backgroundColor = Colors.red;
-            print('删除失败：该账户是系统保护账户');
+            AppLogger.debug('删除失败：该账户是系统保护账户');
             break;
 
           case DeleteAccountResult.error:
-          default:
             message = '删除账户失败：未知错误';
-            backgroundColor = Colors.red;
-            print('删除账户失败：未知错误');
+            AppLogger.debug('删除账户失败：未知错误');
             break;
         }
 
         if (mounted) {
-          print('准备显示消息: $message');
+          AppLogger.debug('准备显示消息: $message');
 
           // 先显示消息，再关闭bottom sheet
           switch (result) {
@@ -324,7 +318,6 @@ class _AccountUpdateBottomSheetState
               SnackBarUtils.showOverlayError(context, message);
               break;
             case DeleteAccountResult.error:
-            default:
               SnackBarUtils.showOverlayError(context, message);
               break;
           }
@@ -337,11 +330,11 @@ class _AccountUpdateBottomSheetState
           });
         }
       } catch (e, stackTrace) {
-        print('删除账户失败: $e');
-        print('堆栈跟踪: $stackTrace');
+        AppLogger.debug('删除账户失败: $e');
+        AppLogger.debug('堆栈跟踪: $stackTrace');
 
         if (mounted) {
-          print('显示异常错误消息: 删除账户失败: $e');
+          AppLogger.debug('显示异常错误消息: 删除账户失败: $e');
           SnackBarUtils.showOverlayError(context, '删除账户失败: $e');
 
           // 延迟关闭bottom sheet

@@ -11,16 +11,16 @@ class AccountSelectorItem extends StatefulWidget {
   final Account? selectedAccount;
 
   const AccountSelectorItem({
-    Key? key,
+    super.key,
     required this.account,
     this.onTap,
     this.isSelected = false,
     this.shouldAutoExpand = false,
     this.selectedAccount,
-  }) : super(key: key);
+  });
 
   @override
-  _AccountSelectorItemState createState() => _AccountSelectorItemState();
+  State<AccountSelectorItem> createState() => _AccountSelectorItemState();
 }
 
 class _AccountSelectorItemState extends State<AccountSelectorItem> {
@@ -125,7 +125,7 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
                     left: 16.0, right: 16.0, bottom: 4.0, top: 0),
                 decoration: BoxDecoration(
                   color: isChildSelected && !childHasChildren
-                      ? Colors.blue.withOpacity(0.1)
+                      ? Colors.blue.withValues(alpha: 0.1)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(6.0),
                   border: isChildSelected && !childHasChildren
@@ -157,8 +157,9 @@ class _AccountSelectorItemState extends State<AccountSelectorItem> {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4.0),
         decoration: BoxDecoration(
-          color:
-              widget.isSelected ? Colors.blue.withOpacity(0.1) : Colors.white,
+          color: widget.isSelected
+              ? Colors.blue.withValues(alpha: 0.1)
+              : Colors.white,
           borderRadius: BorderRadius.circular(8.0),
           border: widget.isSelected
               ? Border.all(color: Colors.blue, width: 2)
@@ -191,14 +192,13 @@ class _AccountSelectorRow extends StatelessWidget {
   final VoidCallback? onLongPress; // 添加长按回调参数
 
   const _AccountSelectorRow({
-    Key? key,
     required this.account,
     this.percentage,
     required this.showCurrencySymbolInAmount,
     this.isSelected = false,
     this.isLeafNode = true,
     this.onLongPress, // 添加长按回调参数
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

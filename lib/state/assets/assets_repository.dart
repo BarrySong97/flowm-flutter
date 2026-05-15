@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../../db/dao/account_dao.dart';
@@ -52,10 +53,9 @@ class SankeyChartData {
 /// 封装与资产分析和管理相关的所有数据库操作，提供更高级别的业务逻辑方法
 class AssetsRepository {
   final AccountDao _accountDao;
-  final PostingDao _postingDao;
   final TransactionDao _transactionDao;
 
-  AssetsRepository(this._accountDao, this._postingDao, this._transactionDao);
+  AssetsRepository(this._accountDao, PostingDao _, this._transactionDao);
 
   /// 获取指定账户的资产流转数据并转换为 Sankey 图表格式
   ///
@@ -88,7 +88,8 @@ class AssetsRepository {
     );
 
     // 转换为 Sankey 图表数据
-    return await _convertToSankeyData(flows, targetAccount, flow, currencySymbol);
+    return await _convertToSankeyData(
+        flows, targetAccount, flow, currencySymbol);
   }
 
   /// 获取资产流转数据
@@ -114,7 +115,7 @@ class AssetsRepository {
     if (flow == 'in') {
       // 查询流入：目标账户作为借方（正数金额）
       query = '''
-        SELECT 
+        SELECT
           p1.posting_id as source_posting_id,
           p1.account_id as source_account_id,
           a1.account_name as source_account_name,
@@ -135,8 +136,8 @@ class AssetsRepository {
         JOIN postings p2 ON p1.transaction_id = p2.transaction_id
         JOIN accounts a1 ON p1.account_id = a1.account_id
         JOIN accounts a2 ON p2.account_id = a2.account_id
-        WHERE p2.account_id = ? 
-          AND p2.amount > 0 
+        WHERE p2.account_id = ?
+          AND p2.amount > 0
           AND p1.amount < 0
           AND p1.account_id != p2.account_id
           $dateFilter
@@ -146,7 +147,7 @@ class AssetsRepository {
     } else {
       // 查询流出：目标账户作为贷方（负数金额）
       query = '''
-        SELECT 
+        SELECT
           p1.posting_id as source_posting_id,
           p1.account_id as source_account_id,
           a1.account_name as source_account_name,
@@ -167,8 +168,8 @@ class AssetsRepository {
         JOIN postings p2 ON p1.transaction_id = p2.transaction_id
         JOIN accounts a1 ON p1.account_id = a1.account_id
         JOIN accounts a2 ON p2.account_id = a2.account_id
-        WHERE p1.account_id = ? 
-          AND p1.amount < 0 
+        WHERE p1.account_id = ?
+          AND p1.amount < 0
           AND p2.amount > 0
           AND p1.account_id != p2.account_id
           $dateFilter
@@ -224,20 +225,20 @@ class AssetsRepository {
     String flow,
     String currencySymbol,
   ) async {
-    print('\n=== AssetsRepository 金额计算调试 ===');
-    print(
+    AppLogger.debug('\n=== AssetsRepository 金额计算调试 ===');
+    AppLogger.debug(
         '目标账户: ${targetAccount.accountName} (ID: ${targetAccount.accountId})');
-    print('流向: $flow');
-    print('原始流转数据 (${flows.length}条):');
+    AppLogger.debug('流向: $flow');
+    AppLogger.debug('原始流转数据 (${flows.length}条):');
 
     for (int i = 0; i < flows.length; i++) {
       final assetFlow = flows[i];
-      print(
+      AppLogger.debug(
           '  ${i + 1}. ${assetFlow.fromAccount.accountName} → ${assetFlow.toAccount.accountName}: $currencySymbol${assetFlow.amount.toStringAsFixed(2)}');
     }
 
     if (flows.isEmpty) {
-      print('无流转数据');
+      AppLogger.debug('无流转数据');
       return SankeyChartData(nodes: [], links: []);
     }
 
@@ -266,12 +267,12 @@ class AssetsRepository {
     final hierarchicalLinks = _createHierarchicalLinks(
         flows, accountMap, targetAccount.accountId, flow);
 
-    print('\n层级链接 (${hierarchicalLinks.length}条):');
+    AppLogger.debug('\n层级链接 (${hierarchicalLinks.length}条):');
     for (int i = 0; i < hierarchicalLinks.length; i++) {
       final link = hierarchicalLinks[i];
       final sourceName = accountMap[link.sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[link.targetId]?.accountName ?? 'Unknown';
-      print(
+      AppLogger.debug(
           '  ${i + 1}. $sourceName (${link.sourceId}) → $targetName (${link.targetId}): $currencySymbol${link.amount.toStringAsFixed(2)}');
     }
 
@@ -292,22 +293,24 @@ class AssetsRepository {
       }
     }
 
-    print('\n聚合后的链接:');
+    AppLogger.debug('\n聚合后的链接:');
     linkAmounts.forEach((linkKey, amount) {
       final parts = linkKey.split('->');
       final sourceId = int.parse(parts[0]);
       final targetId = int.parse(parts[1]);
       final sourceName = accountMap[sourceId]?.accountName ?? 'Unknown';
       final targetName = accountMap[targetId]?.accountName ?? 'Unknown';
-      print('  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
+      AppLogger.debug(
+          '  $sourceName → $targetName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 移除为账户设置余额的逻辑，只显示实际流转金额
 
-    print('\n最终节点金额:');
+    AppLogger.debug('\n最终节点金额:');
     nodeAmounts.forEach((accountId, amount) {
       final accountName = accountMap[accountId]?.accountName ?? 'Unknown';
-      print('  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
+      AppLogger.debug(
+          '  $accountName: $currencySymbol${amount.toStringAsFixed(2)}');
     });
 
     // 创建 SankeyNode 列表，只显示实际流转金额
@@ -330,7 +333,8 @@ class AssetsRepository {
         } else if (amount >= 1000) {
           // 千级，固定两位小数
           final thousands = amount / 1000;
-          formattedAmount = ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
+          formattedAmount =
+              ' ($currencySymbol${thousands.toStringAsFixed(2)}K)';
         } else {
           // 小额，固定两位小数
           formattedAmount = ' ($currencySymbol${amount.toStringAsFixed(2)})';
@@ -516,8 +520,6 @@ class AssetsRepository {
         return DateTime(now.year, 1, 1);
       case TimeRange.all:
         return DateTime(now.year - 10, 1, 1); // 默认返回10年前
-      default:
-        return now.subtract(Duration(days: 30));
     }
   }
 
@@ -575,8 +577,6 @@ final assetsSankeyChartDataProvider = FutureProvider.autoDispose.family<
         return DateTime(now.year, 1, 1);
       case TimeRange.all:
         return DateTime(now.year - 10, 1, 1);
-      default:
-        return now.subtract(const Duration(days: 30));
     }
   }
 

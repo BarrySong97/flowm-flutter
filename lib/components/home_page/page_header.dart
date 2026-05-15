@@ -45,7 +45,6 @@ class PageHeader extends ConsumerWidget {
           ),
           // 页面标题栏
           Expanded(
-              child: Container(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -76,7 +75,7 @@ class PageHeader extends ConsumerWidget {
                 ),
               ),
             ),
-          ))
+          )
         ],
       ),
     );

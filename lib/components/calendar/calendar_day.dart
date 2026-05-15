@@ -38,7 +38,7 @@ class CalendarDay extends StatelessWidget {
         margin: const EdgeInsets.all(2.0), // Reduced margin for more space
         width: 50,
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.08),
+          color: Colors.grey.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(4.0),
           border: isSelected
               ? Border.all(color: Colors.green[300]!, width: 1.5)
@@ -71,7 +71,7 @@ class CalendarDay extends StatelessWidget {
                 child: Text(
                   // Ensure income is not null before calling _formatCompactCurrency
                   // hasIncome already checks income != null
-                  hasIncome ? '+' + _formatCompactCurrency(income!) : '',
+                  hasIncome ? '+${_formatCompactCurrency(income!)}' : '',
                   style: const TextStyle(
                     color: Colors.green,
                     fontSize: 8,
@@ -88,7 +88,7 @@ class CalendarDay extends StatelessWidget {
                 child: Text(
                   // Ensure expense is not null before calling _formatCompactCurrency
                   // hasExpense already checks expense != null
-                  hasExpense ? '-' + _formatCompactCurrency(expense!) : '',
+                  hasExpense ? '-${_formatCompactCurrency(expense!)}' : '',
                   style: const TextStyle(
                     color: Colors.red,
                     fontSize: 8,

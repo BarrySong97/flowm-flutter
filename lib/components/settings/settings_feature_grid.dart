@@ -51,7 +51,7 @@ class SettingsFeatureGrid extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: item.iconColor.withOpacity(0.1),
+                    color: item.iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6.0),
                   ),
                   child: Icon(

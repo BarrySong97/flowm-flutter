@@ -137,28 +137,6 @@ class TransactionRepository {
     return _transactionDao.getLatestTransactionsByLedgerId(ledgerId!, limit);
   }
 
-  /// 获取指定账本的最新交易
-  Stream<List<TransactionWithAmount>> _getLatestTransactionsByLedger(
-      int ledgerId, int limit) {
-    // 首先获取与该账本相关的账户ID
-    return _transactionDao.db.accountDao
-        .watchAccountsByLedgerId(ledgerId)
-        .asyncMap((accounts) async {
-      if (accounts.isEmpty) {
-        return <TransactionWithAmount>[];
-      }
-
-      // 获取这些账户相关的accountIds
-      final accountIds = accounts.map((account) => account.accountId).toSet();
-
-      // 通过accountIds查找相关的交易
-      return await _transactionDao
-          .watchLatestTransactionsByAccountIds(
-              accountIds: accountIds, limit: limit)
-          .first;
-    });
-  }
-
   /// 获取分页的交易记录 (TransactionWithAmount)
   Stream<List<TransactionWithAmount>> watchTransactionsWithAmountPaginated(
           {required int limit, required int offset, int? ledgerId}) =>
@@ -284,7 +262,7 @@ class TransactionRepository {
   ///
   /// [dayForMonth] - 月份中的任意一天，用于确定要查询的月份
   /// [ledgerId] - 账本ID
-  /// Returns: Map<int, ({double income, double expenses})> 其中key是日期中的天数
+  /// Returns a map keyed by day-of-month with income and expense totals.
   Future<Map<int, ({double income, double expenses})>>
       getMonthlyCalendarSummary(
     DateTime dayForMonth,

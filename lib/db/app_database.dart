@@ -45,7 +45,14 @@ part 'app_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(openConnection());
+  AppDatabase()
+      : _seedOnCreate = true,
+        super(openConnection());
+
+  AppDatabase.forTesting(super.executor, {bool seedOnCreate = false})
+      : _seedOnCreate = seedOnCreate;
+
+  final bool _seedOnCreate;
 
   @override
   int get schemaVersion => 2;
@@ -105,8 +112,10 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_transactions_ledger_date ON transactions(transaction_date)');
 
           // 首次创建数据库时填充种子数据
-          final seedData = SeedData(this);
-          await seedData.seedDatabase();
+          if (_seedOnCreate) {
+            final seedData = SeedData(this);
+            await seedData.seedDatabase();
+          }
         },
         onUpgrade: (Migrator m, int from, int to) async {
           // Handle future migrations
@@ -114,7 +123,7 @@ class AppDatabase extends _$AppDatabase {
             // 添加 default_use_assets 列到 accounts 表
             await customStatement(
                 'ALTER TABLE accounts ADD COLUMN default_use_assets INTEGER DEFAULT 0');
-            
+
             // 添加索引的迁移逻辑
             await customStatement(
                 'CREATE INDEX IF NOT EXISTS idx_postings_account_id ON postings(account_id)');

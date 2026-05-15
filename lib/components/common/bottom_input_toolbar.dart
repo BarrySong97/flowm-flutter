@@ -6,11 +6,11 @@ class BottomInputToolbar extends StatelessWidget {
   final VoidCallback onDateTap;
 
   const BottomInputToolbar({
-    Key? key,
+    super.key,
     required this.date,
     required this.noteController,
     required this.onDateTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +20,7 @@ class BottomInputToolbar extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, -4),
           ),

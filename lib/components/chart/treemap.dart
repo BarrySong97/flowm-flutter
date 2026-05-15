@@ -57,7 +57,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
           to: 1000,
           minSaturation: 0.5,
           maxSaturation: 1,
-          color: const Color.fromARGB(255, 122, 165, 123)!), // Light green
+          color: const Color.fromARGB(255, 122, 165, 123)), // Light green
       TreemapColorMapper.range(
           from: 1000,
           to: 5000,
@@ -69,7 +69,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
           to: 50000,
           minSaturation: 0.5,
           maxSaturation: 1,
-          color: const Color.fromARGB(255, 74, 190, 79)!), // Dark green
+          color: const Color.fromARGB(255, 74, 190, 79)), // Dark green
       TreemapColorMapper.range(
           // New range for values greater than 50000
           from: 50000,
@@ -77,7 +77,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
               .infinity, // Or a sufficiently large number if infinity is not appropriate
           minSaturation: 0.5,
           maxSaturation: 1,
-          color: const Color.fromARGB(255, 10, 151, 81)!), // Darkest green
+          color: const Color.fromARGB(255, 10, 151, 81)), // Darkest green
     ];
   }
 
@@ -99,9 +99,6 @@ class _TreemapWidgetState extends State<TreemapWidget> {
           tooltipBuilder: (BuildContext context, TreemapTile tile) {
             final dataItem = widget.dataItems[tile.indices[0]];
             final suffix = widget.tooltipValueSuffix ?? '';
-            // Placeholder for percentage calculation
-            const String percentagePlaceholder = 'XX%';
-
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -109,7 +106,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
                 boxShadow: [
                   // Added shadow for a popover look
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: Offset(0, 2),
                   ),
@@ -134,7 +131,7 @@ class _TreemapWidgetState extends State<TreemapWidget> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '占比: ${dataItem.percentageOfLevel != null ? dataItem.percentageOfLevel!.toStringAsFixed(2) + '%' : 'N/A'} (相对当前层级)',
+                    '占比: ${dataItem.percentageOfLevel != null ? '${dataItem.percentageOfLevel!.toStringAsFixed(2)}%' : 'N/A'} (相对当前层级)',
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
@@ -182,10 +179,8 @@ class _TreemapWidgetState extends State<TreemapWidget> {
             // Percentage thresholds for scaling
             const double verySmallPercentageThreshold =
                 2.0; // Below this, use ultraMin font size
-            const double smallPercentageThreshold =
-                5.0; // Between verySmall and small, use min font size
             const double scalingStartPercentage =
-                5.0; // Same as smallPercentageThreshold, for clarity
+                5.0; // Start scaling from this percentage
             const double maxScalingPercentage =
                 20.0; // Reach max font size at this percentage
 

@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
@@ -100,8 +101,9 @@ class DatabaseSyncService {
   // 上传数据库到服务器
   Future<SyncResult> uploadDatabase({bool forceOverwrite = false}) async {
     final startTime = DateTime.now();
-    print('[DatabaseSyncService] 开始上传数据库 - ${startTime.toIso8601String()}');
-    
+    AppLogger.debug(
+        '[DatabaseSyncService] 开始上传数据库 - ${startTime.toIso8601String()}');
+
     try {
       // 检查数据库文件是否存在
       final dbFile = await getDatabaseFile();
@@ -111,29 +113,32 @@ class DatabaseSyncService {
 
       // 如果强制覆盖，跳过冲突检测直接上传
       if (forceOverwrite) {
-        print('[DatabaseSyncService] 强制上传模式，跳过冲突检测');
-        
+        AppLogger.debug('[DatabaseSyncService] 强制上传模式，跳过冲突检测');
+
         final uploadStartTime = DateTime.now();
-        final uploadResult = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
+        final uploadResult =
+            await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
         final uploadEndTime = DateTime.now();
         final uploadDuration = uploadEndTime.difference(uploadStartTime);
-        print('[DatabaseSyncService] 强制上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 强制上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
 
         if (uploadResult.success) {
           // 优先使用上传返回的 ETag，如果没有则重新获取
           final localHash = await calculateFileHash(dbFile);
           String? remoteEtag = uploadResult.etag;
-          
+
           if (remoteEtag == null || !ETagUtils.isValidEtag(remoteEtag)) {
             // 重新获取文件信息以获得 ETag
             try {
-              final uploadedFileInfo = await webdavClient.getFileInfo(_remoteDatabasePath);
+              final uploadedFileInfo =
+                  await webdavClient.getFileInfo(_remoteDatabasePath);
               remoteEtag = uploadedFileInfo?.etag;
             } catch (e) {
-              print('[DatabaseSyncService] 获取上传后文件信息失败: $e');
+              AppLogger.debug('[DatabaseSyncService] 获取上传后文件信息失败: $e');
             }
           }
-          
+
           // 更新同步记录
           if (ETagUtils.isValidEtag(remoteEtag)) {
             await _updateSyncRecord(localHash, remoteEtag: remoteEtag);
@@ -143,7 +148,8 @@ class DatabaseSyncService {
           }
 
           final totalDuration = DateTime.now().difference(startTime);
-          print('[DatabaseSyncService] 强制上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+          AppLogger.debug(
+              '[DatabaseSyncService] 强制上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
           return SyncResult(
             success: true,
@@ -160,7 +166,8 @@ class DatabaseSyncService {
       final localHash = await calculateFileHash(dbFile);
 
       // 检查远程文件是否存在
-      final remoteFileInfo = await webdavClient.getFileInfo(_remoteDatabasePath);
+      final remoteFileInfo =
+          await webdavClient.getFileInfo(_remoteDatabasePath);
 
       // 冲突检测
       if (remoteFileInfo != null) {
@@ -176,25 +183,28 @@ class DatabaseSyncService {
 
       // 执行上传
       final uploadStartTime = DateTime.now();
-      final uploadResult = await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
+      final uploadResult =
+          await webdavClient.uploadFile(_remoteDatabasePath, dbFile);
       final uploadEndTime = DateTime.now();
       final uploadDuration = uploadEndTime.difference(uploadStartTime);
-      print('[DatabaseSyncService] 上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[DatabaseSyncService] 上传完成，耗时: ${uploadDuration.inMilliseconds}ms');
 
       if (uploadResult.success) {
         // 优先使用上传返回的 ETag，如果没有则重新获取
         String? remoteEtag = uploadResult.etag;
-        
+
         if (remoteEtag == null || !ETagUtils.isValidEtag(remoteEtag)) {
           // 重新获取文件信息以获得 ETag
           try {
-            final uploadedFileInfo = await webdavClient.getFileInfo(_remoteDatabasePath);
+            final uploadedFileInfo =
+                await webdavClient.getFileInfo(_remoteDatabasePath);
             remoteEtag = uploadedFileInfo?.etag;
           } catch (e) {
-            print('[DatabaseSyncService] 获取上传后文件信息失败: $e');
+            AppLogger.debug('[DatabaseSyncService] 获取上传后文件信息失败: $e');
           }
         }
-        
+
         // 更新同步记录
         if (ETagUtils.isValidEtag(remoteEtag)) {
           await _updateSyncRecord(localHash, remoteEtag: remoteEtag);
@@ -204,7 +214,8 @@ class DatabaseSyncService {
         }
 
         final totalDuration = DateTime.now().difference(startTime);
-        print('[DatabaseSyncService] 上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 上传流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
         return SyncResult(
           success: true,
@@ -216,8 +227,9 @@ class DatabaseSyncService {
       }
     } catch (e) {
       final errorDuration = DateTime.now().difference(startTime);
-      print('[DatabaseSyncService] 上传失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
-      
+      AppLogger.debug(
+          '[DatabaseSyncService] 上传失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
+
       return SyncResult(
         success: false,
         message: '上传失败: $e',
@@ -231,8 +243,9 @@ class DatabaseSyncService {
     Function(String)? onProgress,
   }) async {
     final startTime = DateTime.now();
-    print('[DatabaseSyncService] 开始下载数据库 - ${startTime.toIso8601String()}');
-    
+    AppLogger.debug(
+        '[DatabaseSyncService] 开始下载数据库 - ${startTime.toIso8601String()}');
+
     try {
       // 检查远程文件是否存在
       onProgress?.call('正在检查远程文件...');
@@ -240,39 +253,42 @@ class DatabaseSyncService {
       final remoteFileInfo =
           await webdavClient.getFileInfo(_remoteDatabasePath);
       final checkRemoteEndTime = DateTime.now();
-      final checkRemoteDuration = checkRemoteEndTime.difference(checkRemoteStartTime);
-      print('[DatabaseSyncService] 检查远程文件完成，耗时: ${checkRemoteDuration.inMilliseconds}ms');
-      
+      final checkRemoteDuration =
+          checkRemoteEndTime.difference(checkRemoteStartTime);
+      AppLogger.debug(
+          '[DatabaseSyncService] 检查远程文件完成，耗时: ${checkRemoteDuration.inMilliseconds}ms');
+
       if (remoteFileInfo == null) {
         throw Exception('服务器上不存在数据库文件');
       }
 
       final dbFile = await getDatabaseFile();
-      
+
       // 如果强制覆盖，跳过所有检测直接下载
       if (forceOverwrite) {
         onProgress?.call('正在强制下载...');
-        
+
         // 只在文件存在时创建备份，且并行进行
         Future<void>? backupFuture;
         if (await dbFile.exists()) {
           backupFuture = createBackup();
         }
-        
+
         // 并行下载文件
         final downloadStartTime = DateTime.now();
         final remoteDataFuture = webdavClient.downloadFile(_remoteDatabasePath);
-        
+
         // 等待备份完成（如果需要）
         if (backupFuture != null) {
           await backupFuture;
         }
-        
+
         // 等待下载完成
         final remoteData = await remoteDataFuture;
         final downloadEndTime = DateTime.now();
         final downloadDuration = downloadEndTime.difference(downloadStartTime);
-        print('[DatabaseSyncService] 下载远程文件完成，文件大小: ${remoteData.length} bytes，耗时: ${downloadDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 下载远程文件完成，文件大小: ${remoteData.length} bytes，耗时: ${downloadDuration.inMilliseconds}ms');
 
         // 直接写入，跳过完整性验证（因为是强制覆盖）
         onProgress?.call('正在写入文件...');
@@ -280,7 +296,8 @@ class DatabaseSyncService {
         await dbFile.writeAsBytes(remoteData);
         final writeEndTime = DateTime.now();
         final writeDuration = writeEndTime.difference(writeStartTime);
-        print('[DatabaseSyncService] 写入本地文件完成，耗时: ${writeDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 写入本地文件完成，耗时: ${writeDuration.inMilliseconds}ms');
 
         // 快速更新同步记录（使用远程文件的 ETag 信息）
         onProgress?.call('正在更新记录...');
@@ -288,7 +305,8 @@ class DatabaseSyncService {
         await _updateSyncRecord(remoteHash, remoteEtag: remoteFileInfo.etag);
 
         final totalDuration = DateTime.now().difference(startTime);
-        print('[DatabaseSyncService] 强制下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 强制下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
         return SyncResult(
           success: true,
@@ -305,7 +323,8 @@ class DatabaseSyncService {
         localHash = await calculateFileHash(dbFile);
         final hashEndTime = DateTime.now();
         final hashDuration = hashEndTime.difference(hashStartTime);
-        print('[DatabaseSyncService] 计算本地文件哈希完成，耗时: ${hashDuration.inMilliseconds}ms');
+        AppLogger.debug(
+            '[DatabaseSyncService] 计算本地文件哈希完成，耗时: ${hashDuration.inMilliseconds}ms');
       }
 
       // 冲突检测
@@ -315,8 +334,9 @@ class DatabaseSyncService {
         final conflict = await detectConflict(localHash, remoteFileInfo);
         final conflictEndTime = DateTime.now();
         final conflictDuration = conflictEndTime.difference(conflictStartTime);
-        print('[DatabaseSyncService] 冲突检测完成，耗时: ${conflictDuration.inMilliseconds}ms');
-        
+        AppLogger.debug(
+            '[DatabaseSyncService] 冲突检测完成，耗时: ${conflictDuration.inMilliseconds}ms');
+
         if (conflict != null) {
           return SyncResult(
             success: false,
@@ -328,41 +348,44 @@ class DatabaseSyncService {
 
       // 并行执行备份和下载
       onProgress?.call('正在下载文件...');
-      
+
       Future<void>? backupFuture;
       if (await dbFile.exists()) {
         backupFuture = createBackup();
       }
-      
+
       final downloadStartTime = DateTime.now();
       final remoteDataFuture = webdavClient.downloadFile(_remoteDatabasePath);
-      
+
       // 等待备份完成
       if (backupFuture != null) {
         await backupFuture;
       }
-      
+
       // 等待下载完成
       final remoteData = await remoteDataFuture;
       final downloadEndTime = DateTime.now();
       final downloadDuration = downloadEndTime.difference(downloadStartTime);
-      print('[DatabaseSyncService] 下载和备份完成，耗时: ${downloadDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[DatabaseSyncService] 下载和备份完成，耗时: ${downloadDuration.inMilliseconds}ms');
 
       // 快速写入（减少验证步骤）
       onProgress?.call('正在保存文件...');
       final writeStartTime = DateTime.now();
       await dbFile.writeAsBytes(remoteData);
-      
+
       // 只计算一次哈希用于同步记录
       final remoteHash = md5.convert(remoteData).toString();
       await _updateSyncRecord(remoteHash, remoteEtag: remoteFileInfo.etag);
-      
+
       final writeEndTime = DateTime.now();
       final writeDuration = writeEndTime.difference(writeStartTime);
-      print('[DatabaseSyncService] 写入和记录更新完成，耗时: ${writeDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[DatabaseSyncService] 写入和记录更新完成，耗时: ${writeDuration.inMilliseconds}ms');
 
       final totalDuration = DateTime.now().difference(startTime);
-      print('[DatabaseSyncService] 数据库下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
+      AppLogger.debug(
+          '[DatabaseSyncService] 数据库下载流程完成，总耗时: ${totalDuration.inMilliseconds}ms');
 
       return SyncResult(
         success: true,
@@ -371,8 +394,9 @@ class DatabaseSyncService {
       );
     } catch (e) {
       final errorDuration = DateTime.now().difference(startTime);
-      print('[DatabaseSyncService] 下载失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
-      
+      AppLogger.debug(
+          '[DatabaseSyncService] 下载失败，总耗时: ${errorDuration.inMilliseconds}ms，错误: $e');
+
       return SyncResult(
         success: false,
         message: '下载失败: $e',
@@ -384,122 +408,127 @@ class DatabaseSyncService {
   Future<SyncConflict?> detectConflict(
       String localHash, WebDAVFileInfo remoteFileInfo) async {
     try {
-      print('[DatabaseSyncService] 开始基于 ETag/Hash 的冲突检测');
-      
+      AppLogger.debug('[DatabaseSyncService] 开始基于 ETag/Hash 的冲突检测');
+
       // 1. 获取上次同步记录
       final syncRecord = await WebDAVConfig.getSyncRecord();
-      
+
       // 2. 快速检查：如果没有有效的同步记录，不算冲突（首次同步场景）
       if (!syncRecord.hasValidRecord) {
-        print('[DatabaseSyncService] 无有效同步记录，不算冲突');
+        AppLogger.debug('[DatabaseSyncService] 无有效同步记录，不算冲突');
         return null;
       }
-      
+
       // 3. 检查本地文件是否有变化
       final localChanged = syncRecord.lastLocalHash != localHash;
-      print('[DatabaseSyncService] 本地文件是否变化: $localChanged');
-      
+      AppLogger.debug('[DatabaseSyncService] 本地文件是否变化: $localChanged');
+
       // 4. 检查远程文件是否有变化
       bool remoteChanged = false;
       String? currentRemoteAnchor;
-      
+
       // 优先使用 ETag 进行比较
       if (ETagUtils.isValidEtag(remoteFileInfo.etag)) {
         final normalizedEtag = ETagUtils.normalizeEtag(remoteFileInfo.etag);
         currentRemoteAnchor = normalizedEtag;
-        
+
         if (syncRecord.lastRemoteEtag != null) {
-          final lastNormalizedEtag = ETagUtils.normalizeEtag(syncRecord.lastRemoteEtag);
-          remoteChanged = !ETagUtils.etagEquals(normalizedEtag, lastNormalizedEtag);
-          print('[DatabaseSyncService] 使用 ETag 比较，远程是否变化: $remoteChanged');
+          final lastNormalizedEtag =
+              ETagUtils.normalizeEtag(syncRecord.lastRemoteEtag);
+          remoteChanged =
+              !ETagUtils.etagEquals(normalizedEtag, lastNormalizedEtag);
+          AppLogger.debug(
+              '[DatabaseSyncService] 使用 ETag 比较，远程是否变化: $remoteChanged');
         } else {
           // 如果上次同步没有 ETag 记录，但现在有，说明远程可能有变化
           remoteChanged = true;
-          print('[DatabaseSyncService] 上次无 ETag 记录，现在有，认为远程有变化');
+          AppLogger.debug('[DatabaseSyncService] 上次无 ETag 记录，现在有，认为远程有变化');
         }
       } else {
         // 降级到 Hash 比较，需要下载文件
-        print('[DatabaseSyncService] ETag 不可用，降级到 Hash 比较');
+        AppLogger.debug('[DatabaseSyncService] ETag 不可用，降级到 Hash 比较');
         try {
-          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          final remoteData =
+              await webdavClient.downloadFile(_remoteDatabasePath);
           final remoteHash = md5.convert(remoteData).toString();
           currentRemoteAnchor = remoteHash;
-          
+
           if (syncRecord.lastRemoteHash != null) {
             remoteChanged = remoteHash != syncRecord.lastRemoteHash;
-            print('[DatabaseSyncService] 使用 Hash 比较，远程是否变化: $remoteChanged');
+            AppLogger.debug(
+                '[DatabaseSyncService] 使用 Hash 比较，远程是否变化: $remoteChanged');
           } else {
             // 如果上次同步没有 Hash 记录，但现在有，说明远程可能有变化
             remoteChanged = true;
-            print('[DatabaseSyncService] 上次无 Hash 记录，现在有，认为远程有变化');
+            AppLogger.debug('[DatabaseSyncService] 上次无 Hash 记录，现在有，认为远程有变化');
           }
         } catch (e) {
-          print('[DatabaseSyncService] 下载远程文件计算 Hash 失败: $e');
+          AppLogger.debug('[DatabaseSyncService] 下载远程文件计算 Hash 失败: $e');
           // 如果无法获取远程哈希，保守地认为有冲突
           remoteChanged = true;
           currentRemoteAnchor = 'unknown';
         }
       }
-      
+
       // 5. 冲突判断：只有本地和远程都有变化时才算冲突
       if (!localChanged && !remoteChanged) {
-        print('[DatabaseSyncService] 双方都没变化，无冲突');
+        AppLogger.debug('[DatabaseSyncService] 双方都没变化，无冲突');
         return null;
       } else if (localChanged && !remoteChanged) {
-        print('[DatabaseSyncService] 仅本地变化，无冲突');
+        AppLogger.debug('[DatabaseSyncService] 仅本地变化，无冲突');
         return null;
       } else if (!localChanged && remoteChanged) {
-        print('[DatabaseSyncService] 仅远程变化，无冲突');
+        AppLogger.debug('[DatabaseSyncService] 仅远程变化，无冲突');
         return null;
       } else {
         // 双方都有变化，检查内容是否相同
-        if (currentRemoteAnchor != 'unknown' && 
+        if (currentRemoteAnchor != 'unknown' &&
             currentRemoteAnchor == localHash) {
-          print('[DatabaseSyncService] 双方变化但内容相同，无冲突');
+          AppLogger.debug('[DatabaseSyncService] 双方变化但内容相同，无冲突');
           return null;
         }
-        
-        print('[DatabaseSyncService] 双方都有变化且内容不同，存在冲突');
-        return await _buildSyncConflict(localHash, remoteFileInfo, currentRemoteAnchor);
+
+        AppLogger.debug('[DatabaseSyncService] 双方都有变化且内容不同，存在冲突');
+        return await _buildSyncConflict(
+            localHash, remoteFileInfo, currentRemoteAnchor);
       }
     } catch (e) {
-      print('[DatabaseSyncService] 冲突检测过程出错，为安全起见报告冲突: $e');
+      AppLogger.debug('[DatabaseSyncService] 冲突检测过程出错，为安全起见报告冲突: $e');
       // 如果检测过程失败，保守地返回冲突
       return await _buildSyncConflict(localHash, remoteFileInfo, 'unknown');
     }
   }
-  
+
   // 构建冲突信息
-  Future<SyncConflict> _buildSyncConflict(
-    String localHash, 
-    WebDAVFileInfo remoteFileInfo, 
-    String? remoteAnchor
-  ) async {
+  Future<SyncConflict> _buildSyncConflict(String localHash,
+      WebDAVFileInfo remoteFileInfo, String? remoteAnchor) async {
     try {
       final dbFile = await getDatabaseFile();
       final localStat = await dbFile.stat();
-      
+
       // 如果远程锚点是 Hash 格式，直接使用；否则尝试计算
       String remoteHash = remoteAnchor ?? 'unknown';
       if (remoteAnchor == null || remoteAnchor == 'unknown') {
         try {
-          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          final remoteData =
+              await webdavClient.downloadFile(_remoteDatabasePath);
           remoteHash = md5.convert(remoteData).toString();
         } catch (e) {
-          print('[DatabaseSyncService] 构建冲突信息时获取远程哈希失败: $e');
+          AppLogger.debug('[DatabaseSyncService] 构建冲突信息时获取远程哈希失败: $e');
           remoteHash = 'unknown';
         }
       } else if (ETagUtils.isValidEtag(remoteAnchor)) {
         // 如果远程锚点是 ETag，需要下载文件计算 Hash
         try {
-          final remoteData = await webdavClient.downloadFile(_remoteDatabasePath);
+          final remoteData =
+              await webdavClient.downloadFile(_remoteDatabasePath);
           remoteHash = md5.convert(remoteData).toString();
         } catch (e) {
-          print('[DatabaseSyncService] 从 ETag 转换为 Hash 失败: $e');
+          AppLogger.debug('[DatabaseSyncService] 从 ETag 转换为 Hash 失败: $e');
           remoteHash = remoteAnchor; // 使用 ETag 作为标识
         }
       }
-      
+
       return SyncConflict(
         localModified: localStat.modified,
         remoteModified: remoteFileInfo.lastModified,
@@ -509,7 +538,7 @@ class DatabaseSyncService {
         remoteHash: remoteHash,
       );
     } catch (e) {
-      print('[DatabaseSyncService] 构建冲突信息失败: $e');
+      AppLogger.debug('[DatabaseSyncService] 构建冲突信息失败: $e');
       // 返回基本冲突信息
       return SyncConflict(
         localModified: DateTime.now(),
@@ -523,7 +552,8 @@ class DatabaseSyncService {
   }
 
   // 更新同步记录（支持 ETag）
-  Future<void> _updateSyncRecord(String localHash, {String? remoteEtag, String? remoteHash}) async {
+  Future<void> _updateSyncRecord(String localHash,
+      {String? remoteEtag, String? remoteHash}) async {
     await WebDAVConfig.saveSyncStatus(
       localHash: localHash,
       remoteEtag: remoteEtag,

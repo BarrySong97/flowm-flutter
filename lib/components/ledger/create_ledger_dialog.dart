@@ -26,7 +26,7 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
     if (_isEditMode) {
       _nameController.text = widget.ledger!.name;
       _descriptionController.text = widget.ledger!.description ?? '';
-      _currencySymbolController.text = widget.ledger!.currencySymbol ?? AppConstants.currencySymbol;
+      _currencySymbolController.text = widget.ledger!.currencySymbol;
     } else {
       _currencySymbolController.text = AppConstants.currencySymbol;
     }
@@ -76,7 +76,7 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
   Widget build(BuildContext context) {
     final inputDecoration = InputDecoration(
       filled: true,
-      fillColor: Colors.grey.withOpacity(0.1),
+      fillColor: Colors.grey.withValues(alpha: 0.1),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       border: OutlineInputBorder(
         borderSide: BorderSide.none,
@@ -193,20 +193,18 @@ class _CreateLedgerDialogState extends ConsumerState<CreateLedgerDialog> {
                       .read(ledgerRepositoryProvider)
                       .deleteLedgerWithRelatedData(widget.ledger!.ledgerId);
 
-                  if (mounted) {
-                    Navigator.pop(dialogContext); // Close confirmation dialog
-                    Navigator.pop(context, true); // Close edit dialog
-                  }
+                  if (!mounted || !dialogContext.mounted) return;
+                  Navigator.pop(dialogContext); // Close confirmation dialog
+                  Navigator.pop(context, true); // Close edit dialog
                 } catch (e) {
-                  if (mounted) {
-                    Navigator.pop(dialogContext); // Close confirmation dialog
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('删除失败: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
+                  if (!mounted || !dialogContext.mounted) return;
+                  Navigator.pop(dialogContext); // Close confirmation dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('删除失败: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

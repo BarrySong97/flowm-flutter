@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:popover/popover.dart';
 
@@ -47,7 +48,7 @@ class _PopoverSelectState extends State<PopoverSelect> {
         showPopover(
           context: context,
           bodyBuilder: (context) => _buildPopoverList(context),
-          onPop: () => print('Popover was popped!'),
+          onPop: () => AppLogger.debug('Popover was popped!'),
           direction: PopoverDirection.bottom,
           backgroundColor: Colors.white,
           width: 200,
@@ -85,7 +86,7 @@ class _PopoverSelectState extends State<PopoverSelect> {
             },
             child: Container(
               height: 32,
-              color: isSelected ? Colors.blue.withOpacity(0.1) : null,
+              color: isSelected ? Colors.blue.withValues(alpha: 0.1) : null,
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               alignment: Alignment.centerLeft,
               child: Row(

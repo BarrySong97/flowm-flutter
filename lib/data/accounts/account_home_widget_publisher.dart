@@ -1,0 +1,3 @@
+class AccountHomeWidgetPublisher {
+  const AccountHomeWidgetPublisher();
+}

@@ -1,5 +1,4 @@
 import 'package:flowm/db/app_database.dart' as db;
-import 'package:flowm/db/dao/account_dao.dart';
 import 'package:flowm/components/common/popover_select.dart';
 // ignore: depend_on_referenced_packages
 import 'package:collection/collection.dart';

@@ -1,3 +1,6 @@
+// ignore_for_file: constant_identifier_names
+// AccountType.name is persisted in Drift rows, so these values must stay stable.
+
 import 'package:drift/drift.dart';
 import 'ledger_table.dart'; // Added import for Ledgers table
 
@@ -10,7 +13,8 @@ class Accounts extends Table {
   TextColumn get fullPath => text()();
   TextColumn get accountType => textEnum<AccountType>()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-  BoolColumn get defaultUseAssets => boolean().nullable().withDefault(const Constant(false))();
+  BoolColumn get defaultUseAssets =>
+      boolean().nullable().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 

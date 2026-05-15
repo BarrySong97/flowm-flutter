@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flowm/components/account/account_item.dart';
 import 'package:flowm/utils/provider_invalidator.dart';
 import 'package:flutter/material.dart';
@@ -55,7 +56,7 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
 
   void _onTimeRangeChanged(TimeRange timeRange) {
     // 处理时间范围变化的逻辑
-    print('Time range changed to: ${timeRange.label}');
+    AppLogger.debug('Time range changed to: ${timeRange.label}');
     // 在这里可以添加更多逻辑，比如刷新数据、更新图表等
   }
 
@@ -238,7 +239,8 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
                     );
 
                     // 如果账户被删除，退出详情页面
-                    if (isDeleted == true && mounted) {
+                    if (!context.mounted) return;
+                    if (isDeleted == true) {
                       Navigator.of(context).pop();
                     }
                   },
@@ -279,30 +281,6 @@ class _AssetsDetailPageState extends ConsumerState<AssetsDetailPage>
       ),
     );
   }
-
-  Widget _buildDetailItem(String label, String amount) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          amount,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // 独立的页面主体内容 Widget
@@ -313,12 +291,12 @@ class AssetsDetailBody extends StatelessWidget {
   final Function(String) onFlowChanged;
 
   const AssetsDetailBody({
-    Key? key,
+    super.key,
     required this.account,
     required this.selectedFlow,
     required this.selectedTimeRange,
     required this.onFlowChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +331,7 @@ class AssetsDetailBody extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -422,6 +400,7 @@ class SankeyChartWidget extends ConsumerWidget {
   final TimeRange selectedTimeRange;
 
   const SankeyChartWidget({
+    super.key,
     required this.account,
     required this.selectedFlow,
     required this.selectedTimeRange,
@@ -445,7 +424,7 @@ class SankeyChartWidget extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -559,7 +538,7 @@ class SankeyChartWidget extends ConsumerWidget {
                       nodeColors: generateDefaultNodeColorMap(sankeyData.nodes),
                       selectedNodeId: null,
                       onNodeTap: (nodeId) {
-                        print('点击了节点: $nodeId');
+                        AppLogger.debug('点击了节点: $nodeId');
                         // 这里可以添加节点点击的处理逻辑
                       },
                       size: Size(calculatedWidth, calculatedHeight),
@@ -615,10 +594,10 @@ class AccountTransactionList extends ConsumerWidget {
   final TimeRange selectedTimeRange;
 
   const AccountTransactionList({
-    Key? key,
+    super.key,
     required this.account,
     required this.selectedTimeRange,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -634,7 +613,7 @@ class AccountTransactionList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: Offset(0, 2),
           ),

@@ -6,7 +6,7 @@ part 'posting_dao.g.dart';
 
 @DriftAccessor(tables: [Postings])
 class PostingDao extends DatabaseAccessor<AppDatabase> with _$PostingDaoMixin {
-  PostingDao(AppDatabase db) : super(db);
+  PostingDao(super.db);
 
   // Get postings by transaction ID
   Future<List<Posting>> getPostingsByTransactionId(int transactionId) =>

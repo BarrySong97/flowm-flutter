@@ -1,3 +1,4 @@
+import 'package:flowm/shared/logging/app_logger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../db/app_database.dart';
 import '../../db/dao/account_dao.dart';
@@ -22,14 +23,14 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   // 监听刷新触发器，确保在触发器变化时重新创建数据库
   ref.watch(databaseRefreshTriggerProvider);
 
-  print('[DatabaseProvider] 创建新的数据库连接实例');
+  AppLogger.debug('[DatabaseProvider] 创建新的数据库连接实例');
 
   // 创建数据库实例
   final database = AppDatabase();
 
   // 确保当Provider被销毁时关闭数据库连接
   ref.onDispose(() {
-    print('[DatabaseProvider] 关闭数据库连接');
+    AppLogger.debug('[DatabaseProvider] 关闭数据库连接');
     database.close();
   });
 
